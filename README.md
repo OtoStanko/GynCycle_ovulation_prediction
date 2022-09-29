@@ -11,8 +11,7 @@ The model is written in MATLAB - no additional package installations are necessa
 To use this GynCycle version, please clone the repository:
 
 ```
-git clone https://github.com/mmaleck/chondrocyte.git
-cd chondrocyte
+git clone https://github.com/SoFiwork/GynCycle_newVersion
 ```
 
 ## Usage
