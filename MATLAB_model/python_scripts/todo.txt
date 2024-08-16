@@ -1,0 +1,16 @@
+pull the repo
+have a look at the rest of the code
+
+
+pkg install -forge statistics
+pkg load statistics
+
+Simulation line 167
+
+
+
+
+convert simulation file into python
+
+
+[t,n]= ode15s(F,[0:5e-12:1e-7],IC);
