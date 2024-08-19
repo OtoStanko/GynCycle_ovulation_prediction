@@ -1,26 +1,31 @@
 import numpy as np
 
 def ODE_Model_NormalCycle(t, y, Par):
-    r, c = y.shape
-    dy = np.zeros((r, c))
+    print("t", t)
+    print("y", y)
+    print("Par", Par)
+    #r, c = y.shape
+    #dy = np.zeros((r, c))
+    r = len(y)
+    dy = np.zeros(r)
     
-    i_FSH_med  = r
-    i_LH_med   = r - 1
-    i_GnRH     = r - 2
-    i_RecGa    = r - 3
-    i_RecGi    = r - 4
-    i_GReca    = r - 5
-    i_GReci    = r - 6
-    i_RP_LH    = r - 7
-    i_LH       = r - 8
-    i_RP_FSH   = r - 9
-    i_FSH      = r - 10
-    i_FSHfoll  = r - 11
-    i_RFSH     = r - 12
-    i_RFSH_des = r - 13
-    i_FSHR     = r - 14
-    i_P4       = r - 15
-    i_E2       = r - 16
+    i_FSH_med  = r - 1
+    i_LH_med   = r - 2
+    i_GnRH     = r - 3
+    i_RecGa    = r - 4
+    i_RecGi    = r - 5
+    i_GReca    = r - 6
+    i_GReci    = r - 7
+    i_RP_LH    = r - 8
+    i_LH       = r - 9
+    i_RP_FSH   = r - 10
+    i_FSH      = r - 11
+    i_FSHfoll  = r - 12
+    i_RFSH     = r - 13
+    i_RFSH_des = r - 14
+    i_FSHR     = r - 15
+    i_P4       = r - 16
+    i_E2       = r - 17
 
     yGfreq = Par[0] / (1 + (y[i_P4] / Par[1]) ** Par[2]) * (1 + y[i_E2] ** Par[3] / (Par[4] ** Par[3] + y[i_E2] ** Par[3]))
     yGmass = Par[5] * (y[i_E2] ** Par[6] / (Par[7] ** Par[6] + y[i_E2] ** Par[6]) + Par[8] ** Par[9] / (Par[8] ** Par[9] + y[i_E2] ** Par[9]))
@@ -46,7 +51,7 @@ def ODE_Model_NormalCycle(t, y, Par):
     hm_freq = 1 / (1 + (yGfreq / Par[42]) ** Par[43])
 
     f_FSH_prod = (f_FSH_prod1 / f_FSH_prod2) * hm_freq
-    f_FSH_rel = Par[44] + Par[45] * (Par[30] * ((y[i_GReca] / Par[46]) ** Par[47] / (1 + (y[i_GReca] / Par[46]) ** Par[47]))) * 1 / (1 + (y[i_E2] / Par[72]) ** Par[73]))
+    f_FSH_rel = Par[44] + Par[45] * (Par[30] * ((y[i_GReca] / Par[46]) ** Par[47] / (1 + (y[i_GReca] / Par[46]) ** Par[47]))) * 1 / (1 + (y[i_E2] / Par[72]) ** Par[73])
 
     dy[i_RP_FSH] = f_FSH_prod - f_FSH_rel * y[i_RP_FSH]
     dy[i_FSH] = (1 / Par[37]) * f_FSH_rel * y[i_RP_FSH] - Par[49] * y[i_FSH] - Par[50] * y[i_FSH]

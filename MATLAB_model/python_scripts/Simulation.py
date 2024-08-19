@@ -12,8 +12,10 @@ from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 import os
 
-import EvaluateFollicle
-import Poissonproc
+from FollicleClass import FollicleClass
+from FollicleFunction import FollicleFunction
+from EvaluateFollicle import EvaluateFollicle
+from Poissonproc import poissonproc
 
 
 def Simulation(para, paraPoi, parafoll, Par, tb, te,\
@@ -65,15 +67,15 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
     global ModelPop_CycleInfo
 
     # Tracking the concentrations of important hormone species
-    E2 = {'Time': t, 'Y': y0[-16]}
-    P4 = {'Time': t, 'Y': y0[-15]}
-    FSH = {'Time': t, 'Y': y0[-10]}
-    FSHRez = {'Time': t, 'Y': y0[-14]}
-    LH = {'Time': t, 'Y': y0[-8]}
-    GnRH = {'Time': t, 'Y': y0[-2]}
-    GnRHRezA = {'Time': t, 'Y': y0[-5]}
-    FSHmed = {'Time': t, 'Y': y0[-1]}
-    solutions = {'Time': t, 'Y': y0[1:]}
+    E2 = {'Time': np.array([t]), 'Y': np.array([y0[-16]])}
+    P4 = {'Time': np.array([t]), 'Y': np.array([y0[-15]])}
+    FSH = {'Time': np.array([t]), 'Y': np.array([y0[-10]])}
+    FSHRez = {'Time': np.array([t]), 'Y': np.array([y0[-14]])}
+    LH = {'Time': np.array([t]), 'Y': np.array([y0[-8]])}
+    GnRH = {'Time': np.array([t]), 'Y': np.array([y0[-2]])}
+    GnRHRezA = {'Time': np.array([t]), 'Y': np.array([y0[-5]])}
+    FSHmed = {'Time': np.array([t]), 'Y': np.array([y0[-1]])}
+    solutions = {'Time': np.array([t]), 'Y': np.array([y0[1:]])}
 
     # Main loop
     while t < te:
@@ -82,10 +84,12 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
         # Follicles recruitment depending on FSH concentration in the system
         fshAll = y0[-10] + y0[-1]
         fshimp = fshAll**Par[31] / (fshAll**Par[31] + Par[32]**Par[31])
+        print(paraPoi[0], paraPoi[0], fshimp)
+        print([t, te])
         timevec = poissonproc(paraPoi[0] + 6 * paraPoi[0] * fshimp, [t, te])
 
         # Set integration period for the current follicle
-        if timevec:
+        if timevec.size != 0:
             NextStart = timevec[0]
             tspan = [t, NextStart] 
         else:
@@ -103,9 +107,11 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
         M[NumFollicles + 16, NumFollicles + 16] = 0     # alg. eq. for FSH med
 
         # Event function stops the integration when an ovulation takes place within the interval tspan
+        print("para", para)
+        #print("t", t, "y", y)
         options = {'mass': M,\
-                   'events': lambda t,\
-                   y: EvaluateFollicle(t, y, para, parafoll, LH)}
+                   'events': lambda t, y: EvaluateFollicle(t, y, para, parafoll, LH)}
+        print("para after", para)
 
         # Search for dosing events in [tspan[0], tspan[1]]:
         dosing_timeIdx = []
@@ -115,18 +121,18 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
                 np.where(dosing_events1[0] <= tspan[1]))
 
         # solve differential equations
-        para = [0]
+        para[0] = 0
         Y = []
         T = []
         if dosing_timeIdx:
             tstart = tspan[0]
             tend = tspan[1]
             yInitial = y0
+            print("YInitial, supposedly y", yInitial)
             for i in range(len(dosing_timeIdx)):
                 tspan = [tstart, dosing_events1[0, dosing_timeIdx[i]]]
                 if tspan[0] != tspan[1]:
-                    sol = solve_ivp(lambda t,\
-                                    y: FollicleFunction(\
+                    sol = solve_ivp(lambda t, y: FollicleFunction(\
                                         t, y, Tovu, Follicles, para,\
                                         parafoll, Par, dd1, Stim,\
                                         LutStim, FollStim, DoubStim,\
@@ -141,8 +147,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
                     yInitial = Y[-1]
                 dd1 = dosing_events1[1, dosing_timeIdx[i]]
             tspan = [T[-1], tend]
-            sol = solve_ivp(lambda t,\
-                            y: FollicleFunction(
+            sol = solve_ivp(lambda t, y: FollicleFunction(
                                 t, y, Tovu, Follicles, para,\
                                 parafoll, Par, dd1, Stim,\
                                 LutStim, FollStim, DoubStim,\
@@ -153,8 +158,9 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
             T.extend(ti[1:])
             Y.extend(yi[1:])
         else:
-            sol = solve_ivp(lambda t,\
-                            y: FollicleFunction(\
+            print("para 160", para)
+            print("y0 supposedly y", y0)
+            sol = solve_ivp(lambda t, y: FollicleFunction(\
                                 t, y, Tovu, Follicles, para,\
                                 parafoll, Par, dd1, Stim,\
                                 LutStim, FollStim, DoubStim,\
@@ -212,23 +218,23 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
         # saves the measuring times of the active foll.
         TimeFol.extend(T[1:])
         # saves last Y values of the follicles
-        LastYValues = Y[-1, :].T
+        LastYValues = Y[-1, :]
 
         # save values for E2 
-        E2.Time.extend(T[1:])
-        E2.Y.extend(Y[1:, -16])
+        E2['Time'].extend(T[1:])
+        E2['Y'].extend(Y[1:, -16])
         # save values for P4
-        P4.Time.extend(T[1:])
-        P4.Y.extend(Y[1:, -15])
+        P4['Time'].extend(T[1:])
+        P4['Y'].extend(Y[1:, -15])
         # save values for LH
-        LH.Time.extend(T[1:])
-        LH.Y.extend(Y[1:, -8])
+        LH['Time'].extend(T[1:])
+        LH['Y'].extend(Y[1:, -8])
         # save values for FSH 
-        FSH.Time.extend(T[1:])
-        FSH.Y.extend(Y[1:, -10])
+        FSH['Time'].extend(T[1:])
+        FSH['Y'].extend(Y[1:, -10])
         # save values for FSH Rezeptor
-        FSHRez.Time.extend(T[1:])
-        FSHRez.Y.extend(Y[1:, -14])
+        FSHRez['Time'].extend(T[1:])
+        FSHRez['Y'].extend(Y[1:, -14])
         # save values for GnRH
         GnRH['Time'] = np.concatenate((GnRH['Time'], T[1:]))
         GnRH['Y'] = np.concatenate((GnRH['Y'], Y[1:, -3]))
@@ -380,7 +386,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
         y0old = []
         for i in range(Follicles.NumActive):
             y0old.append(Follicles.Follicle[Follicles.Active[i]].Y[-1])
-        y0old = np.array(y0old).reshape(-1, 1)
+        y0old = np.array(y0old)#.reshape(-1, 1)
         y0 = np.vstack((y0old, LastYValues[-para[1]:]))
 
         # integration end reached
@@ -504,15 +510,15 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
 
     if ShowPlots:  # Define ShowPlots appropriately
         # FSH
-        hfsh, = plt.plot(FSH.Time, FSH.Y, color=[1/2, 1, 1/2],\
+        hfsh, = plt.plot(FSH['Time'], FSH['Y'], color=[1/2, 1, 1/2],\
                          linewidth=widthofline, label='x1')
 
         # LH  
-        hLH, = plt.plot(LH.Time, LH.Y, color=[1, 1/4, 1/2],\
+        hLH, = plt.plot(LH['Time'], LH['Y'], color=[1, 1/4, 1/2],\
                         linewidth=widthofline, label='x1')
 
         # P4
-        hp4, = plt.plot(P4.Time, P4.Y, color=[1, 0, 1],\
+        hp4, = plt.plot(P4['Time'], P4['Y'], color=[1, 0, 1],\
                         linewidth=widthofline, label='x1')
 
         # Threshold when you can measure the follicle size
@@ -530,17 +536,17 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
                    fontsize=15, loc='northeast')
 
         plt.figure(2)
-        plt.plot(P4.Time, P4.Y, LH.Time, LH.Y, linewidth=2)
+        plt.plot(P4['Time'], P4['Y'], LH['Time'], LH['Y'], linewidth=2)
         plt.gca().tick_params(labelsize=24)
         plt.legend(['P4', 'FSH'], fontsize=24, loc='northeastoutside')
 
         plt.figure(3)
-        plt.plot(E2.Time, E2.Y, LH.Time, LH.Y, linewidth=2)
+        plt.plot(E2['Time'], E2['Y'], LH['Time'], LH['Y'], linewidth=2)
         plt.gca().tick_params(labelsize=24)
         plt.legend(['E2', 'LH'], fontsize=24, loc='northeastoutside')
 
         plt.figure(4)
-        plt.plot(GnRH.Time, GnRH.Y, linewidth=2)
+        plt.plot(GnRH['Time'], GnRH['Y'], linewidth=2)
         plt.gca().tick_params(labelsize=24)
         plt.legend(['GnRH'], fontsize=24, loc='northeastoutside')
 
@@ -562,10 +568,10 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
             Tovu = FollOvulInfo[2, i]
             t1 = Tovu - 14
             t2 = Tovu + 14
-            idx1 = np.argmin(np.abs(LH.Time - t1))
-            idx2 = np.argmin(np.abs(LH.Time - t2))
-            Timenew = LH.Time[idx1:idx2] - t1
-            plt.plot(Timenew, LH.Y[idx1:idx2], 'k--')
+            idx1 = np.argmin(np.abs(LH['Time'] - t1))
+            idx2 = np.argmin(np.abs(LH['Time'] - t2))
+            Timenew = LH['Time'][idx1:idx2] - t1
+            plt.plot(Timenew, LH['Y'][idx1:idx2], 'k--')
             plt.hold(True)
 
         plt.figure(6)
@@ -579,10 +585,10 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
             Tovu = FollOvulInfo[2, i]
             t1 = Tovu - 14
             t2 = Tovu + 14
-            idx1 = np.argmin(np.abs(FSH.Time - t1))
-            idx2 = np.argmin(np.abs(FSH.Time - t2))
-            Timenew = FSH.Time[idx1:idx2] - t1
-            plt.plot(Timenew, FSH.Y[idx1:idx2], 'k--')
+            idx1 = np.argmin(np.abs(FSH['Time'] - t1))
+            idx2 = np.argmin(np.abs(FSH['Time'] - t2))
+            Timenew = FSH['Time'][idx1:idx2] - t1
+            plt.plot(Timenew, FSH['Y'][idx1:idx2], 'k--')
             plt.hold(True)
 
         plt.figure(7)
@@ -597,8 +603,8 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
             t2 = Tovu + 14
             idx1 = np.argmin(np.abs(E2.Time - t1))
             idx2 = np.argmin(np.abs(E2.Time - t2))
-            Timenew = E2.Time[idx1:idx2 + 1] - t1
-            plt.plot(Timenew, E2.Y[idx1:idx2 + 1], 'k--')
+            Timenew = E2['Time'][idx1:idx2 + 1] - t1
+            plt.plot(Timenew, E2['Y'][idx1:idx2 + 1], 'k--')
             plt.hold(True)
 
         plt.figure(8)
@@ -618,67 +624,67 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
             t2 = Tovu + 14
             idx1 = np.argmin(np.abs(P4.Time - t1))
             idx2 = np.argmin(np.abs(P4.Time - t2))
-            Timenew = P4.Time[idx1:idx2 + 1] - t1
-            plt.plot(Timenew, P4.Y[idx1:idx2 + 1], 'k--')
+            Timenew = P4['Time'][idx1:idx2 + 1] - t1
+            plt.plot(Timenew, P4['Y'][idx1:idx2 + 1], 'k--')
             plt.hold(True)
 
         freq = []
         for i in range(len(E2.Y)):
-            yGfreq = Par[0] / (1 + (P4.Y[i] / Par[1]) ** Par[2]) *\
-                     (1 + E2.Y[i] ** Par[3] / (Par[4] ** Par[3] +\
-                                               E2.Y[i] ** Par[3]))
+            yGfreq = Par[0] / (1 + (P4['Y'][i] / Par[1]) ** Par[2]) *\
+                     (1 + E2['Y'][i] ** Par[3] / (Par[4] ** Par[3] +\
+                                               E2['Y'][i] ** Par[3]))
             freq.append(yGfreq)
 
         plt.figure(9)
-        plt.plot(E2.Time, freq)
+        plt.plot(E2['Time'], freq)
 
         plt.figure(10)
-        plt.plot(FSHRez.Time, FSHRez.Y)
+        plt.plot(FSHRez['Time'], FSHRez.Y)
 
     if Par[64] == 1:
-        val, idx = min((abs(E2.Time - (Par[71] - 1)), i)\
-                       for i in range(len(E2.Time)))
-        E2dm1 = E2.Y[idx]
-        val, idx = min((abs(E2.Time - (Par[71] + 1)), i)\
-                       for i in range(len(E2.Time)))
-        E2d1 = E2.Y[idx]
-        val, idx = min((abs(E2.Time - (Par[71] + 5)), i)\
-                       for i in range(len(E2.Time)))
-        E2d6 = E2.Y[idx]
-        E2dend = E2.Y[-1]
+        val, idx = min((abs(E2['Time'] - (Par[71] - 1)), i)\
+                       for i in range(len(E2['Time'])))
+        E2dm1 = E2['Y'][idx]
+        val, idx = min((abs(E2['Time'] - (Par[71] + 1)), i)\
+                       for i in range(len(E2['Time'])))
+        E2d1 = E2['Y'][idx]
+        val, idx = min((abs(E2['Time'] - (Par[71] + 5)), i)\
+                       for i in range(len(E2['Time'])))
+        E2d6 = E2['Y'][idx]
+        E2dend = E2['Y'][-1]
 
-        val, idx = min((abs(P4.Time - (Par[71] - 1)), i)\
-                       for i in range(len(P4.Time)))
-        P4dm1 = P4.Y[idx]
-        val, idx = min((abs(P4.Time - (Par[71] + 1)), i)\
-                       for i in range(len(P4.Time)))
+        val, idx = min((abs(P4['Time'] - (Par[71] - 1)), i)\
+                       for i in range(len(P4['Time'])))
+        P4dm1 = P4['Y'][idx]
+        val, idx = min((abs(P4['Time'] - (Par[71] + 1)), i)\
+                       for i in range(len(P4['Time'])))
         P4d1 = P4.Y[idx]
         val, idx = min((abs(P4.Time - (Par[71] + 5)), i)\
                        for i in range(len(P4.Time)))
-        P4d6 = P4.Y[idx]
-        P4dend = P4.Y[-1]
+        P4d6 = P4['Y'][idx]
+        P4dend = P4['Y'][-1]
 
-        val, idx = min((abs(LH.Time - (Par[71] - 1)), i)\
-                       for i in range(len(LH.Time)))
-        LHdm1 = LH.Y[idx]
-        val, idx = min((abs(LH.Time - (Par[71] + 1)), i)\
-                       for i in range(len(LH.Time)))
-        LHd1 = LH.Y[idx]
-        val, idx = min((abs(LH.Time - (Par[71] + 5)), i)\
-                       for i in range(len(LH.Time)))
-        LHd6 = LH.Y[idx]
-        LHdend = LH.Y[-1]
+        val, idx = min((abs(LH['Time'] - (Par[71] - 1)), i)\
+                       for i in range(len(LH['Time'])))
+        LHdm1 = LH['Y'][idx]
+        val, idx = min((abs(LH['Time'] - (Par[71] + 1)), i)\
+                       for i in range(len(LH['Time'])))
+        LHd1 = LH['Y'][idx]
+        val, idx = min((abs(LH['Time'] - (Par[71] + 5)), i)\
+                       for i in range(len(LH['Time'])))
+        LHd6 = LH['Y'][idx]
+        LHdend = LH['Y'][-1]
 
-        sumFSH = FSH.Y + FSHmed.Y
+        sumFSH = FSH['Y'] + FSHmed['Y']
 
-        val, idx = min((abs(FSH.Time - (Par[71] - 1)), i)\
-                       for i in range(len(FSH.Time)))
+        val, idx = min((abs(FSH['Time'] - (Par[71] - 1)), i)\
+                       for i in range(len(FSH['Time'])))
         FSHdm1 = sumFSH[idx]
-        val, idx = min((abs(FSH.Time - (Par[71] + 1)), i)\
-                       for i in range(len(FSH.Time)))
+        val, idx = min((abs(FSH['Time'] - (Par[71] + 1)), i)\
+                       for i in range(len(FSH['Time'])))
         FSHd1 = sumFSH[idx]
-        val, idx = min((abs(FSH.Time - (Par[71] + 5)), i)\
-                       for i in range(len(FSH.Time)))
+        val, idx = min((abs(FSH['Time'] - (Par[71] + 5)), i)\
+                       for i in range(len(FSH['Time'])))
         FSHd6 = sumFSH[idx]
         FSHdend = sumFSH[-1]
 
@@ -702,24 +708,24 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
                 t2 = Tovu - 2
                 t3 = Tovu + 0.05
                 t4 = Tovu + 7
-                val, idx1 = min((abs(FSH.Time - t1), i)\
-                                for i in range(len(FSH.Time)))
-                val, idx2 = min((abs(FSH.Time - t2), i)\
-                                for i in range(len(FSH.Time)))
-                val, idx3 = min((abs(FSH.Time - t3), i)\
-                                for i in range(len(FSH.Time)))
-                val, idx4 = min((abs(FSH.Time - t4), i)\
-                                for i in range(len(FSH.Time)))
+                val, idx1 = min((abs(FSH['Time'] - t1), i)\
+                                for i in range(len(FSH['Time'])))
+                val, idx2 = min((abs(FSH['Time'] - t2), i)\
+                                for i in range(len(FSH['Time'])))
+                val, idx3 = min((abs(FSH['Time'] - t3), i)\
+                                for i in range(len(FSH['Time'])))
+                val, idx4 = min((abs(FSH['Time'] - t4), i)\
+                                for i in range(len(FSH['Time'])))
 
                 check = 0
 
-                if FSH.Y[idx2] - FSH.Y[idx1] < 0:
+                if FSH['Y'][idx2] - FSH['Y'][idx1] < 0:
                     check += 1
 
-                if FSH.Y[idx3] - FSH.Y[idx2] > 0:
+                if FSH['Y'][idx3] - FSH['Y'][idx2] > 0:
                     check += 1
 
-                if FSH.Y[idx4] - FSH.Y[idx3] < 0:
+                if FSH['Y'][idx4] - FSH['Y'][idx3] < 0:
                     check += 1
 
                 if check == 3:
@@ -737,7 +743,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
                 Par[77] = 1
 
             if FollOvulInfo:
-                H = np.array([Par] + [paraPoi] + [parafoll]).T
+                H = np.array([Par] + [paraPoi] + [parafoll])
                 ModelPop_Params = np.hstack((ModelPop_Params, H))
 
                 F = np.array([Cyclelengthmean, Cyclelengthstd,\
@@ -747,23 +753,23 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
     if SavePlotStuff:
         FileName = f'E2_{runind}.csv'
         fullFileName = os.path.join(DirStuff, FileName)
-        np.savetxt(fullFileName, E2.Y, delimiter=',')
+        np.savetxt(fullFileName, E2['Y'], delimiter=',')
 
         FileName = f'FSH_{runind}.csv'
         fullFileName = os.path.join(DirStuff, FileName)
-        np.savetxt(fullFileName, FSH.Y, delimiter=',')
+        np.savetxt(fullFileName, FSH['Y'], delimiter=',')
 
         FileName = f'LH_{runind}.csv'
         fullFileName = os.path.join(DirStuff, FileName)
-        np.savetxt(fullFileName, LH.Y, delimiter=',')
+        np.savetxt(fullFileName, LH['Y'], delimiter=',')
 
         FileName = f'P4_{runind}.csv'
         fullFileName = os.path.join(DirStuff, FileName)
-        np.savetxt(fullFileName, P4.Y, delimiter=',')
+        np.savetxt(fullFileName, P4['Y'], delimiter=',')
 
         FileName = f'Time_{runind}.csv'
         fullFileName = os.path.join(DirStuff, FileName)
-        np.savetxt(fullFileName, E2.Time, delimiter=',')
+        np.savetxt(fullFileName, E2['Time'], delimiter=',')
 
         FileName = f'OvulationInfo_{runind}.csv'
         fullFileName = os.path.join(DirStuff, FileName)
@@ -771,7 +777,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
 
         FileName = 'Solutions.csv'
         fullFileName = os.path.join(DirStuff, FileName)
-        np.savetxt(fullFileName, solutions.Y, delimiter=',')
+        np.savetxt(fullFileName, solutions['Y'], delimiter=',')
 
     if SaveSim:
         FileName = f'DomFolGrowth_{runind}.csv'

@@ -2,16 +2,18 @@ import numpy as np
 import os
 import CreateFollicles
 
-import CreateFollicles
-import Simulation
+from CreateFollicles import CreateFollicles
+from Simulation import Simulation
 
 def StartSimulation():
     runnum = 30
-    ShowPlots = 0
+    ShowPlots = 1
     SaveSim = 0
     SavePlotStuff = 0
     SavePop = 0
-    DirStuff = os.getcwd()
+    DirStuff = os.path.join(os.getcwd(), "..")
+    print(DirStuff)
+    
     NormalCycle = 1
     LutStim = 0
     FollStim = 0
@@ -29,7 +31,7 @@ def StartSimulation():
         tb = 0
         te = 300
         # follicle params
-        para = np.array([0, 17]).reshape(-1, 1)
+        para = np.array([0, 17])#.reshape(-1, 1)
         parafoll = np.array([
             2,
             0.04 / 2,
@@ -46,11 +48,12 @@ def StartSimulation():
             0.1,
             2,
             25
-        ]).reshape(-1, 1)
+        ])#.reshape(-1, 1)
         # poisson distr params
-        paraPoi = np.array([10/14, 0.25]).reshape(-1, 1)
+        paraPoi = np.array([10/14, 0.25])#.reshape(-1, 1)
+        print(paraPoi)
         # ODE params
-        Par = np.zeros((74, 1))
+        Par = np.zeros((77, 1))
         Par[0] = 16
         Par[1] = 3
         Par[2] = 2
@@ -123,11 +126,16 @@ def StartSimulation():
         # init values
         file = 'yInitial.txt'
         delimiterIn = ';'
-        yInitial = np.genfromtxt(file, delimiter=delimiterIn, skip_header=0)
+        fullFileName = os.path.join(DirStuff, file)
+        yInitial = np.genfromtxt(fullFileName, delimiter=delimiterIn, skip_header=0)
 
         # init follicles
         y0Foll = 4
-        StartValues = np.array([y0Foll] + yInitial.tolist()).reshape(1, -1)
+        #print(y0Foll)
+        #print(yInitial)
+        #StartValues = np.array([y0Foll] + yInitial.tolist()).reshape(1, -1)
+        StartValues = np.concatenate(([y0Foll], yInitial))
+        #print(StartValues)
 
         if Foll_ModelPop or Horm_ModelPop:
             FSHVec = np.genfromtxt('FSHS.txt', delimiter=',', skip_header=1)
