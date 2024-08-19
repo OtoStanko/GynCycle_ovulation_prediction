@@ -2,13 +2,16 @@ import numpy as np
 import os
 import CreateFollicles
 
+import CreateFollicles
+import Simulation
+
 def StartSimulation():
     runnum = 30
     ShowPlots = 0
     SaveSim = 0
     SavePlotStuff = 0
     SavePop = 0
-    DirStuff = '/Users/sophie/Documents/GynCycleModel_Pub2021/NonVec_Model/ModelPopulation/HormPopulation'
+    DirStuff = os.getcwd()
     NormalCycle = 1
     LutStim = 0
     FollStim = 0
@@ -138,7 +141,7 @@ def StartSimulation():
         """
         if NormalCycle:
             Stim = 0
-            #Simulation(para, paraPoi, parafoll, Par,\
+            Simulation(para, paraPoi, parafoll, Par,\
                        tb, te, StartValues, StartVec,\
                        FSHVec, ShowPlots, SaveSim,\
                        SavePlotStuff, DirStuff, Stim,\
@@ -159,7 +162,7 @@ def StartSimulation():
             Par[71] = 150
             Par[72] = Par[71] + 15
             Par = Par.T
-            #Simulation(para, paraPoi, parafoll, Par,\
+            Simulation(para, paraPoi, parafoll, Par,\
                        tb, te, StartValues, StartVec,\
                        FSHVec, ShowPlots, SaveSim,\
                        SavePlotStuff, DirStuff, Stim,\
@@ -180,7 +183,7 @@ def StartSimulation():
             Par[71] = 150
             Par[72] = Par[71] + 15
             Par = Par.T
-            #Simulation(para, paraPoi, parafoll,Par,\
+            Simulation(para, paraPoi, parafoll,Par,\
                        tb, te, StartValues, StartVec,\
                        FSHVec, ShowPlots, SaveSim,\
                        SavePlotStuff, DirStuff, Stim,\
@@ -207,7 +210,7 @@ def StartSimulation():
             Par[71] = 150
             Par[72] = Par[71] + 15
             Par = Par.T
-            #Simulation(para, paraPoi, parafoll, Par,\
+            Simulation(para, paraPoi, parafoll, Par,\
                        tb, te, StartValues, StartVec,\
                        FSHVec, ShowPlots, SaveSim,\
                        SavePlotStuff, DirStuff, Stim,\
@@ -221,7 +224,7 @@ def StartSimulation():
             parafoll[3] = np.random.lognormal(np.log(parafoll[3]), 0.15)
             parafoll[4] = np.random.lognormal(np.log(parafoll[4]), 0.15)
             Par[32] = np.random.lognormal(np.log(Par[32]), 0.15)
-            #Simulation(para, paraPoi, parafoll, Par,\
+            Simulation(para, paraPoi, parafoll, Par,\
                        tb, te, StartValues, StartVec,\
                        FSHVec, ShowPlots, SaveSim,\
                        SavePlotStuff, DirStuff, Stim,\
@@ -234,7 +237,7 @@ def StartSimulation():
                        34, 35, 36, 40, 41, 43, 45, 46, 47, 51, 73]
             for i in indices:
                 Par[i] = np.random.lognormal(mean=np.log(Par[i]), sigma=0.15)
-            #Simulation(para, paraPoi, parafoll, Par,\
+            Simulation(para, paraPoi, parafoll, Par,\
                        tb, te, StartValues, StartVec,\
                        FSHVec, ShowPlots, SaveSim,\
                        SavePlotStuff, DirStuff, Stim,\
