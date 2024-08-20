@@ -20,6 +20,9 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
                 x[i] = 0
 
     # solve differential equations
+    #print("P4: ", Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
+    print(NumFollicles, y[NumFollicles + 1])
+    print(y)
     dy = ODE_Model_NormalCycle(t, y, Par)
     f = dy.copy()
 
@@ -92,6 +95,7 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
                       Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
 
     # Calculation of P4 values
+    #print("P4: ", Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
     f[NumFollicles + 1] = y[NumFollicles + 1] - Par[75] - Par[62] *\
                           np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
 

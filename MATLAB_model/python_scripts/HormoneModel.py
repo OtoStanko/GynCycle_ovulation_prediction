@@ -40,6 +40,7 @@ def ODE_Model_NormalCycle(t, y, Par):
     hp_freq = ((yGfreq / Par[23]) ** Par[24]) / (1 + (yGfreq / Par[23]) ** Par[24])
     f_LH_prod1 = Par[25] + Par[26] * hp_e2
     hm_p4 = 1 + Par[29] * (y[i_P4] / Par[27]) ** Par[28]
+    #print(hm_p4, y[i_P4])
 
     f_LH_prod = (f_LH_prod1 / hm_p4) * (1 + hp_freq)
     f_LH_rel = (Par[33] + Par[34] * (y[i_GReca] / Par[35]) ** Par[36] / (1 + (y[i_GReca] / Par[35]) ** Par[36]))

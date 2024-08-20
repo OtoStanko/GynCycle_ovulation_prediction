@@ -79,7 +79,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
 
     # Main loop
     while t < te:
-        print(t)
+        print("t:", round(t, 3))
 
         # Follicles recruitment depending on FSH concentration in the system
         fshAll = y0[-10] + y0[-1]
@@ -160,7 +160,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
             Y = np.concatenate((Y, yi[1:]))
         else:
             #print("para 160", para)
-            #print("y0 supposedly y", y0)
+            print("y0 supposedly y", y0)
             sol = solve_ivp(lambda t, y: FollicleFunction(\
                                 t, y, Tovu, Follicles, para,\
                                 parafoll, Par, dd1, Stim,\
@@ -222,6 +222,8 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
         TimeFol = np.concatenate((TimeFol, T[1:]))
         # saves last Y values of the follicles
         LastYValues = Y[-1, :]
+        print("Y", Y)
+        print("?? not sure is assignet something:", LastYValues)
 
         # save values for E2 
         E2['Time'] = np.concatenate((E2['Time'], T[1:]))
@@ -392,7 +394,10 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
             #print("f:", Follicles.Follicle[Follicles.Active[i]]['Y'])
             y0old.append(Follicles.Follicle[Follicles.Active[i]-1]['Y'][-1])
         y0old = np.array(y0old)#.reshape(-1, 1)
-        y0 = np.vstack((y0old, LastYValues[-para[1]:]))
+        print("Last Y value of follicles:", y0old)
+        print("? not sure:", LastYValues[-para[1]:])
+        y0 = np.concatenate((y0old, LastYValues[-para[1]:]))
+        #y0 = np.vstack((y0old, LastYValues[-para[1]:]))
 
         # integration end reached
         t = T[-1]
@@ -454,7 +459,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
         hf = plt.figure(1)
         plt.clf()
         widthofline = 2
-        plt.hold(True)
+        #plt.hold(True)
 
     # vector to save informations about the ovulating follicle
     FollOvulInfo = []
@@ -563,11 +568,11 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
         ID = np.unique(Data[:, -1])
 
         plt.figure(5)
-        plt.hold(True)
+        #plt.hold(True)
         for i in range(len(ID)):
             Data_LH = Data[Data[:, -1] == ID[i]]
             plt.scatter(Data_LH[:, 0], Data_LH[:, 1], marker='x')
-            plt.hold(True)
+            #plt.hold(True)
 
         for i in range(len(FollOvulInfo[-1, :])):
             Tovu = FollOvulInfo[2, i]
@@ -577,14 +582,14 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
             idx2 = np.argmin(np.abs(LH['Time'] - t2))
             Timenew = LH['Time'][idx1:idx2] - t1
             plt.plot(Timenew, LH['Y'][idx1:idx2], 'k--')
-            plt.hold(True)
+            #plt.hold(True)
 
         plt.figure(6)
-        plt.hold(True)
+        #plt.hold(True)
         for i in range(len(ID)):
             H = Data[Data[:, -1] == ID[i]]
             plt.scatter(H[:, 0], H[:, 2], marker='x')
-            plt.hold(True)
+            #plt.hold(True)
 
         for i in range(len(FollOvulInfo[-1, :])):
             Tovu = FollOvulInfo[2, i]
@@ -594,14 +599,14 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
             idx2 = np.argmin(np.abs(FSH['Time'] - t2))
             Timenew = FSH['Time'][idx1:idx2] - t1
             plt.plot(Timenew, FSH['Y'][idx1:idx2], 'k--')
-            plt.hold(True)
+            #plt.hold(True)
 
         plt.figure(7)
-        plt.hold(True)
+        #plt.hold(True)
         for i in range(len(ID)):
             H = Data[Data[:, -1] == ID[i]]
             plt.scatter(H[:, 0], H[:, 3], marker='x')
-            plt.hold(True)
+            #plt.hold(True)
         for i in range(len(FollOvulInfo[-1])):
             Tovu = FollOvulInfo[2, i]
             t1 = Tovu - 14
@@ -610,10 +615,10 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
             idx2 = np.argmin(np.abs(E2.Time - t2))
             Timenew = E2['Time'][idx1:idx2 + 1] - t1
             plt.plot(Timenew, E2['Y'][idx1:idx2 + 1], 'k--')
-            plt.hold(True)
+            #plt.hold(True)
 
         plt.figure(8)
-        plt.hold(True)
+        #plt.hold(True)
         for i in range(len(ID)):
             H = []
             for j in range(len(Data[:, -1])):
@@ -621,7 +626,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
                     H.append(Data[j, :])
             H = np.array(H)
             plt.scatter(H[:, 0], H[:, 4], marker='x')
-            plt.hold(True)
+            #plt.hold(True)
 
         for i in range(len(FollOvulInfo[-1])):
             Tovu = FollOvulInfo[2, i]
@@ -631,7 +636,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
             idx2 = np.argmin(np.abs(P4.Time - t2))
             Timenew = P4['Time'][idx1:idx2 + 1] - t1
             plt.plot(Timenew, P4['Y'][idx1:idx2 + 1], 'k--')
-            plt.hold(True)
+            #plt.hold(True)
 
         freq = []
         for i in range(len(E2.Y)):
@@ -645,6 +650,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,\
 
         plt.figure(10)
         plt.plot(FSHRez['Time'], FSHRez.Y)
+        plt.show()
 
     if Par[64] == 1:
         val, idx = min((abs(E2['Time'] - (Par[71] - 1)), i)\
