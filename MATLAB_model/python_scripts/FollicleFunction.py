@@ -55,15 +55,15 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
         if para[0] == 0:
             if (X <= parafoll[11] or
                 Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == -2 or
-                (X <= parafoll[12] and\
-                     (t - Follicles.Follicle[Follicles.Active[i]-1]['Time'][0]) >= parafoll[14] and\
-                     Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 3) or\
-                    (X <= parafoll[12] and\
-                     (t - Follicles.Follicle[Follicles.Active[i]-1]['Time'][0]) >= parafoll[13] and\
-                     Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == -1) or\
-                    (Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 3 and\
-                     (t - Follicles.Follicle[Follicles.Active[i]]['TimeDecrease']) >= parafoll[10]) or\
-                    (Follicles.Follicle[Follicles.Active[i]-1]['Time'][0] -\
+                (X <= parafoll[12] and
+                     (t - Follicles.Follicle[Follicles.Active[i]-1]['Time'][0]) >= parafoll[14] and
+                     Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 3) or
+                    (X <= parafoll[12] and
+                     (t - Follicles.Follicle[Follicles.Active[i]-1]['Time'][0]) >= parafoll[13] and
+                     Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == -1) or
+                    (Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 3 and
+                     (t - Follicles.Follicle[Follicles.Active[i]]['TimeDecrease']) >= parafoll[10]) or
+                    (Follicles.Follicle[Follicles.Active[i]-1]['Time'][0] -
                      Follicles.Follicle[Follicles.Active[i]-1]['Time'][-1] > parafoll[14])):
                 # set time the follicle starts to decrease & set destiny to decrease
                 #print(Follicles.Follicle)

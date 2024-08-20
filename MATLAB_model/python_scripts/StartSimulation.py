@@ -149,11 +149,11 @@ def StartSimulation():
         """
         if NormalCycle:
             Stim = 0
-            Simulation(para, paraPoi, parafoll, Par,\
-                       tb, te, StartValues, StartVec,\
-                       FSHVec, ShowPlots, SaveSim,\
-                       SavePlotStuff, DirStuff, Stim,\
-                       LutStim, FollStim, DoubStim,\
+            Simulation(para, paraPoi, parafoll, Par,
+                       tb, te, StartValues, StartVec,
+                       FSHVec, ShowPlots, SaveSim,
+                       SavePlotStuff, DirStuff, Stim,
+                       LutStim, FollStim, DoubStim,
                        Foll_ModelPop, Horm_ModelPop, runind)
         """
             Luteal phase stimulation
@@ -170,11 +170,11 @@ def StartSimulation():
             Par[71] = 150
             Par[72] = Par[71] + 15
             Par = Par.T
-            Simulation(para, paraPoi, parafoll, Par,\
-                       tb, te, StartValues, StartVec,\
-                       FSHVec, ShowPlots, SaveSim,\
-                       SavePlotStuff, DirStuff, Stim,\
-                       LutStim, FollStim, DoubStim,\
+            Simulation(para, paraPoi, parafoll, Par,
+                       tb, te, StartValues, StartVec,
+                       FSHVec, ShowPlots, SaveSim,
+                       SavePlotStuff, DirStuff, Stim,
+                       LutStim, FollStim, DoubStim,
                        Foll_ModelPop, Horm_ModelPop, runind)
         """
             Follicular phase stimulation
@@ -191,11 +191,11 @@ def StartSimulation():
             Par[71] = 150
             Par[72] = Par[71] + 15
             Par = Par.T
-            Simulation(para, paraPoi, parafoll,Par,\
-                       tb, te, StartValues, StartVec,\
-                       FSHVec, ShowPlots, SaveSim,\
-                       SavePlotStuff, DirStuff, Stim,\
-                       LutStim, FollStim, DoubStim,\
+            Simulation(para, paraPoi, parafoll,Par,
+                       tb, te, StartValues, StartVec,
+                       FSHVec, ShowPlots, SaveSim,
+                       SavePlotStuff, DirStuff, Stim,
+                       LutStim, FollStim, DoubStim,
                        Foll_ModelPop, Horm_ModelPop, runind)
 
         """
@@ -218,11 +218,11 @@ def StartSimulation():
             Par[71] = 150
             Par[72] = Par[71] + 15
             Par = Par.T
-            Simulation(para, paraPoi, parafoll, Par,\
-                       tb, te, StartValues, StartVec,\
-                       FSHVec, ShowPlots, SaveSim,\
-                       SavePlotStuff, DirStuff, Stim,\
-                       LutStim, FollStim, DoubStim,\
+            Simulation(para, paraPoi, parafoll, Par,
+                       tb, te, StartValues, StartVec,
+                       FSHVec, ShowPlots, SaveSim,
+                       SavePlotStuff, DirStuff, Stim,
+                       LutStim, FollStim, DoubStim,
                        Foll_ModelPop, Horm_ModelPop, runind)
 
         #
@@ -232,24 +232,24 @@ def StartSimulation():
             parafoll[3] = np.random.lognormal(np.log(parafoll[3]), 0.15)
             parafoll[4] = np.random.lognormal(np.log(parafoll[4]), 0.15)
             Par[32] = np.random.lognormal(np.log(Par[32]), 0.15)
-            Simulation(para, paraPoi, parafoll, Par,\
-                       tb, te, StartValues, StartVec,\
-                       FSHVec, ShowPlots, SaveSim,\
-                       SavePlotStuff, DirStuff, Stim,\
-                       LutStim, FollStim, DoubStim,\
+            Simulation(para, paraPoi, parafoll, Par,
+                       tb, te, StartValues, StartVec,
+                       FSHVec, ShowPlots, SaveSim,
+                       SavePlotStuff, DirStuff, Stim,
+                       LutStim, FollStim, DoubStim,
                        Foll_ModelPop, Horm_ModelPop, runind)
 
         if Horm_ModelPop:
             Stim = 0
-            indices = [1, 2, 5, 6, 8, 9, 22, 24, 26, 27, 28,\
+            indices = [1, 2, 5, 6, 8, 9, 22, 24, 26, 27, 28,
                        34, 35, 36, 40, 41, 43, 45, 46, 47, 51, 73]
             for i in indices:
                 Par[i] = np.random.lognormal(mean=np.log(Par[i]), sigma=0.15)
-            Simulation(para, paraPoi, parafoll, Par,\
-                       tb, te, StartValues, StartVec,\
-                       FSHVec, ShowPlots, SaveSim,\
-                       SavePlotStuff, DirStuff, Stim,\
-                       LutStim, FollStim, DoubStim,\
+            Simulation(para, paraPoi, parafoll, Par,
+                       tb, te, StartValues, StartVec,
+                       FSHVec, ShowPlots, SaveSim,
+                       SavePlotStuff, DirStuff, Stim,
+                       LutStim, FollStim, DoubStim,
                        Foll_ModelPop, Horm_ModelPop, runind)
 
         if SavePop and runind % 10 == 0:

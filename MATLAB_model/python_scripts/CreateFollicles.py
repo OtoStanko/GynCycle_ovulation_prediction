@@ -6,8 +6,8 @@ def CreateFollicles(parafoll, paraPoi, tb, te):
     with open('FSH.txt', 'w+') as fileID2:
         fileID2.write('Number    FSH\n')
         num_FSH_sensitivity_values = 10000
-        FSHdistri = np.random.normal(loc=parafoll[8],\
-                                     scale=parafoll[9],\
+        FSHdistri = np.random.normal(loc=parafoll[8],
+                                     scale=parafoll[9],
                                      size=num_FSH_sensitivity_values)
         
         for i in range(num_FSH_sensitivity_values):
