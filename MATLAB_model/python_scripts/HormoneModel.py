@@ -1,9 +1,9 @@
 import numpy as np
 
 def ODE_Model_NormalCycle(t, y, Par):
-    print("t", t)
-    print("y", y)
-    print("Par", Par)
+    #print("t", t)
+    #print("y", y)
+    #print("Par", Par)
     #r, c = y.shape
     #dy = np.zeros((r, c))
     r = len(y)

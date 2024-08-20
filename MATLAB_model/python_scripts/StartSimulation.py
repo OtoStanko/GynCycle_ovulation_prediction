@@ -12,7 +12,7 @@ def StartSimulation():
     SavePlotStuff = 0
     SavePop = 0
     DirStuff = os.path.join(os.getcwd(), "..")
-    print(DirStuff)
+    #print(DirStuff)
     
     NormalCycle = 1
     LutStim = 0
@@ -29,7 +29,7 @@ def StartSimulation():
     for runind in range(1, runnum + 1):
         # technical params
         tb = 0
-        te = 300
+        te = 10
         # follicle params
         para = np.array([0, 17])#.reshape(-1, 1)
         parafoll = np.array([
@@ -51,7 +51,7 @@ def StartSimulation():
         ])#.reshape(-1, 1)
         # poisson distr params
         paraPoi = np.array([10/14, 0.25])#.reshape(-1, 1)
-        print(paraPoi)
+        #print(paraPoi)
         # ODE params
         Par = np.zeros((77, 1))
         Par[0] = 16
@@ -267,3 +267,4 @@ def StartSimulation():
             np.savetxt(fullFileName, M, delimiter=',')
             ModelPop_CycleInfo = []
 
+StartSimulation()

@@ -12,9 +12,9 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
         x = np.array([0])
 
     if NumFollicles > 0 and para[0] == 0:
-        print("Follicles number", Follicles.Number)
-        print("Supposedly num of follicles", NumFollicles)
-        print(Follicles.Follicle)
+        #print("Follicles number", Follicles.Number)
+        #print("Supposedly num of follicles", NumFollicles)
+        #print(Follicles.Follicle)
         for i in range(NumFollicles):
             if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] in [-2, -3]:
                 x[i] = 0
@@ -63,8 +63,8 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
                     (Follicles.Follicle[Follicles.Active[i]-1]['Time'][0] -\
                      Follicles.Follicle[Follicles.Active[i]-1]['Time'][-1] > parafoll[14])):
                 # set time the follicle starts to decrease & set destiny to decrease
-                print(Follicles.Follicle)
-                print(Follicles.Active)
+                #print(Follicles.Follicle)
+                #print(Follicles.Active)
                 if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] != -2:
                     Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] = -2
                     Follicles.Follicle[Follicles.Active[i]-1]['TimeDecrease'] = t

@@ -1,16 +1,16 @@
 import numpy as np
 
 def EvaluateFollicle(t, y, para, parafoll, LH):
-    print("para evalfol", np.array(para))
+    #print("para evalfol", np.array(para))
     m = parafoll[6]
     th = t - 0.5
     idx = np.argmin(np.abs(LH['Time'] - th))
     y_lh = LH['Y'][idx]
 
     # number of current follicle(s)
-    print(y)
-    print(y.shape[0])
-    print(para)
+    #print(y)
+    #print(y.shape[0])
+    #print(para)
     NumFoll = y.shape[0] - para[1]
     # size(s) of current follicle(s)
     FollSize = y[:NumFoll]
