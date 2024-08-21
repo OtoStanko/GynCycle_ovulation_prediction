@@ -4,7 +4,8 @@ from HormoneModel import ODE_Model_NormalCycle
 
 def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutStim, FollStim, DoubStim, firstExtraction):
     # determine number of active follicles
-    NumFollicles = y.shape[0] - para[1]
+    NumFollicles = y.shape[0] - para[1] # does not work when a new follicle is added
+    NumFollicles = len(Follicles.Active)
 
     if NumFollicles > 0:
         x = y[:NumFollicles]
@@ -27,8 +28,8 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
     f = dy.copy()
 
     r = len(y)
-    fshrezcomp = y[r-16]
-    p4all = y[r-17]
+    fshrezcomp = y[r-15]
+    p4all = y[r-16]
     SumV = np.sum(x ** parafoll[0])
 
     for i in range(NumFollicles):
@@ -95,7 +96,7 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
                       Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
 
     # Calculation of P4 values
-    #print("P4: ", Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
+    print("P4: ", Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
     f[NumFollicles + 1] = y[NumFollicles + 1] - Par[75] - Par[62] *\
                           np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
 

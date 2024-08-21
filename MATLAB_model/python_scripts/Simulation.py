@@ -222,8 +222,8 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         TimeFol = np.concatenate((TimeFol, T[1:]))
         # saves last Y values of the follicles
         LastYValues = Y[-1, :]
-        print("Y", Y)
-        print("?? not sure is assignet something:", LastYValues)
+        print("Y", Y[-1, :])
+        print("?? not sure is assigned something:", LastYValues)
 
         # save values for E2 
         E2['Time'] = np.concatenate((E2['Time'], T[1:]))
@@ -288,7 +288,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                 Follicles.Number += 1
                 Follicle1['Number'] = Follicles.Number
                 Follicles.NumActive += 1
-                Follicles.Active = np.concatenate(\
+                Follicles.Active = np.concatenate(
                     (Follicles.Active, [Follicle1['Number']]))
                 Follicles.Follicle = np.append(Follicles.Follicle, Follicle1)
                 NewFollicle.append(T[-1])
@@ -348,7 +348,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                    (yCurFoll >= parafoll[6] and Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 3):
                     th = t - 0.5
                     idx = np.argmin(np.abs(LH['Time'] - th))
-                    if LH.Y[idx] >= parafoll[9]: 
+                    if LH['Y'][idx] >= parafoll[9]:
                         Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] = 4
                         Follicles.Follicle[Follicles.Active[i]-1]['TimeDecrease'] = t
             
