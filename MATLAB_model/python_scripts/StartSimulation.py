@@ -5,15 +5,18 @@ import CreateFollicles
 from CreateFollicles import CreateFollicles
 from Simulation import Simulation
 
+import parameters
+
 def StartSimulation():
     runnum = 30
+    # save simulation results
     ShowPlots = 1
     SaveSim = 0
     SavePlotStuff = 0
     SavePop = 0
     DirStuff = os.path.join(os.getcwd(), "..")
     #print(DirStuff)
-    
+    # select type of simulation
     NormalCycle = 1
     LutStim = 0
     FollStim = 0
@@ -27,101 +30,36 @@ def StartSimulation():
     ModelPop_CycleInfo = []
 
     for runind in range(1, runnum + 1):
-        # technical params
+        # integration time beginning and end
         tb = 0
         te = 10
+        # technical params
+        para = np.array([0, 17])
         # follicle params
-        para = np.array([0, 17])#.reshape(-1, 1)
         parafoll = np.array([
-            2,
-            0.04 / 2,
-            25,
-            1,
+            2,                  # v - fractal dimension
+            0.04 / 2,           # gamma - growth rate
+            25,                 # xi - max. diameter of follicles
+            1,                  # mu - proportion of self harm
             0.065 / (25 ** 2),  # k - strength of competition
-            0.01,
-            18,
-            3 / 10,
-            0.1,
-            25,
-            5,
-            0.01,
-            0.1,
-            2,
-            25
-        ])#.reshape(-1, 1)
+            0.01,               # rho - rate of decline
+            18,                 # min. ovulation size
+            3 / 10,             # mean for FSH Sensitivity
+            0.1,                # std.deviation for FSH Sensitivity %0.55
+            25,                 # threshold LH concentration for ovulation
+            5,                  # big but not ovulated follicle lifetime
+            0.01,               # too slow foll growth
+            0.1,                # very slow foll growth
+            2,                  # max life time for a small slow growing follicles
+            25                  # max follicle life time for a big follicles that start to rest
+        ])
         # poisson distr params
-        paraPoi = np.array([10/14, 0.25])#.reshape(-1, 1)
+        paraPoi = np.array([10/14, 0.25])
         #print(paraPoi)
-        # ODE params
-        Par = np.zeros((77, 1))
-        Par[0] = 16
-        Par[1] = 3
-        Par[2] = 2
-        Par[3] = 10
-        Par[4] = 120
-        Par[5] = 0.0056
-        Par[6] = 2
-        Par[7] = 100
-        Par[8] = 9.6000
-        Par[9] = 1
-        Par[10] = 322.1765
-        Par[11] = 644.3530
-        Par[12] = 0.4475
-        Par[13] = 3.2218
-        Par[14] = 32.2176
-        Par[15] = 8.9493e-05
-        Par[16] = 32.2176
-        Par[17] = 0.0895
-        Par[18] = 32.2176
-        Par[19] = 3.2218
-        Par[20] = 0.0089
-        Par[21] = 192.2041
-        Par[22] = 5
-        Par[23] = 18
-        Par[24] = 5
-        Par[25] = 1.8275e+03
-        Par[26] = 7.3099e+03
-        Par[27] = 2.3708
-        Par[28] = 1
-        Par[29] = 0.25
-        Par[30] = 1.25
-        Par[31] = 3
-        Par[32] = 12
-        Par[33] = 10
-        Par[34] = 0.1904
-        Par[35] = 0.0003
-        Par[36] = 5
-        Par[37] = 5
-        Par[38] = 74.851
-        Par[39] = 1.6e+04
-        Par[40] = 2
-        Par[41] = 2
-        Par[42] = 15
-        Par[43] = 5
-        Par[44] = 0.02
-        Par[45] = 0.12
-        Par[46] = 0.00025
-        Par[47] = 3
-        Par[49] = 0.02
-        Par[50] = 114.2474
-        Par[51] = 500
-        Par[52] = 3.5289
-        Par[53] = 0.1000
-        Par[54] = 61.0292
-        Par[55] = 138.3032
-        Par[56] = 5
-        Par[57] = 15
-        Par[58] = 20
-        Par[59] = 0.25
-        Par[60] = 120
-        Par[61] = 0.06
-        Par[62] = 15
-        Par[72] = 80
-        Par[73] = 4
-        Par[74] = 20
-        Par[75] = 0.2
-        Par[76] = 0
-        Par = Par.flatten()
+
+        # ODE param
+        # imported from parameters.py file; Par variable
+        Par = parameters.Par
 
         # init values
         file = 'yInitial.txt'
