@@ -160,7 +160,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             Y = np.concatenate((Y, yi[1:]))
         else:
             #print("para 160", para)
-            print("y0 supposedly y", y0)
+            #print("y0 supposedly y", y0)
             sol = solve_ivp(lambda t, y: FollicleFunction(
                                 t, y, Tovu, Follicles, para,
                                 parafoll, Par, dd1, Stim,
@@ -178,52 +178,13 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             Follicles.Follicle[Follicles.Active[i]-1]['Y'] = \
                     np.concatenate((Follicles.Follicle[Follicles.Active[i]-1]['Y'], Y[1:, i]))
 
-        if LutStim:
-            # Werte für die Medikamentengabe setzen
-            if Par[70] == Tovu and Par[63] == 0:
-                for i in range(Follicles.NumActive):
-                    if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == -1:
-                        # matrix of dosing times and drugs added: row1: times, row2: drug, row 3, dose
-                        if 1 <= t - Par[70] < 4:
-                            Par[70] = round(t)
-                            Par[71] = Par[70] + 15
-                            # Menopur
-                            numDoses = Par[71] - Par[70] + 1
-                            dosing_events1 = np.array(
-                                [[*range(Par[70], Par[71] + 1)],
-                                 [*range(1, numDoses + 1)]])
-                            Par[63] = 1
-
-        if FollStim:
-            if Par[70] == Tovu and Par[63] == 0:
-                if t > Par[70] + 14:
-                    for i in range(Follicles.NumActive):
-                        if Follicles.Follicle[Follicles.Active[i]-1]['Y'][-1] >= 14:
-                            # matrix of dosing times and drugs added: row1: times, row2: drug, row 3, dose
-                            Par[70] = round(t) + 1
-                            Par[71] = Par[70] + 14
-                            numDoses = Par[71] - Par[70] + 1
-                            dosing_events1 = np.array(
-                                [[*range(Par[70], Par[71] + 1)],
-                                 [*range(1, numDoses + 1)]])
-                            Par[63] = 1
-
-        if DoubStim:
-            if Par[70] == Tovu and Par[63] == 0:
-                Par[70] = round(t) + 20
-                Par[71] = Par[70] + 15
-                numDoses = Par[71] - Par[70] + 1
-                dosing_events1 = np.array(
-                    [[*range(Par[70], Par[71] + 1)],
-                     [*range(1, numDoses + 1)]])
-                Par[63] = 1
-
         # saves the measuring times of the active foll.
         TimeFol = np.concatenate((TimeFol, T[1:]))
         # saves last Y values of the follicles
         LastYValues = Y[-1, :]
         print("Y", Y[-1, :])
         print("?? not sure is assigned something:", LastYValues)
+        print("t:", round(t, 3))
 
         # save values for E2 
         E2['Time'] = np.concatenate((E2['Time'], T[1:]))
@@ -364,7 +325,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             
             if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] != 1:
                 # put the follicle back to the list of actives and its FSH
-                ActiveHelp.append(Follicles.Active[i]-1)
+                ActiveHelp.append(Follicles.Active[i])
                 # sensitivity back in the FSH vector...
                 Follicles.ActiveFSHS.append(Follicles.Follicle[Follicles.Active[i]-1]['FSHSensitivity'])
             
@@ -393,7 +354,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         for i in range(Follicles.NumActive):
             #print("f:", Follicles.Follicle[Follicles.Active[i]]['Y'])
             y0old.append(Follicles.Follicle[Follicles.Active[i]-1]['Y'][-1])
-        y0old = np.array(y0old)#.reshape(-1, 1)
+        y0old = np.array(y0old)
         print("Last Y value of follicles:", y0old)
         print("? not sure:", LastYValues[-para[1]:])
         y0 = np.concatenate((y0old, LastYValues[-para[1]:]))
@@ -403,56 +364,6 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         t = T[-1]
         if te - t < 0.001:
             t = te
-
-        if LutStim:
-            if (Par[63] == 1 and t > Par[71] + 1) or \
-               (Par[63] == 1 and count18 >= 3) or \
-               (Par[63] == 1 and count20 >= 1):
-                break
-
-        if FollStim:
-            if (Par[63] == 1 and t > Par[71] + 1) or \
-               (Par[63] == 1 and count18 >= 3):
-                break
-
-        if DoubStim:
-            if not firstExtraction:
-                if Par[63] == 1:
-                    if Par[71] < t:
-                        break
-                    if count18 > 0:
-                        result[0, 0] = count10
-                        result[1, 0] = count14
-                        result[2, 0] = count18
-                        result[3, 0] = Par[70]
-                        result[4, 0] = t
-                        # change medicaments
-                        Par[70] = int(np.ceil(t)) + 1
-                        Par[71] = Par[70] + 20
-                        numDoses = Par[71] - Par[70] + 1
-                        dosing_events1 = np.array(\
-                            [[Par[70] + i for i in range(numDoses)],
-                             range(1, numDoses + 1)])
-                        # change follicle size and destination for all follicles >8mm
-                        for i in range(indexFollGreater8.shape[1]):
-                            currentIndex = indexFollGreater8[0, i]
-                            Follicles.Follicle[\
-                                Follicles.Active[currentIndex]-1]['Destiny'] = -3
-                            Follicles.Follicle[\
-                                Follicles.Active[currentIndex]-1]['Y'][-1, 0] = 0
-                        if antralcount >= 2:
-                            firstExtraction = 1
-                        else:
-                            break
-                else:
-                    if Par[63] == 1:
-                        if count20 > 0 or count18 >= 3 or Par[71] < t:
-                            result[0, 1] = count10
-                            result[1, 1] = count14
-                            result[2, 1] = count18
-                            result[3, 1] = Par[70]
-                            result[4, 1] = t
-                            break
 
     # plotting
     if ShowPlots:
@@ -493,8 +404,8 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             plt.plot(Follicles.Follicle[i]['Time'], Follicles.Follicle[i]['Y'], color=[0, 0, 0],
                      label='x1', linewidth=widthofline)
     # Cycle length
-    FollOvulInfo = ...  # Define or load your FollOvulInfo data
-    OvuT = FollOvulInfo[2, :]
+    FollOvulInfo = np.array(FollOvulInfo)
+    OvuT = FollOvulInfo[:, 2]
     Cyclelength = np.diff(OvuT)
     Cyclelengthmean = np.mean(Cyclelength)
     Cyclelengthstd = np.std(Cyclelength)
@@ -505,9 +416,9 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         t1 = OvuT[i]
         t2 = OvuT[i + 1]
         count = 0
-        tp = len(FollInfo[0, :])  # Define or load your FollInfo data
+        tp = len(FollInfo[0])  # Define or load your FollInfo data
         for j in range(tp):
-            if t1 < FollInfo[0, j] < t2:
+            if t1 < FollInfo[j][0] < t2:
                 count += 1
         FollperCycle.append(count)
 
