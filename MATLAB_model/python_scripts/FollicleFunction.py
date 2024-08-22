@@ -21,23 +21,16 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
                 x[i] = 0
 
     print("Folls +..., ", y)
-
-    # calculate E2 concentration
-    #SF = np.pi * np.sum((x ** Par[56]) / (x ** Par[56] + Par[57] ** Par[56]) * (x ** 2))
-    #E2_lvl = Par[74] + (Par[58] + Par[59] * SF) - Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
-
-    # Calculation of P4 values
-    #P4_lvl = Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
-    print("Num follicles:", NumFollicles, "Current P4 lvl: ", e2p4_lvls[1])
+    print("Num follicles:", NumFollicles, "Current P4 lvl: ", e2p4_lvls[1][-1])
 
     # solve differential equations
-    dy = ODE_Model_NormalCycle(t, y, Par, e2p4_lvls[0], e2p4_lvls[1]) # E2 and p4 as  params
+    dy = ODE_Model_NormalCycle(t, y, Par, e2p4_lvls[0][-1], e2p4_lvls[1][-1]) # E2 and p4 as  params
     f = dy.copy()
 
     r = len(y)
     fshrezcomp = y[r-15]
     #p4all = y[r-16]
-    p4all = e2p4_lvls[1]
+    p4all = e2p4_lvls[1][-1]
     SumV = np.sum(x ** parafoll[0])
 
     for i in range(NumFollicles):
@@ -95,11 +88,11 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
 
     # calculate E2 concentration
     SF = np.pi * np.sum((x ** Par[56]) / (x ** Par[56] + Par[57] ** Par[56]) * (x ** 2))
-    e2p4_lvls[0] = Par[74] + (Par[58] + Par[59] * SF) - Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
+    e2p4_lvls[0].append(Par[74] + (Par[58] + Par[59] * SF) - Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
 
     # Calculation of P4 values
-    e2p4_lvls[1] = Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
-    print("Num follicles:", NumFollicles, "Current P4 lvl: ", e2p4_lvls[1])
+    e2p4_lvls[1].append(Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
+    print("Num follicles:", NumFollicles, "Current P4 lvl: ", e2p4_lvls[1][-1])
 
     """# calculate E2 concentration
     f[NumFollicles] = y[NumFollicles] - Par[74] - (Par[58] + Par[59] * SF) -\

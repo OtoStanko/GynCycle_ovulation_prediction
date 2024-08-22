@@ -41,7 +41,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
     # remove the values of E2 and P4 from the initial vector
     # they will be computed every step in the Follicle function
     # this allows us to use ODE solver, as DAE is not in the scipy
-    e2p4_lvls = [StartValues[1], StartValues[2]]
+    e2p4_lvls = [[StartValues[1]], [StartValues[2]]]
     y0 = np.array(StartValues)
     y0 = np.delete(y0, [1, 2])
 
