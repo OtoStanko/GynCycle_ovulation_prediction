@@ -37,7 +37,13 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
     y0P4 = StartValues[2]      # start value progesterone
     y0LH = StartValues[9]      # start value LH
     y0FSH = StartValues[7]     # start value FSH
+
+    # remove the values of E2 and P4 from the initial vector
+    # they will be computed every step in the Follicle function
+    # this allows us to use ODE solver, as DAE is not in the scipy
+    e2p4_lvls = [StartValues[1], StartValues[2]]
     y0 = np.array(StartValues)
+    y0 = np.delete(y0, [1, 2])
 
     # Values for tracking the follicles 
     FollCounter = 1
@@ -67,8 +73,8 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
     global ModelPop_CycleInfo
 
     # Tracking the concentrations of important hormone species
-    E2 = {'Time': np.array([t]), 'Y': np.array([y0[-17]])}
-    P4 = {'Time': np.array([t]), 'Y': np.array([y0[-16]])}
+    #E2 = {'Time': np.array([t]), 'Y': np.array([y0[-17]])}
+    #P4 = {'Time': np.array([t]), 'Y': np.array([y0[-16]])}
     FSH = {'Time': np.array([t]), 'Y': np.array([y0[-11]])}
     FSHRez = {'Time': np.array([t]), 'Y': np.array([y0[-15]])}
     LH = {'Time': np.array([t]), 'Y': np.array([y0[-9]])}
@@ -96,15 +102,16 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             tspan = [t, te]
 
         # Determine number of follicles
-        NumFollicles = len(y0) - para[1] 
+        NumFollicles = len(y0) - para[1]
 
         # Set mass matrix for DAE system
         n = len(y0)
         M = np.eye(n)
-        M[NumFollicles, NumFollicles] = 0     # alg. eq. for E2
-        M[NumFollicles + 1, NumFollicles + 1] = 0     # alg. eq. for P4
-        M[NumFollicles + 15, NumFollicles + 15] = 0     # alg. eq. for LH med
-        M[NumFollicles + 16, NumFollicles + 16] = 0     # alg. eq. for FSH med
+        # This is not needed, E2 and P4 no longer in y0
+        #M[NumFollicles, NumFollicles] = 0     # alg. eq. for E2
+        #M[NumFollicles + 1, NumFollicles + 1] = 0     # alg. eq. for P4
+        M[NumFollicles + 13, NumFollicles + 13] = 0     # alg. eq. for LH med
+        M[NumFollicles + 14, NumFollicles + 14] = 0     # alg. eq. for FSH med
 
         # Event function stops the integration when an ovulation takes place within the interval tspan
         #print("para", para)
@@ -137,7 +144,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                                         t, y, Tovu, Follicles, para,
                                         parafoll, Par, dd1, Stim,
                                         LutStim, FollStim, DoubStim,
-                                        firstExtraction),
+                                        firstExtraction, e2p4_lvls),
                                     tspan, yInitial, method='LSODA',
                                     **options)
                     ti = sol.t
@@ -152,7 +159,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                                 t, y, Tovu, Follicles, para,
                                 parafoll, Par, dd1, Stim,
                                 LutStim, FollStim, DoubStim,
-                                firstExtraction),
+                                firstExtraction, e2p4_lvls),
                             tspan, yInitial, method='LSODA', **options)
             ti = sol.t
             yi = sol.y.T
@@ -165,7 +172,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                                 t, y, Tovu, Follicles, para,
                                 parafoll, Par, dd1, Stim,
                                 LutStim, FollStim, DoubStim,
-                                firstExtraction),
+                                firstExtraction, e2p4_lvls),
                             tspan, y0, method='LSODA', **options)
             T = sol.t
             Y = sol.y.T
@@ -187,11 +194,11 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         print("t:", round(t, 3))
 
         # save values for E2 
-        E2['Time'] = np.concatenate((E2['Time'], T[1:]))
-        E2['Y'] = np.concatenate((E2['Y'], Y[1:, -17]))
+        #E2['Time'] = np.concatenate((E2['Time'], T[1:]))
+        #E2['Y'] = np.concatenate((E2['Y'], Y[1:, -17]))
         # save values for P4
-        P4['Time'] = np.concatenate((P4['Time'], T[1:]))
-        P4['Y'] = np.concatenate((P4['Y'], Y[1:, -16]))
+        #P4['Time'] = np.concatenate((P4['Time'], T[1:]))
+        #P4['Y'] = np.concatenate((P4['Y'], Y[1:, -16]))
         # save values for LH
         LH['Time'] = np.concatenate((LH['Time'], T[1:]))
         LH['Y'] = np.concatenate((LH['Y'], Y[1:, -9]))
@@ -239,7 +246,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             testyslope = FollicleFunction(T[-1], testyvalues, Tovu,
                                           Follicles, para, parafoll,
                                           Par, dd1, Stim, LutStim,
-                                          FollStim, DoubStim, firstExtraction)
+                                          FollStim, DoubStim, firstExtraction, e2p4_lvls)
 
             # if follicle got chance to survive -> initiate new follicle and update follicles-vector
             if testyslope[-para[1]-1] > 0:
@@ -270,7 +277,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         para[0] = 0
         res = FollicleFunction(T[-1], LastYValues, Tovu, Follicles,
                                para, parafoll, Par, dd1, Stim,
-                               LutStim, FollStim, DoubStim, firstExtraction)
+                               LutStim, FollStim, DoubStim, firstExtraction, e2p4_lvls)
         # reset vector of active FSH sensitivities
         Follicles.ActiveFSHS = []
 
@@ -439,14 +446,15 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                         linewidth=widthofline, label='x1')
 
         # P4
-        hp4, = plt.plot(P4['Time'], P4['Y'], color=[1, 0, 1],
-                        linewidth=widthofline, label='x1')
+        """hp4, = plt.plot(P4['Time'], P4['Y'], color=[1, 0, 1],
+                        linewidth=widthofline, label='x1')"""
 
         # Threshold when you can measure the follicle size
         hTwo = plt.plot(plt.xlim(), [4, 4], color='r')
 
         # Plot for the follicle size, amount of FSH and amount of P4 
-        h = [hfsh, hTwo, hp4, hLH]
+        #h = [hfsh, hTwo, hp4, hLH]
+        h = [hfsh, hTwo, hLH]
         plt.xlabel('time in d', fontsize=15)
         plt.ylabel('follicle diameter in mm', fontsize=15)
         plt.ylim([0, 50])
@@ -456,15 +464,15 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         plt.legend(h, ['follicle growth', 'FSH', 'measurable', 'P4', 'LH'],
                    fontsize=15, loc='northeast')
 
-        plt.figure(2)
+        """plt.figure(2)
         plt.plot(P4['Time'], P4['Y'], LH['Time'], LH['Y'], linewidth=2)
         plt.gca().tick_params(labelsize=24)
-        plt.legend(['P4', 'FSH'], fontsize=24, loc='northeastoutside')
+        plt.legend(['P4', 'FSH'], fontsize=24, loc='northeastoutside')"""
 
-        plt.figure(3)
+        """plt.figure(3)
         plt.plot(E2['Time'], E2['Y'], LH['Time'], LH['Y'], linewidth=2)
         plt.gca().tick_params(labelsize=24)
-        plt.legend(['E2', 'LH'], fontsize=24, loc='northeastoutside')
+        plt.legend(['E2', 'LH'], fontsize=24, loc='northeastoutside')"""
 
         plt.figure(4)
         plt.plot(GnRH['Time'], GnRH['Y'], linewidth=2)
@@ -518,14 +526,14 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             H = Data[Data[:, -1] == ID[i]]
             plt.scatter(H[:, 0], H[:, 3], marker='x')
             #plt.hold(True)
-        for i in range(len(FollOvulInfo[-1])):
+        """for i in range(len(FollOvulInfo[-1])):
             Tovu = FollOvulInfo[2, i]
             t1 = Tovu - 14
             t2 = Tovu + 14
             idx1 = np.argmin(np.abs(E2['Time'] - t1))
             idx2 = np.argmin(np.abs(E2['Time'] - t2))
             Timenew = E2['Time'][idx1:idx2 + 1] - t1
-            plt.plot(Timenew, E2['Y'][idx1:idx2 + 1], 'k--')
+            plt.plot(Timenew, E2['Y'][idx1:idx2 + 1], 'k--')"""
             #plt.hold(True)
 
         plt.figure(8)
@@ -539,31 +547,31 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             plt.scatter(H[:, 0], H[:, 4], marker='x')
             #plt.hold(True)
 
-        for i in range(len(FollOvulInfo[-1])):
+        """for i in range(len(FollOvulInfo[-1])):
             Tovu = FollOvulInfo[2, i]
             t1 = Tovu - 14
             t2 = Tovu + 14
             idx1 = np.argmin(np.abs(P4['Time'] - t1))
             idx2 = np.argmin(np.abs(P4['Time'] - t2))
             Timenew = P4['Time'][idx1:idx2 + 1] - t1
-            plt.plot(Timenew, P4['Y'][idx1:idx2 + 1], 'k--')
+            plt.plot(Timenew, P4['Y'][idx1:idx2 + 1], 'k--')"""
             #plt.hold(True)
 
-        freq = []
+        """freq = []
         for i in range(len(E2['Y'])):
             yGfreq = Par[0] / (1 + (P4['Y'][i] / Par[1]) ** Par[2]) *\
                      (1 + E2['Y'][i] ** Par[3] / (Par[4] ** Par[3] +
                                                E2['Y'][i] ** Par[3]))
-            freq.append(yGfreq)
+            freq.append(yGfreq)"""
 
-        plt.figure(9)
-        plt.plot(E2['Time'], freq)
+        #plt.figure(9)
+        #plt.plot(E2['Time'], freq)
 
         plt.figure(10)
         plt.plot(FSHRez['Time'], FSHRez['Y'])
         plt.show()
 
-    if Par[64] == 1:
+    """if Par[64] == 1:
         val, idx = min((abs(E2['Time'] - (Par[71] - 1)), i)\
                        for i in range(len(E2['Time'])))
         E2dm1 = E2['Y'][idx]
@@ -619,7 +627,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         count18
         count20
         dosing_events1
-        t
+        t"""
 
     if Foll_ModelPop or Horm_ModelPop:
         totalcheck = 0

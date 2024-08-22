@@ -34,7 +34,7 @@ def StartSimulation():
         tb = 0
         te = 10
         # technical params
-        para = np.array([0, 17])
+        para = np.array([0, 15])
         # follicle params
         parafoll = np.array([
             2,                  # v - fractal dimension
