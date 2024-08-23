@@ -6,24 +6,18 @@ from CreateFollicles import CreateFollicles
 from Simulation import Simulation
 
 import parameters
+from SimulationSettings import SimulationSettings
 
 def StartSimulation():
-    runnum = 30
-    # save simulation results
-    ShowPlots = 1
-    SaveSim = 0
-    SavePlotStuff = 0
-    SavePop = 0
+    runnum = 1
+
+    settings = SimulationSettings(ShowPlots=1, SaveSim = 0, SavePlotStuff = 0,
+                                  SavePop = 0, NormalCycle = 1, LutStim = 0,
+                                  FollStim = 0, DoubStim = 0, Foll_ModelPop = 0,
+                                  Horm_ModelPop = 0)
     DirStuff = os.path.join(os.getcwd(), "..")
     #print(DirStuff)
-    # select type of simulation
-    NormalCycle = 1
-    LutStim = 0
-    FollStim = 0
-    DoubStim = 0
-    Foll_ModelPop = 0
-    Horm_ModelPop = 0
-    
+
     global ModelPop_Params
     ModelPop_Params = []
     global ModelPop_CycleInfo
@@ -32,8 +26,10 @@ def StartSimulation():
     for runind in range(1, runnum + 1):
         # integration time beginning and end
         tb = 0
-        te = 10
+        te = 40
         # technical params
+        # ODE function called to test(0) or not (1)
+        # number of non-follcile equations (NO DRUG)
         para = np.array([0, 15])
         # follicle params
         parafoll = np.array([
@@ -71,11 +67,10 @@ def StartSimulation():
         y0Foll = 4
         #print(y0Foll)
         #print(yInitial)
-        #StartValues = np.array([y0Foll] + yInitial.tolist()).reshape(1, -1)
         StartValues = np.concatenate(([y0Foll], yInitial))
         #print(StartValues)
 
-        if Foll_ModelPop or Horm_ModelPop:
+        if settings.foll_modelPop or settings.horm_modelPop:
             FSHVec = np.genfromtxt('FSHS.txt', delimiter=',', skip_header=1)
             StartVec = np.genfromtxt('StartTimesPoiss.txt', delimiter=',', skip_header=1)
         else:
@@ -85,18 +80,16 @@ def StartSimulation():
         """
             Normal cycle
         """
-        if NormalCycle:
+        if settings.normalCycle:
             Stim = 0
             Simulation(para, paraPoi, parafoll, Par,
                        tb, te, StartValues, StartVec,
-                       FSHVec, ShowPlots, SaveSim,
-                       SavePlotStuff, DirStuff, Stim,
-                       LutStim, FollStim, DoubStim,
-                       Foll_ModelPop, Horm_ModelPop, runind)
+                       FSHVec, DirStuff, Stim,
+                       runind, settings)
         """
             Luteal phase stimulation
         """
-        if LutStim:
+        if settings.lut_stim:
             Stim = 1
             Par[64] = 0
             Par[65] = 13.387 / 2.6667
@@ -110,14 +103,12 @@ def StartSimulation():
             Par = Par.T
             Simulation(para, paraPoi, parafoll, Par,
                        tb, te, StartValues, StartVec,
-                       FSHVec, ShowPlots, SaveSim,
-                       SavePlotStuff, DirStuff, Stim,
-                       LutStim, FollStim, DoubStim,
-                       Foll_ModelPop, Horm_ModelPop, runind)
+                       FSHVec, DirStuff, Stim,
+                       runind, settings)
         """
             Follicular phase stimulation
         """
-        if FollStim:
+        if settings.foll_stim:
             Stim = 1
             Par[64] = 0
             Par[65] = 13.387 / 2.6667
@@ -131,15 +122,13 @@ def StartSimulation():
             Par = Par.T
             Simulation(para, paraPoi, parafoll,Par,
                        tb, te, StartValues, StartVec,
-                       FSHVec, ShowPlots, SaveSim,
-                       SavePlotStuff, DirStuff, Stim,
-                       LutStim, FollStim, DoubStim,
-                       Foll_ModelPop, Horm_ModelPop, runind)
+                       FSHVec, DirStuff, Stim,
+                       runind, settings)
 
         """
             Double stimulation
         """
-        if DoubStim:
+        if settings.doub_stim:
             Stim = 1
             paraPoi[0] = 5 / 14
             y0Foll = 4
@@ -158,13 +147,11 @@ def StartSimulation():
             Par = Par.T
             Simulation(para, paraPoi, parafoll, Par,
                        tb, te, StartValues, StartVec,
-                       FSHVec, ShowPlots, SaveSim,
-                       SavePlotStuff, DirStuff, Stim,
-                       LutStim, FollStim, DoubStim,
-                       Foll_ModelPop, Horm_ModelPop, runind)
+                       FSHVec, DirStuff, Stim,
+                       runind, settings)
 
         #
-        if Foll_ModelPop:
+        if settings.foll_modelPop:
             Stim = 0
             parafoll[1] = np.random.lognormal(np.log(parafoll[1]), 0.15)
             parafoll[3] = np.random.lognormal(np.log(parafoll[3]), 0.15)
@@ -172,12 +159,10 @@ def StartSimulation():
             Par[32] = np.random.lognormal(np.log(Par[32]), 0.15)
             Simulation(para, paraPoi, parafoll, Par,
                        tb, te, StartValues, StartVec,
-                       FSHVec, ShowPlots, SaveSim,
-                       SavePlotStuff, DirStuff, Stim,
-                       LutStim, FollStim, DoubStim,
-                       Foll_ModelPop, Horm_ModelPop, runind)
+                       FSHVec, DirStuff, Stim,
+                       runind, settings)
 
-        if Horm_ModelPop:
+        if settings.horm_modelPop:
             Stim = 0
             indices = [1, 2, 5, 6, 8, 9, 22, 24, 26, 27, 28,
                        34, 35, 36, 40, 41, 43, 45, 46, 47, 51, 73]
@@ -185,12 +170,10 @@ def StartSimulation():
                 Par[i] = np.random.lognormal(mean=np.log(Par[i]), sigma=0.15)
             Simulation(para, paraPoi, parafoll, Par,
                        tb, te, StartValues, StartVec,
-                       FSHVec, ShowPlots, SaveSim,
-                       SavePlotStuff, DirStuff, Stim,
-                       LutStim, FollStim, DoubStim,
-                       Foll_ModelPop, Horm_ModelPop, runind)
+                       FSHVec, DirStuff, Stim,
+                       runind, settings)
 
-        if SavePop and runind % 10 == 0:
+        if settings.savePop and runind % 10 == 0:
             FileName = 'ModelPopulation_Parameters.txt'
             fullFileName = os.path.join(DirStuff, FileName)
             M = np.loadtxt(fullFileName)
