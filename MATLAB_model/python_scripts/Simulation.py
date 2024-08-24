@@ -140,7 +140,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                     sol = solve_ivp(lambda t, y: FollicleFunction(
                                         t, y, Tovu, Follicles, para,
                                         parafoll, Par, dd1, Stim,
-                                        settings, firstExtraction, e2p4_lvls),
+                                        settings, firstExtraction),
                                     tspan, yInitial, method='LSODA',
                                     **options)
                     ti = sol.t
@@ -154,7 +154,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             sol = solve_ivp(lambda t, y: FollicleFunction(
                                 t, y, Tovu, Follicles, para,
                                 parafoll, Par, dd1, Stim,
-                                settings, firstExtraction, e2p4_lvls),
+                                settings, firstExtraction),
                             tspan, yInitial, method='LSODA', **options)
             ti = sol.t
             yi = sol.y.T
@@ -166,7 +166,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             sol = solve_ivp(lambda t, y: FollicleFunction(
                                 t, y, Tovu, Follicles, para,
                                 parafoll, Par, dd1, Stim,
-                                settings, firstExtraction, e2p4_lvls),
+                                settings, firstExtraction),
                             tspan, y0, method='LSODA', **options)
             T = sol.t
             Y = sol.y.T
@@ -182,17 +182,28 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         # saves the measuring times of the active foll.
         TimeFol = np.concatenate((TimeFol, T[1:]))
         # saves last Y values of the follicles
-        LastYValues = Y[-1, :]
-        print("Y", Y[-1, :])
-        print("?? not sure is assigned something:", LastYValues)
-        print("t:", round(t, 3))
+        LastYValues = Y[-1, :] # What is assigned here? Are the values correct?
 
-        # save values for E2 
-        #E2['Time'] = np.concatenate((E2['Time'], T[1:]))
-        #E2['Y'] = np.concatenate((E2['Y'], Y[1:, -17]))
+        # E2 production
+        # calculate E2 concentration
+        # recalculate the x in every time step
+        solution_time_points = T[1:]
+        num_t = len(solution_time_points)
+        for tidx in range(len(solution_time_points)):
+            x = y0[:NumFollicles]
+            x = np.array([])
+            for i in range(NumFollicles):
+                if NumFollicles > 0 and para[0] == 0 and Follicles.Follicle[Follicles.Active[i] - 1]['Destiny'] == 4:
+                    x = np.append(x,0)
+                else:
+                    x = np.append(x, Follicles.Follicle[Follicles.Active[i] - 1]['Y'][-num_t+tidx])
+            t = solution_time_points[tidx]
+            SF = np.pi * np.sum((x ** Par[56]) / (x ** Par[56] + Par[57] ** Par[56]) * (x ** 2))
+            e2p4_lvls[0].append(Par[74] + (Par[58] + Par[59] * SF) - Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
         # save values for P4
-        #P4['Time'] = np.concatenate((P4['Time'], T[1:]))
-        #P4['Y'] = np.concatenate((P4['Y'], Y[1:, -16]))
+        solution_time_points = T[1:]
+        for t in solution_time_points:
+            e2p4_lvls[1].append(Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
         # save values for LH
         LH['Time'] = np.concatenate((LH['Time'], T[1:]))
         LH['Y'] = np.concatenate((LH['Y'], Y[1:, -9]))
@@ -240,7 +251,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             testyslope = FollicleFunction(T[-1], testyvalues, Tovu,
                                           Follicles, para, parafoll,
                                           Par, dd1, Stim, settings,
-                                          firstExtraction, e2p4_lvls)
+                                          firstExtraction)
 
             # if follicle got chance to survive -> initiate new follicle and update follicles-vector
             if testyslope[-para[1]-1] > 0:
@@ -271,7 +282,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         para[0] = 0
         res = FollicleFunction(T[-1], LastYValues, Tovu, Follicles,
                                para, parafoll, Par, dd1, Stim,
-                               settings, firstExtraction, e2p4_lvls, 0)
+                               settings, firstExtraction)
         # reset vector of active FSH sensitivities
         Follicles.ActiveFSHS = []
 
@@ -372,6 +383,10 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         plt.clf()
         widthofline = 2
         #plt.hold(True)
+    print(len(FSH['Time']), len(LH['Time']), len(GnRH['Time']), len(e2p4_lvls[1]), len(e2p4_lvls[0]))
+    print(FSH['Time'][-1:-10:-1])
+    print(LH['Time'][-1:-10:-1])
+    print(GnRH['Time'][-1:-10:-1])
 
     # vector to save informations about the ovulating follicle
     FollOvulInfo = []
@@ -499,9 +514,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         plt.legend(['E2'], fontsize=24, loc='upper left')
 
         plt.figure(8)
-        e_end = LH['Time'][-1]
-        num_elements = len(e2p4_lvls[1])
-        plt.plot([(i+1)*(e_end/num_elements) for i in range(num_elements)], e2p4_lvls[1], linewidth=2)
+        plt.plot(LH['Time'], e2p4_lvls[1], linewidth=2)
         plt.gca().tick_params(labelsize=24)
         plt.legend(['P4'], fontsize=24, loc='upper left')
 
