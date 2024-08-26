@@ -190,7 +190,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         solution_time_points = T[1:]
         num_t = len(solution_time_points)
         for tidx in range(len(solution_time_points)):
-            x = y0[:NumFollicles]
+            #x = y0[:NumFollicles]
             x = np.array([])
             for i in range(NumFollicles):
                 if NumFollicles > 0 and para[0] == 0 and Follicles.Follicle[Follicles.Active[i] - 1]['Destiny'] == 4:
@@ -199,7 +199,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                     x = np.append(x, Follicles.Follicle[Follicles.Active[i] - 1]['Y'][-num_t+tidx])
             t = solution_time_points[tidx]
             SF = np.pi * np.sum((x ** Par[56]) / (x ** Par[56] + Par[57] ** Par[56]) * (x ** 2))
-            e2p4_lvls[0].append(Par[74] + (Par[58] + Par[59] * SF) - Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
+            e2p4_lvls[0].append(Par[74] + (Par[58] + Par[59] * SF) + Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
         # save values for P4
         solution_time_points = T[1:]
         for t in solution_time_points:

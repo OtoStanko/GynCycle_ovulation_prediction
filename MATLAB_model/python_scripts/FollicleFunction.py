@@ -30,7 +30,7 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, sett
 
     # calculate E2 concentration
     SF = np.pi * np.sum((x ** Par[56]) / (x ** Par[56] + Par[57] ** Par[56]) * (x ** 2))
-    E2_lvl = Par[74] + (Par[58] + Par[59] * SF) - Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
+    E2_lvl = Par[74] + (Par[58] + Par[59] * SF) + Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
     P4_lvl = Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
     print("E2:", E2_lvl, "P4:", P4_lvl)
     #print("Folls +..., ", y)
