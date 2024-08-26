@@ -1,5 +1,8 @@
 import numpy as np
 
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
 def EvaluateFollicle(t, y, para, parafoll, LH):
     #print("para evalfol", np.array(para))
     m = parafoll[6]
@@ -21,10 +24,14 @@ def EvaluateFollicle(t, y, para, parafoll, LH):
         stop = 1
         # locates zeros where the event function is decreasing
         direction = -1
+        return (m - 0.001) - np.max(FollSize)
     else:
         lookfor = 0
         stop = 0
         direction = -1
+        return 0
+        return ((m - 0.001) - np.max(FollSize)) * (parafoll[9] - y_lh)
+
 
     return lookfor, stop, direction
 

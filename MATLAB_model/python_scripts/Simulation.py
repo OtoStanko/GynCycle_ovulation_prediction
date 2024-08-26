@@ -137,11 +137,13 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             for i in range(len(dosing_timeIdx)):
                 tspan = [tstart, dosing_events1[0, dosing_timeIdx[i]]]
                 if tspan[0] != tspan[1]:
+                    EvaluateFollicle.terminal = True
                     sol = solve_ivp(lambda t, y: FollicleFunction(
                                         t, y, Tovu, Follicles, para,
                                         parafoll, Par, dd1, Stim,
                                         settings, firstExtraction),
                                     tspan, yInitial, method='LSODA',
+                                    events=lambda t_ev, y_ev: EvaluateFollicle(t_ev, y_ev, para, parafoll, LH),
                                     **options)
                     ti = sol.t
                     yi = sol.y.T
@@ -151,11 +153,14 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                     yInitial = Y[-1]
                 dd1 = dosing_events1[1, dosing_timeIdx[i]]
             tspan = [T[-1], tend]
+            EvaluateFollicle.terminal = True
             sol = solve_ivp(lambda t, y: FollicleFunction(
                                 t, y, Tovu, Follicles, para,
                                 parafoll, Par, dd1, Stim,
                                 settings, firstExtraction),
-                            tspan, yInitial, method='LSODA', **options)
+                            tspan, yInitial, method='LSODA',
+                            events=lambda t_ev, y_ev: EvaluateFollicle(t_ev, y_ev, para, parafoll, LH),
+                            **options)
             ti = sol.t
             yi = sol.y.T
             T = np.concatenate((T, ti[1:]))
@@ -163,11 +168,14 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         else:
             #print("para 160", para)
             #print("y0 supposedly y", y0)
+            EvaluateFollicle.terminal = True
             sol = solve_ivp(lambda t, y: FollicleFunction(
                                 t, y, Tovu, Follicles, para,
                                 parafoll, Par, dd1, Stim,
                                 settings, firstExtraction),
-                            tspan, y0, method='LSODA', **options)
+                            tspan, y0, method='LSODA',
+                            events=lambda t_ev, y_ev: EvaluateFollicle(t_ev, y_ev, para, parafoll, LH),
+                            **options)
             T = sol.t
             Y = sol.y.T
 
@@ -383,10 +391,6 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         plt.clf()
         widthofline = 2
         #plt.hold(True)
-    print(len(FSH['Time']), len(LH['Time']), len(GnRH['Time']), len(e2p4_lvls[1]), len(e2p4_lvls[0]))
-    print(FSH['Time'][-1:-10:-1])
-    print(LH['Time'][-1:-10:-1])
-    print(GnRH['Time'][-1:-10:-1])
 
     # vector to save informations about the ovulating follicle
     FollOvulInfo = []
@@ -466,57 +470,39 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         hfsh, = plt.plot(FSH['Time'], FSH['Y'], color=[1 / 2, 1, 1 / 2],
                  linewidth=widthofline, label='FSH')
 
-        # LH  
-        hLH, = plt.plot(LH['Time'], LH['Y'], color=[1, 1/4, 1/2],
-                        linewidth=widthofline, label='LH')
-
         # P4
-        """hp4, = plt.plot(P4['Time'], P4['Y'], color=[1, 0, 1],
-                        linewidth=widthofline, label='x1')"""
-
+        p4, = plt.plot(LH['Time'], e2p4_lvls[1], linewidth=2, label='P4')
+        #plt.legend(['P4'], fontsize=24, loc='upper left')
 
         # Plot for the follicle size, amount of FSH and amount of P4 
-        h = [hfsh, hLH]
+        h = [hfsh, p4]
         plt.xlabel('time in d', fontsize=15)
-        plt.ylabel('LH and hfsh c', fontsize=15)
+        plt.ylabel('FSH and P4 c', fontsize=15)
         #plt.ylim([-30, 70])
         ax = plt.gca()
         ax.set_box_aspect(1)
         ax.tick_params(labelsize=15)
-        plt.legend(h, ['FSH',  'LH'],
+        plt.legend(h, ['FSH',  'P4'],
                    fontsize=15, loc='upper left')
 
-        """plt.figure(2)
-        plt.plot(P4['Time'], P4['Y'], LH['Time'], LH['Y'], linewidth=2)
-        plt.gca().tick_params(labelsize=24)
-        plt.legend(['P4', 'FSH'], fontsize=24, loc='northeastoutside')"""
-
-        """plt.figure(3)
-        plt.plot(E2['Time'], E2['Y'], LH['Time'], LH['Y'], linewidth=2)
-        plt.gca().tick_params(labelsize=24)
-        plt.legend(['E2', 'LH'], fontsize=24, loc='northeastoutside')"""
-
+        # GnRH
         plt.figure(4)
         plt.plot(GnRH['Time'], GnRH['Y'], linewidth=2)
         plt.gca().tick_params(labelsize=24)
         plt.legend(['GnRH'], fontsize=24, loc='upper left')
 
-        plt.figure(6)
-        plt.plot(LH['Time'], LH['Y'], linewidth=2)
-        plt.gca().tick_params(labelsize=24)
-        plt.legend(['LH'], fontsize=24, loc='upper left')
-
+        # E2 and LH
         plt.figure(7)
-        e_end = LH['Time'][-1]
-        num_elements = len(e2p4_lvls[0])
-        plt.plot([(i+1)*(e_end/num_elements) for i in range(num_elements)], e2p4_lvls[0], linewidth=2)
-        plt.gca().tick_params(labelsize=24)
-        plt.legend(['E2'], fontsize=24, loc='upper left')
+        e2, = plt.plot(LH['Time'], e2p4_lvls[0], linewidth=2, label='E2')
 
-        plt.figure(8)
-        plt.plot(LH['Time'], e2p4_lvls[1], linewidth=2)
+        # LH
+        hLH, = plt.plot(LH['Time'], LH['Y'], color=[1, 1 / 4, 1 / 2],
+                        linewidth=widthofline, label='LH')
+        h = [e2, hLH]
+        plt.gca().set_box_aspect(1)
         plt.gca().tick_params(labelsize=24)
-        plt.legend(['P4'], fontsize=24, loc='upper left')
+        plt.legend(h, ['E2', 'LH'], fontsize=24, loc='upper left')
+
 
         # Indexes of solutions are number from Model28_ODE + 1
         solutions = np.column_stack((solutions['Time'], solutions['Y']))
