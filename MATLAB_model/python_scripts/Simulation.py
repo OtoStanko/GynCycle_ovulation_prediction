@@ -137,13 +137,14 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             for i in range(len(dosing_timeIdx)):
                 tspan = [tstart, dosing_events1[0, dosing_timeIdx[i]]]
                 if tspan[0] != tspan[1]:
-                    EvaluateFollicle.terminal = True
+                    event_function = lambda t_ev, y_ev: EvaluateFollicle(t_ev, y_ev, para, parafoll, LH)
+                    event_function.terminal = True
                     sol = solve_ivp(lambda t, y: FollicleFunction(
                                         t, y, Tovu, Follicles, para,
                                         parafoll, Par, dd1, Stim,
                                         settings, firstExtraction),
                                     tspan, yInitial, method='LSODA',
-                                    events=lambda t_ev, y_ev: EvaluateFollicle(t_ev, y_ev, para, parafoll, LH),
+                                    events=event_function,
                                     **options)
                     ti = sol.t
                     yi = sol.y.T
@@ -153,13 +154,14 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                     yInitial = Y[-1]
                 dd1 = dosing_events1[1, dosing_timeIdx[i]]
             tspan = [T[-1], tend]
-            EvaluateFollicle.terminal = True
+            event_function = lambda t_ev, y_ev: EvaluateFollicle(t_ev, y_ev, para, parafoll, LH)
+            event_function.terminal = True
             sol = solve_ivp(lambda t, y: FollicleFunction(
                                 t, y, Tovu, Follicles, para,
                                 parafoll, Par, dd1, Stim,
                                 settings, firstExtraction),
                             tspan, yInitial, method='LSODA',
-                            events=lambda t_ev, y_ev: EvaluateFollicle(t_ev, y_ev, para, parafoll, LH),
+                            events=event_function,
                             **options)
             ti = sol.t
             yi = sol.y.T
@@ -168,16 +170,18 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         else:
             #print("para 160", para)
             #print("y0 supposedly y", y0)
-            EvaluateFollicle.terminal = True
+            event_function = lambda t_ev, y_ev: EvaluateFollicle(t_ev, y_ev, para, parafoll, LH)
+            event_function.terminal = True
             sol = solve_ivp(lambda t, y: FollicleFunction(
                                 t, y, Tovu, Follicles, para,
                                 parafoll, Par, dd1, Stim,
                                 settings, firstExtraction),
                             tspan, y0, method='LSODA',
-                            events=lambda t_ev, y_ev: EvaluateFollicle(t_ev, y_ev, para, parafoll, LH),
+                            events=event_function,
                             **options)
             T = sol.t
             Y = sol.y.T
+            #print("Events:", sol.t_events)
 
         for i in range(Follicles.NumActive):
             # saves all times of the foll that was active during last run
@@ -335,7 +339,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             
             # Follicle ovulates
             if (Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 4 and 
-                Follicles.Follicle[Follicles.Active[i]-1]['TimeDecrease'] + 0.5 <= t):
+                Follicles.Follicle[Follicles.Active[i]-1]['TimeDecrease'] <= t):
                 Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] = 1
                 Tovu = T[-1]
                 OvulationNumber = i
@@ -375,8 +379,8 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
             #print("f:", Follicles.Follicle[Follicles.Active[i]]['Y'])
             y0old.append(Follicles.Follicle[Follicles.Active[i]-1]['Y'][-1])
         y0old = np.array(y0old)
-        print("Last Y value of follicles:", y0old)
-        print("? not sure:", LastYValues[-para[1]:])
+        #print("Last Y value of follicles:", y0old)
+        #print("? not sure:", LastYValues[-para[1]:])
         y0 = np.concatenate((y0old, LastYValues[-para[1]:]))
         #y0 = np.vstack((y0old, LastYValues[-para[1]:]))
 
