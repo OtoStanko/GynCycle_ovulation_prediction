@@ -25,7 +25,8 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
     # Variable for the current time
     t = tb
     # Timepoint of last ovulation, initiated as 14 will be changed in the course of the simulation 
-    Tovu = 14
+    #Tovu = 14
+    Tovu = 40
 
     # Initial values
     y0Foll = StartValues[0]    # start size of the follicle
@@ -284,7 +285,9 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                     if Tovu > Par[70] and Par[63] == 0: 
                         Par[70] = Tovu
             
-            if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] != 1:
+            if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] != 1 and \
+                    (Follicles.Follicle[Follicles.Active[i]-1]['Time'][0] + 20 > t or
+                     Follicles.Follicle[Follicles.Active[i]-1]['Y'][-1] != 0):
                 # put the follicle back to the list of actives and its FSH
                 ActiveHelp.append(Follicles.Active[i])
                 # sensitivity back in the FSH vector...
