@@ -2,10 +2,9 @@ import numpy as np
 
 from HormoneModel import ODE_Model_NormalCycle
 
-def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, settings, firstExtraction):
+def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, Stim, settings):
     # determine number of active follicles
     NumFollicles = y.shape[0] - para[1] # does not work when a new follicle is added
-    #NumFollicles = len(Follicles.Active)
 
     if NumFollicles > 0:
         x = y[:NumFollicles]
@@ -26,8 +25,6 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, sett
             if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 4:
                 x[i] = 0
 
-    #SF = np.pi * np.sum((x ** Par[56]) / (x ** Par[56] + Par[57] ** Par[56]) * (x ** 2))
-
     # calculate E2 concentration
     SF = np.pi * np.sum((x ** Par[56]) / (x ** Par[56] + Par[57] ** Par[56]) * (x ** 2))
     E2_lvl = Par[74] + (Par[58] + Par[59] * SF) + Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
@@ -42,7 +39,6 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, sett
 
     r = len(y)
     fshrezcomp = y[r-15]
-    #p4all = y[r-16]
     p4all = P4_lvl
     SumV = np.sum(x ** parafoll[0])
 
@@ -61,7 +57,7 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, sett
         ffsh = (fshrezcomp ** 4) / (fshrezcomp ** 4 + (fFSH) ** 4)
 
         # follicles growth equation
-        X = ffsh * (xi - y[i]) * y[i] * (gamma - (kappa * (SumV - (parafoll[3] * (y[i] ** parafoll[0])))))
+        X = ffsh * (xi - fsize) * fsize * (gamma - (kappa * (SumV - (parafoll[3] * (fsize ** parafoll[0])))))
 
         if para[0] == 1:
             if X <= 0:
@@ -90,36 +86,5 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, sett
         else:
             # if called to test use normal equation
             f[i] = X
-
-    """"# E2 production
-    if NumFollicles > 0 and para[0] == 0:
-        for i in range(NumFollicles):
-            if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 4:
-                x[i] = 0
-
-    #SF = np.pi * np.sum((x ** Par[56]) / (x ** Par[56] + Par[57] ** Par[56]) * (x ** 2))
-
-    # calculate E2 concentration
-    if app:
-        SF = np.pi * np.sum((x ** Par[56]) / (x ** Par[56] + Par[57] ** Par[56]) * (x ** 2))
-        e2p4_lvls[0].append(Par[74] + (Par[58] + Par[59] * SF) - Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))"""
-
-    # Calculation of P4 values
-    #e2p4_lvls[1].append(Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
-    #print("Num follicles:", NumFollicles, "Current P4 lvl: ", e2p4_lvls[1][-1])
-
-    """# calculate E2 concentration
-    f[NumFollicles] = y[NumFollicles] - Par[74] - (Par[58] + Par[59] * SF) -\
-                      Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
-
-    # Calculation of P4 values
-    #print("P4: ", Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
-    f[NumFollicles + 1] = y[NumFollicles + 1] - Par[75] - Par[62] *\
-                          np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)"""
-
-    # Calculation of FSHAnaC
-    if Stim == 0:
-        f[NumFollicles + 14] = y[NumFollicles + 14] - 0
-        f[NumFollicles + 13] = y[NumFollicles + 13] - 0
 
     return f
