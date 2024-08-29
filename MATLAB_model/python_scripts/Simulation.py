@@ -19,14 +19,13 @@ from Poissonproc import poissonproc
 
 
 def Simulation(para, paraPoi, parafoll, Par, tb, te,
-               StartValues, StartTimes, FSHVec, DirStuff, Stim, runind, settings):
+               StartValues, StartTimes, FSHVec, Stim, runind, settings):
     
     # Integration period
     # Variable for the current time
     t = tb
     # Timepoint of last ovulation, initiated as 14 will be changed in the course of the simulation 
-    #Tovu = 14
-    Tovu = 40
+    Tovu = 14
 
     # Initial values
     y0Foll = StartValues[0]    # start size of the follicle
@@ -105,13 +104,6 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         M[NumFollicles + 14, NumFollicles + 14] = 0     # alg. eq. for FSH med
 
         # Event function stops the integration when an ovulation takes place within the interval tspan
-        #print("para", para)
-        #print("t", t, "y", y)
-        #options = {'mass': M,\
-                   #'events': lambda t, y: EvaluateFollicle(t, y, para, parafoll, LH)}
-        #print("para after", para)
-        options = {'mass': M}
-
         # solve differential equations
         para[0] = 0
         Y = np.array([])
@@ -127,8 +119,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                             parafoll, Par, Stim,
                             settings),
                         tspan, y0, method='LSODA',
-                        events=event_function,
-                        **options)
+                        events=event_function)
         T = sol.t
         Y = sol.y.T
         #print("Events:", sol.t_events)
@@ -284,7 +275,10 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                 if Stim:
                     if Tovu > Par[70] and Par[63] == 0: 
                         Par[70] = Tovu
-            
+
+            # Follicles that ovulated are no longer active
+            # Follicles that are dead and has been active for more than 20 days are also not considered
+            #   active to optimize the simulation
             if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] != 1 and \
                     (Follicles.Follicle[Follicles.Active[i]-1]['Time'][0] + 20 > t or
                      Follicles.Follicle[Follicles.Active[i]-1]['Y'][-1] != 0):
@@ -301,13 +295,9 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         # determine new initial values for all differential equations
         y0old = []
         for i in range(Follicles.NumActive):
-            #print("f:", Follicles.Follicle[Follicles.Active[i]]['Y'])
             y0old.append(Follicles.Follicle[Follicles.Active[i]-1]['Y'][-1])
         y0old = np.array(y0old)
-        #print("Last Y value of follicles:", y0old)
-        #print("? not sure:", LastYValues[-para[1]:])
         y0 = np.concatenate((y0old, LastYValues[-para[1]:]))
-        #y0 = np.vstack((y0old, LastYValues[-para[1]:]))
 
         # integration end reached
         t = T[-1]
@@ -319,7 +309,6 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         hf = plt.figure(1)
         plt.clf()
         widthofline = 2
-        #plt.hold(True)
 
     # vector to save informations about the ovulating follicle
     FollOvulInfo = []
@@ -350,13 +339,16 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
 
     # Cycle length
     FollOvulInfo = np.array(FollOvulInfo)
-    #OvuT = FollOvulInfo[:, 2]
-    #Cyclelength = np.diff(OvuT)
-    #Cyclelengthmean = np.mean(Cyclelength)
-    #Cyclelengthstd = np.std(Cyclelength)
-    #NumCycles = len(Cyclelength)
+    OvuT = FollOvulInfo[:, 2]
+    Cyclelength = np.diff(OvuT)
+    Cyclelengthmean = np.mean(Cyclelength)
+    Cyclelengthstd = np.std(Cyclelength)
+    NumCycles = len(Cyclelength)
+    print("Number of cycles in {} days: {}".format(te, NumCycles))
+    print("Mean cycle length: {}+-{} days".format(Cyclelengthmean, Cyclelengthstd))
 
-    """FollperCycle = []
+
+    FollperCycle = []
     for i in range(NumCycles):
         t1 = OvuT[i]
         t2 = OvuT[i + 1]
@@ -365,9 +357,8 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         for j in range(tp):
             if t1 < FollInfo[j][0] < t2:
                 count += 1
-        FollperCycle.append(count)"""
-
-    #FollperCyclemean = np.mean(FollperCycle)
+        FollperCycle.append(count)
+    FollperCyclemean = np.mean(FollperCycle)
 
     #a = sum(FollperCycle)
     #rest = n - a  # Define n appropriately
@@ -377,7 +368,6 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
     if settings.showPlots:  # Define ShowPlots appropriately
         # Threshold when you can measure the follicle size
         plt.plot(plt.xlim(), [4, 4], color='b')
-
         plt.xlabel('time in d', fontsize=15)
         plt.ylabel('follicle diameter in mm', fontsize=15)
         plt.ylim([-30, 70])
@@ -388,21 +378,17 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                    fontsize=15, loc='upper left')
 
         # FSH
-        #plt.plot(FSH['Time'], FSH['Y'], color=[1/2, 1, 1/2],
-        #                 linewidth=widthofline, label='FSH')
         plt.figure(2)
         hfsh, = plt.plot(FSH['Time'], FSH['Y'], color=[1 / 2, 1, 1 / 2],
                  linewidth=widthofline, label='FSH')
 
         # P4
         p4, = plt.plot(LH['Time'], e2p4_lvls[1], linewidth=2, label='P4')
-        #plt.legend(['P4'], fontsize=24, loc='upper left')
 
-        # Plot for the follicle size, amount of FSH and amount of P4 
+        # Plot for the FSH and P4
         h = [hfsh, p4]
         plt.xlabel('time in d', fontsize=15)
         plt.ylabel('FSH and P4 c', fontsize=15)
-        #plt.ylim([-30, 70])
         ax = plt.gca()
         ax.set_box_aspect(1)
         ax.tick_params(labelsize=15)
@@ -489,33 +475,33 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         t"""
 
     if settings.savePlotsStuff:
-        """FileName = f'E2_{runind}.csv'
-        fullFileName = os.path.join(DirStuff, FileName)
-        np.savetxt(fullFileName, E2['Y'], delimiter=',')"""
+        FileName = f'E2_{runind}.csv'
+        fullFileName = os.path.join(settings.outputDir, FileName)
+        np.savetxt(fullFileName, e2p4_lvls[0], delimiter=',')
 
         FileName = f'FSH_{runind}.csv'
-        fullFileName = os.path.join(DirStuff, FileName)
+        fullFileName = os.path.join(settings.outputDir, FileName)
         np.savetxt(fullFileName, FSH['Y'], delimiter=',')
 
         FileName = f'LH_{runind}.csv'
-        fullFileName = os.path.join(DirStuff, FileName)
+        fullFileName = os.path.join(settings.outputDir, FileName)
         np.savetxt(fullFileName, LH['Y'], delimiter=',')
 
-        """FileName = f'P4_{runind}.csv'
-        fullFileName = os.path.join(DirStuff, FileName)
-        np.savetxt(fullFileName, P4['Y'], delimiter=',')"""
+        FileName = f'P4_{runind}.csv'
+        fullFileName = os.path.join(settings.outputDir, FileName)
+        np.savetxt(fullFileName, e2p4_lvls[1], delimiter=',')
 
-        """FileName = f'Time_{runind}.csv'
-        fullFileName = os.path.join(DirStuff, FileName)
-        np.savetxt(fullFileName, E2['Time'], delimiter=',')"""
+        FileName = f'Time_{runind}.csv'
+        fullFileName = os.path.join(settings.outputDir, FileName)
+        np.savetxt(fullFileName, LH['Time'], delimiter=',')
 
         FileName = f'OvulationInfo_{runind}.csv'
-        fullFileName = os.path.join(DirStuff, FileName)
+        fullFileName = os.path.join(settings.outputDir, FileName)
         np.savetxt(fullFileName, FollOvulInfo, delimiter=',')
 
-        FileName = 'Solutions.csv'
+        """FileName = 'Solutions.csv'
         fullFileName = os.path.join(DirStuff, FileName)
-        np.savetxt(fullFileName, solutions['Y'], delimiter=',')
+        np.savetxt(fullFileName, solutions['Y'], delimiter=',')"""
 
     """if settings.saveSim:
         FileName = f'DomFolGrowth_{runind}.csv'

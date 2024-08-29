@@ -11,12 +11,11 @@ from SimulationSettings import SimulationSettings
 def StartSimulation():
     runnum = 1
 
-    settings = SimulationSettings(ShowPlots=1, SaveSim = 0, SavePlotStuff = 0,
+    settings = SimulationSettings(ShowPlots = 1, SaveSim = 0, SavePlotStuff = 1,
                                   SavePop = 0, NormalCycle = 1, LutStim = 0,
                                   FollStim = 0, DoubStim = 0, Foll_ModelPop = 0,
-                                  Horm_ModelPop = 0)
-    DirStuff = os.path.join(os.getcwd(), "..")
-    #print(DirStuff)
+                                  Horm_ModelPop = 0, workDir=os.path.join(os.getcwd(), ".."),
+                                  outputDir=os.path.join(os.getcwd(), "../outputDir/"))
 
     global ModelPop_Params
     ModelPop_Params = []
@@ -26,7 +25,7 @@ def StartSimulation():
     for runind in range(1, runnum + 1):
         # integration time beginning and end
         tb = 0
-        te = 80
+        te = 300
         # technical params
         # ODE function called to test(0) or not (1)
         # number of non-follicle equations (NO DRUG)
@@ -59,7 +58,7 @@ def StartSimulation():
         # init values
         file = 'yInitial.txt'
         delimiterIn = ';'
-        fullFileName = os.path.join(DirStuff, file)
+        fullFileName = os.path.join(settings.workDir, file)
         yInitial = np.genfromtxt(fullFileName, delimiter=delimiterIn, skip_header=0)
 
         # init follicles
@@ -80,19 +79,19 @@ def StartSimulation():
             Stim = 0
             Simulation(para, paraPoi, parafoll, Par,
                        tb, te, StartValues, StartVec,
-                       FSHVec, DirStuff, Stim,
+                       FSHVec, Stim,
                        runind, settings)
 
         if settings.savePop and runind % 10 == 0:
             FileName = 'ModelPopulation_Parameters.txt'
-            fullFileName = os.path.join(DirStuff, FileName)
+            fullFileName = os.path.join(settings.workDir, FileName)
             M = np.loadtxt(fullFileName)
             M = np.column_stack((M, ModelPop_Params))
             np.savetxt(fullFileName, M, delimiter=',')
             ModelPop_Params = []
 
             FileName = 'ModelPopulation_CycleInfo.txt'
-            fullFileName = os.path.join(DirStuff, FileName)
+            fullFileName = os.path.join(settings.workDir, FileName)
             M = np.loadtxt(fullFileName)
             M = np.column_stack((M, ModelPop_CycleInfo))
             np.savetxt(fullFileName, M, delimiter=',')
