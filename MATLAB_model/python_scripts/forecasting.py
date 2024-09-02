@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+from windowGenerator import WindowGenerator
 
 
 def sample_data(original_df, new_index, column):
@@ -117,12 +118,15 @@ sampled_df_timeH = sample_data(filtered_df_timeH, sapmled_df_timeH_index, hormon
 
 plt.plot(sampled_df_timeH.index, sampled_df_timeH[hormone], )
 plt.show()
-
-sampled_df_timeH['Month_sin'] = (np.sin((sampled_df_timeH.index * ((2 * np.pi / (25*24))))) * 5) + 15
-plt.plot(sampled_df_timeH['Month_sin'])
-plt.plot(sampled_df_timeH[hormone])
-plt.show()
-
+"""
+days = [23, 24, 25, 26, 27, 28, 29, 30]
+for day in days:
+    sampled_df_timeH['{} days'.format(day)] = (np.sin((sampled_df_timeH.index * ((2 * np.pi / (day * 24))))) * 5) + 15
+    plt.plot(sampled_df_timeH['{} days'.format(day)])
+    plt.plot(sampled_df_timeH[hormone])
+    plt.title('{} days cycle sin function'.format(day))
+    plt.show()
+"""
 fft = tf.signal.rfft(sampled_df_timeH[hormone])
 f_per_dataset = np.arange(0, len(fft))
 n_samples_h = len(sampled_df_timeH[hormone])
@@ -149,6 +153,7 @@ test_df = sampled_df_timeH[int(n*0.9):]
 num_features = sampled_df_timeH.shape[1]
 print(num_features)
 
+
 train_mean = train_df.mean()
 train_std = train_df.std()
 
@@ -161,9 +166,28 @@ plt.plot(val_df.index, val_df[hormone], color='blue')
 plt.plot(test_df.index, test_df[hormone], color='red')
 plt.show()
 
+w2 = WindowGenerator(input_width=599, label_width=1, shift=1,
+                     train_df=train_df, val_df=val_df, test_df=test_df,
+                     label_columns=[hormone])
 
+# Stack three slices, the length of the total window.
+example_window = tf.stack([np.array(train_df[:w2.total_window_size]),
+                           np.array(train_df[700:700+w2.total_window_size]),
+                           np.array(train_df[1400:1400+w2.total_window_size])])
 
+#example_inputs, example_labels = w2.split_window(example_window)
+#w2.example = example_inputs, example_labels
+#w2.plot()
 
+#print('All shapes are: (batch, time, features)')
+#print(f'Window shape: {example_window.shape}')
+#print(f'Inputs shape: {example_inputs.shape}')
+#print(f'Labels shape: {example_labels.shape}')
+
+print(w2.train.element_spec)
+for example_inputs, example_labels in w2.train.take(1):
+    print(f'Inputs shape (batch, time, features): {example_inputs.shape}')
+    print(f'Labels shape (batch, time, features): {example_labels.shape}')
 
 
 """
