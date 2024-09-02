@@ -10,6 +10,19 @@ from windowGenerator import WindowGenerator
 from models import Baseline
 
 
+def compile_and_fit(model, window, patience=2):
+    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                                    patience=patience,
+                                                    mode='min')
+    model.compile(loss=tf.keras.losses.MeanSquaredError(),
+                optimizer=tf.keras.optimizers.Adam(),
+                metrics=[tf.keras.metrics.MeanAbsoluteError()])
+    history = model.fit(window.train, epochs=MAX_EPOCHS,
+                      validation_data=window.val,
+                      callbacks=[early_stopping])
+    return history
+
+
 def sample_data(original_df, new_index, columns):
     # The records are not evenly distributed. We will do sampling with linear interpolation for the models
     """
@@ -57,6 +70,7 @@ train_test_split_days = 250
 test_days_end = 300
 hormone = 'FSH'
 features = ['FSH', 'E2', 'P4', 'LH']
+MAX_EPOCHS = 20
 
 
 timeFile = os.path.join(workDir, "Time_1.csv")
@@ -202,7 +216,7 @@ single_step_window = WindowGenerator(
     train_df=train_df, val_df=val_df, test_df=test_df,
     label_columns=[hormone])
 
-
+# Baseline model
 baseline = Baseline(label_index=column_indices[hormone])
 
 baseline.compile(loss=tf.keras.losses.MeanSquaredError(),
@@ -222,6 +236,37 @@ wide_window = WindowGenerator(
 #print(wide_window)
 wide_window.plot(baseline)
 
+# Linear model
+linear = tf.keras.Sequential([
+    tf.keras.layers.Dense(units=1)
+])
+history = compile_and_fit(linear, single_step_window)
+
+val_performance['Linear'] = linear.evaluate(single_step_window.val, return_dict=True)
+performance['Linear'] = linear.evaluate(single_step_window.test, verbose=0, return_dict=True)
+
+wide_window.plot(linear)
+
+plt.bar(x = range(len(train_df.columns)),
+        height=linear.layers[0].kernel[:,0].numpy())
+axis = plt.gca()
+axis.set_xticks(range(len(train_df.columns)))
+_ = axis.set_xticklabels(train_df.columns, rotation=90)
+plt.show()
+
+
+# Dense model
+dense = tf.keras.Sequential([
+    tf.keras.layers.Dense(units=64, activation='relu'),
+    tf.keras.layers.Dense(units=64, activation='relu'),
+    tf.keras.layers.Dense(units=1)
+])
+history = compile_and_fit(dense, single_step_window)
+
+val_performance['Dense'] = dense.evaluate(single_step_window.val, return_dict=True)
+performance['Dense'] = dense.evaluate(single_step_window.test, verbose=0, return_dict=True)
+
+wide_window.plot(dense)
 
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
