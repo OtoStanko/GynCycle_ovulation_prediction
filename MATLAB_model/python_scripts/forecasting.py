@@ -7,9 +7,10 @@ import tensorflow as tf
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from windowGenerator import WindowGenerator
+from models import Baseline
 
 
-def sample_data(original_df, new_index, column):
+def sample_data(original_df, new_index, columns):
     # The records are not evenly distributed. We will do sampling with linear interpolation for the models
     """
         for every time in the new index, find the largest smaller value and smallest larger value
@@ -21,6 +22,7 @@ def sample_data(original_df, new_index, column):
     for curr_time in new_index:
         while original_df.index[i + 1] < curr_time:
             i += 1
+        for feature
         # index_of_largest_smaller_time = i
         x0 = largest_smaller_time = original_df.index[i]
         y0 = largest_smaller_value = original_df[column][original_df.index[i]]
@@ -53,23 +55,27 @@ num_initial_days_to_discard = 50
 train_test_split_days = 250
 test_days_end = 300
 hormone = 'FSH'
+features = ['FSH', 'E2', 'P4', 'LH']
 
 
 timeFile = os.path.join(workDir, "Time_1.csv")
-FSHFile = os.path.join(workDir, "{}_1.csv".format(hormone))
 times = pd.read_csv(timeFile, header=None, names=['Time'])
-fsh_levels = pd.read_csv(FSHFile, header=None, names=[hormone])
+hormone_levels = [times]
+for feature in features:
+    feature_file = os.path.join(workDir, "{}_1.csv".format(feature))
+    feature_values = pd.read_csv(feature_file, header=None, names=[feature])
+    hormone_levels.append(feature_values)
 
-combined_df = pd.concat([times, fsh_levels], axis=1)
+combined_df = pd.concat(hormone_levels, axis=1)
 combined_df['Time'] = combined_df['Time'] * 24
 
 
 # Plot the loaded data
 sns.set()
-plt.ylabel('{} level'.format(hormone))
-plt.xlabel('Time in days')
+plt.ylabel('{} levels'.format('Hormones'))
 plt.xticks(rotation=45)
-plt.plot(combined_df['Time'], combined_df[hormone], )
+plt.xlabel('Time in hours')
+plt.plot(combined_df['Time'], combined_df[features], )
 plt.show()
 
 
@@ -169,6 +175,7 @@ plt.show()
 w2 = WindowGenerator(input_width=599, label_width=1, shift=1,
                      train_df=train_df, val_df=val_df, test_df=test_df,
                      label_columns=[hormone])
+#print(w2)
 
 # Stack three slices, the length of the total window.
 example_window = tf.stack([np.array(train_df[:w2.total_window_size]),
@@ -188,6 +195,31 @@ print(w2.train.element_spec)
 for example_inputs, example_labels in w2.train.take(1):
     print(f'Inputs shape (batch, time, features): {example_inputs.shape}')
     print(f'Labels shape (batch, time, features): {example_labels.shape}')
+
+single_step_window = WindowGenerator(
+    input_width=1, label_width=1, shift=1,
+    train_df=train_df, val_df=val_df, test_df=test_df,
+    label_columns=[hormone])
+
+
+baseline = Baseline(label_index=column_indices[hormone])
+
+baseline.compile(loss=tf.keras.losses.MeanSquaredError(),
+                 metrics=[tf.keras.metrics.MeanAbsoluteError()])
+
+val_performance = {}
+performance = {}
+val_performance['Baseline'] = baseline.evaluate(single_step_window.val, return_dict=True)
+performance['Baseline'] = baseline.evaluate(single_step_window.test, verbose=0, return_dict=True)
+
+
+wide_window = WindowGenerator(
+    input_width=24, label_width=24, shift=1,
+    train_df=train_df, val_df=val_df, test_df=test_df,
+    label_columns=[hormone])
+
+#print(wide_window)
+wide_window.plot(baseline)
 
 
 """
