@@ -8,6 +8,8 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from windowGenerator import WindowGenerator
 from models import Baseline
+import IPython
+import IPython.display
 
 
 def compile_and_fit(model, window, patience=2):
@@ -267,6 +269,36 @@ val_performance['Dense'] = dense.evaluate(single_step_window.val, return_dict=Tr
 performance['Dense'] = dense.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
 wide_window.plot(dense)
+
+
+# Multistep dense
+# CNN
+CONV_WIDTH = 3
+conv_window = WindowGenerator(input_width=CONV_WIDTH, label_width=1, shift=1,
+                              train_df=train_df, val_df=val_df, test_df=test_df,
+                              label_columns=[hormone])
+
+print(conv_window)
+conv_model = tf.keras.Sequential([
+    tf.keras.layers.Conv1D(filters=32,
+                           kernel_size=(CONV_WIDTH,),
+                           activation='relu'),
+    tf.keras.layers.Dense(units=32, activation='relu'),
+    tf.keras.layers.Dense(units=1),
+])
+history = compile_and_fit(conv_model, conv_window)
+
+IPython.display.clear_output()
+val_performance['Conv'] = conv_model.evaluate(conv_window.val, return_dict=True)
+performance['Conv'] = conv_model.evaluate(conv_window.test, verbose=0, return_dict=True)
+
+LABEL_WIDTH = 24
+INPUT_WIDTH = LABEL_WIDTH + (CONV_WIDTH - 1)
+wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH, label_width=LABEL_WIDTH, shift=1,
+                                    train_df=train_df, val_df=val_df, test_df=test_df,
+                                    label_columns=[hormone])
+
+wide_conv_window.plot(conv_model)
 
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
