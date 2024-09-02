@@ -17,31 +17,32 @@ def sample_data(original_df, new_index, columns):
         and interpolate them to get the new value
         Edge case if at least one of the is the same time
     """
-    FSH_levels = np.array([])
+    hormone_levels = {key: [] for key in columns}
     i = 0
     for curr_time in new_index:
         while original_df.index[i + 1] < curr_time:
             i += 1
-        for feature
-        # index_of_largest_smaller_time = i
-        x0 = largest_smaller_time = original_df.index[i]
-        y0 = largest_smaller_value = original_df[column][original_df.index[i]]
-        x1 = smallest_larger_time = original_df.index[i + 1]
-        y1 = smallest_larger_value = original_df[column][original_df.index[i + 1]]
-        x = curr_time
-        if type(curr_time) == np.datetime64:
-            diff_x1_x = (x1 - x).total_seconds()
-            diff_x_x0 = (x - x0).total_seconds()
-            diff_x1_x0 = (x1 - x0).total_seconds()
-        else:
-            diff_x1_x = (x1 - x)
-            diff_x_x0 = (x - x0)
-            diff_x1_x0 = (x1 - x0)
-        y = y0 * (diff_x1_x / diff_x1_x0) + y1 * (diff_x_x0 / diff_x1_x0)
-        FSH_levels = np.append(FSH_levels, y)
+        for feature in columns:
+            # index_of_largest_smaller_time = i
+            x0 = largest_smaller_time = original_df.index[i]
+            y0 = largest_smaller_value = original_df[feature][original_df.index[i]]
+            x1 = smallest_larger_time = original_df.index[i + 1]
+            y1 = smallest_larger_value = original_df[feature][original_df.index[i + 1]]
+            x = curr_time
+            if type(curr_time) == np.datetime64:
+                diff_x1_x = (x1 - x).total_seconds()
+                diff_x_x0 = (x - x0).total_seconds()
+                diff_x1_x0 = (x1 - x0).total_seconds()
+            else:
+                diff_x1_x = (x1 - x)
+                diff_x_x0 = (x - x0)
+                diff_x1_x0 = (x1 - x0)
+            y = y0 * (diff_x1_x / diff_x1_x0) + y1 * (diff_x_x0 / diff_x1_x0)
+            hormone_levels[feature].append(y)
 
     sampled_df = pd.DataFrame()
-    sampled_df[column] = FSH_levels
+    for feature in columns:
+        sampled_df[feature] = np.array(hormone_levels[feature])
     sampled_df.index = new_index
     sampled_df.index.name = 'DateTime'
     return sampled_df
@@ -110,9 +111,9 @@ new_index = pd.date_range(start=data_start_date,
                           end=data_stop_date,
                           freq="{}{}".format(sampling_frequency, sampling_frequency_unit))
 
-sampled_df = sample_data(filtered_df, new_index, hormone)
+sampled_df = sample_data(filtered_df, new_index, features)
 
-plt.plot(sampled_df.index, sampled_df[hormone], )
+plt.plot(sampled_df.index, sampled_df[features], )
 plt.show()
 
 
@@ -120,9 +121,9 @@ plt.show()
 sapmled_df_timeH_index = [i for i in range(num_initial_days_to_discard*24, test_days_end*24+1)]
 print(sapmled_df_timeH_index)
 print(len(sapmled_df_timeH_index))
-sampled_df_timeH = sample_data(filtered_df_timeH, sapmled_df_timeH_index, hormone)
+sampled_df_timeH = sample_data(filtered_df_timeH, sapmled_df_timeH_index, features)
 
-plt.plot(sampled_df_timeH.index, sampled_df_timeH[hormone], )
+plt.plot(sampled_df_timeH.index, sampled_df_timeH[features], )
 plt.show()
 """
 days = [23, 24, 25, 26, 27, 28, 29, 30]
