@@ -7,7 +7,7 @@ import tensorflow as tf
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from windowGenerator import WindowGenerator
-from models import Baseline
+from models import Baseline, ResidualWrapper
 import IPython
 import IPython.display
 
@@ -299,6 +299,64 @@ wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH, label_width=LABEL_W
                                     label_columns=[hormone])
 
 wide_conv_window.plot(conv_model)
+
+
+
+# RNN model
+# LSTM long short-term memory
+lstm_model = tf.keras.models.Sequential([
+    # Shape [batch, time, features] => [batch, time, lstm_units]
+    tf.keras.layers.LSTM(32, return_sequences=True),
+    # Shape => [batch, time, features]
+    tf.keras.layers.Dense(units=1)
+])
+history = compile_and_fit(lstm_model, wide_window)
+
+IPython.display.clear_output()
+val_performance['LSTM'] = lstm_model.evaluate(wide_window.val, return_dict=True)
+performance['LSTM'] = lstm_model.evaluate(wide_window.test, verbose=0, return_dict=True)
+
+wide_window.plot(lstm_model)
+
+
+# Residual connections
+residual_lstm = ResidualWrapper(
+    tf.keras.Sequential([
+    tf.keras.layers.LSTM(32, return_sequences=True),
+    tf.keras.layers.Dense(
+        num_features,
+        # The predicted deltas should start small.
+        # Therefore, initialize the output layer with zeros.
+        kernel_initializer=tf.initializers.zeros())
+]))
+
+history = compile_and_fit(residual_lstm, wide_window)
+
+IPython.display.clear_output()
+val_performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.val, return_dict=True)
+performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.test, verbose=0, return_dict=True)
+
+
+
+# Performance
+x = np.arange(len(performance))
+width = 0.3
+metric_name = 'mean_absolute_error'
+val_mae = [v[metric_name] for v in val_performance.values()]
+test_mae = [v[metric_name] for v in performance.values()]
+
+plt.ylabel('mean_absolute_error [T (degC), normalized]')
+plt.bar(x - 0.17, val_mae, width, label='Validation')
+plt.bar(x + 0.17, test_mae, width, label='Test')
+plt.xticks(ticks=x, labels=performance.keys(),
+           rotation=45)
+_ = plt.legend()
+plt.show()
+
+for name, value in performance.items():
+    print(f'{name:12s}: {value[metric_name]:0.4f}')
+
+
 
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
