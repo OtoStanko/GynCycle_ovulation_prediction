@@ -119,7 +119,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
                             parafoll, Par, Stim,
                             settings),
                         tspan, y0, method='LSODA',
-                        events=event_function)
+                        events=event_function, t_eval=)
         T = sol.t
         Y = sol.y.T
         #print("Events:", sol.t_events)

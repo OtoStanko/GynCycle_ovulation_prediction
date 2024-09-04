@@ -57,7 +57,7 @@ class WindowGenerator():
         labels.set_shape([None, self.label_width, None])
         return inputs, labels
 
-    def plot(self, model=None, plot_col='FSH', max_subplots=3):
+    def plot(self, plot_col, model=None, max_subplots=3):
         inputs, labels = self.example
         plt.figure(figsize=(12, 8))
         plot_col_index = self.column_indices[plot_col]

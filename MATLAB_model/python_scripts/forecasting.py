@@ -7,7 +7,7 @@ import tensorflow as tf
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from windowGenerator import WindowGenerator
-from models import Baseline, ResidualWrapper
+from models import Baseline, ResidualWrapper, FeedBack
 import IPython
 import IPython.display
 
@@ -65,14 +65,14 @@ def sample_data(original_df, new_index, columns):
 
 # Set the parameters
 workDir = os.path.join(os.getcwd(), "../outputDir/")
-sampling_frequency = 1
+sampling_frequency = 12
 sampling_frequency_unit = 'H'
 num_initial_days_to_discard = 50
 train_test_split_days = 250
 test_days_end = 300
-hormone = 'FSH'
+hormone = 'LH'
 features = ['FSH', 'E2', 'P4', 'LH']
-MAX_EPOCHS = 20
+MAX_EPOCHS = 25
 
 
 timeFile = os.path.join(workDir, "Time_1.csv")
@@ -86,13 +86,14 @@ for feature in features:
 combined_df = pd.concat(hormone_levels, axis=1)
 combined_df['Time'] = combined_df['Time'] * 24
 
-
+print('Num records in the loaded data:', len(combined_df[hormone]))
 # Plot the loaded data
 sns.set()
 plt.ylabel('{} levels'.format('Hormones'))
 plt.xticks(rotation=45)
 plt.xlabel('Time in hours')
 plt.plot(combined_df['Time'], combined_df[features], )
+plt.title('Loaded combined dataframe')
 plt.show()
 
 
@@ -130,16 +131,17 @@ new_index = pd.date_range(start=data_start_date,
 sampled_df = sample_data(filtered_df, new_index, features)
 
 plt.plot(sampled_df.index, sampled_df[features], )
+plt.title('Sampled dataframe with datetime')
 plt.show()
 
 
 
-sapmled_df_timeH_index = [i for i in range(num_initial_days_to_discard*24, test_days_end*24+1)]
-print(sapmled_df_timeH_index)
+sapmled_df_timeH_index = [i for i in range(num_initial_days_to_discard*24, test_days_end*24+1, sampling_frequency)]
 print(len(sapmled_df_timeH_index))
 sampled_df_timeH = sample_data(filtered_df_timeH, sapmled_df_timeH_index, features)
-
+print('Num records in the sampled dataframe with raw hours:', len(sampled_df_timeH[hormone]))
 plt.plot(sampled_df_timeH.index, sampled_df_timeH[features], )
+plt.title('Sampled dataframe with raw hours')
 plt.show()
 """
 days = [23, 24, 25, 26, 27, 28, 29, 30]
@@ -150,7 +152,7 @@ for day in days:
     plt.title('{} days cycle sin function'.format(day))
     plt.show()
 """
-fft = tf.signal.rfft(sampled_df_timeH[hormone])
+"""fft = tf.signal.rfft(sampled_df_timeH[hormone])
 f_per_dataset = np.arange(0, len(fft))
 n_samples_h = len(sampled_df_timeH[hormone])
 print(n_samples_h)
@@ -164,7 +166,7 @@ plt.ylim(0, 25000)
 plt.xlim([0.1, max(plt.xlim())])
 plt.xticks([1, 365.2524/12, 365.2524], labels=['1/Year', '1/month', '1/day'])
 _ = plt.xlabel('Frequency (log scale)')
-plt.show()
+plt.show()"""
 
 column_indices = {name: i for i, name in enumerate(sampled_df_timeH.columns)}
 
@@ -187,17 +189,46 @@ test_df = (test_df - train_mean) / train_std
 plt.plot(train_df.index, train_df[hormone], color='black')
 plt.plot(val_df.index, val_df[hormone], color='blue')
 plt.plot(test_df.index, test_df[hormone], color='red')
+plt.title('Sampled raw hours split {} levels normalized'.format(hormone))
 plt.show()
 
-w2 = WindowGenerator(input_width=599, label_width=1, shift=1,
+# Tru adding artificial samples every hour from the sampled df
+sampled_df_timeH_index_new = [i for i in range(num_initial_days_to_discard*24, test_days_end*24+1, 1)]
+artificial_sampled = sample_data(sampled_df_timeH, sampled_df_timeH_index_new, features)
+# the plot them to compare them
+column_indices = {name: i for i, name in enumerate(artificial_sampled.columns)}
+n = len(artificial_sampled)
+train_df_a = artificial_sampled[0:int(n*0.7)]
+val_df_a = artificial_sampled[int(n*0.7):int(n*0.9)]
+test_df_a = artificial_sampled[int(n*0.9):]
+
+num_features = artificial_sampled.shape[1]
+print(num_features)
+
+
+train_mean_a = train_df_a.mean()
+train_std_a = train_df_a.std()
+
+train_df_a = (train_df_a - train_mean_a) / train_std_a
+val_df_a = (val_df_a - train_mean_a) / train_std_a
+test_df_a = (test_df_a - train_mean_a) / train_std_a
+
+plt.plot(train_df_a.index, train_df_a[hormone], color='black')
+plt.plot(val_df_a.index, val_df_a[hormone], color='blue')
+plt.plot(test_df_a.index, test_df_a[hormone], color='red')
+plt.title('Sampled raw hours split {} levels normalized artificially added records'.format(hormone))
+plt.show()
+
+# Window
+w2 = WindowGenerator(input_width=34, label_width=1, shift=1,
                      train_df=train_df, val_df=val_df, test_df=test_df,
                      label_columns=[hormone])
 #print(w2)
 
 # Stack three slices, the length of the total window.
-example_window = tf.stack([np.array(train_df[:w2.total_window_size]),
-                           np.array(train_df[700:700+w2.total_window_size]),
-                           np.array(train_df[1400:1400+w2.total_window_size])])
+#example_window = tf.stack([np.array(train_df[:w2.total_window_size]),
+#                           np.array(train_df[5:+w2.total_window_size]),
+#                           np.array(train_df[10:10+w2.total_window_size])])
 
 #example_inputs, example_labels = w2.split_window(example_window)
 #w2.example = example_inputs, example_labels
@@ -236,7 +267,7 @@ wide_window = WindowGenerator(
     label_columns=[hormone])
 
 #print(wide_window)
-wide_window.plot(baseline)
+wide_window.plot(hormone, baseline)
 
 # Linear model
 linear = tf.keras.Sequential([
@@ -247,7 +278,7 @@ history = compile_and_fit(linear, single_step_window)
 val_performance['Linear'] = linear.evaluate(single_step_window.val, return_dict=True)
 performance['Linear'] = linear.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
-wide_window.plot(linear)
+wide_window.plot(hormone, linear)
 
 plt.bar(x = range(len(train_df.columns)),
         height=linear.layers[0].kernel[:,0].numpy())
@@ -268,7 +299,7 @@ history = compile_and_fit(dense, single_step_window)
 val_performance['Dense'] = dense.evaluate(single_step_window.val, return_dict=True)
 performance['Dense'] = dense.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
-wide_window.plot(dense)
+wide_window.plot(hormone, dense)
 
 
 # Multistep dense
@@ -298,7 +329,7 @@ wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH, label_width=LABEL_W
                                     train_df=train_df, val_df=val_df, test_df=test_df,
                                     label_columns=[hormone])
 
-wide_conv_window.plot(conv_model)
+wide_conv_window.plot(hormone, conv_model)
 
 
 
@@ -316,7 +347,7 @@ IPython.display.clear_output()
 val_performance['LSTM'] = lstm_model.evaluate(wide_window.val, return_dict=True)
 performance['LSTM'] = lstm_model.evaluate(wide_window.test, verbose=0, return_dict=True)
 
-wide_window.plot(lstm_model)
+wide_window.plot(hormone, lstm_model)
 
 
 # Residual connections
@@ -345,7 +376,7 @@ metric_name = 'mean_absolute_error'
 val_mae = [v[metric_name] for v in val_performance.values()]
 test_mae = [v[metric_name] for v in performance.values()]
 
-plt.ylabel('mean_absolute_error [T (degC), normalized]')
+plt.ylabel('mean_absolute_error [{}, normalized]'.format(hormone))
 plt.bar(x - 0.17, val_mae, width, label='Validation')
 plt.bar(x + 0.17, test_mae, width, label='Test')
 plt.xticks(ticks=x, labels=performance.keys(),
@@ -357,7 +388,68 @@ for name, value in performance.items():
     print(f'{name:12s}: {value[metric_name]:0.4f}')
 
 
+# Multi-step models
+OUT_STEPS = 24
+multi_window = WindowGenerator(input_width=24, label_width=OUT_STEPS,   shift=OUT_STEPS,
+                               train_df=train_df, val_df=val_df, test_df=test_df,
+                               label_columns=features)
+multi_window.plot(hormone)
 
+# variant with the artificially added samples
+OUT_STEPS_a = 24
+multi_window_a = WindowGenerator(input_width=24*24, label_width=OUT_STEPS_a*24,   shift=OUT_STEPS_a*24,
+                               train_df=train_df_a, val_df=val_df_a, test_df=test_df_a,
+                               label_columns=features)
+multi_window_a.plot(hormone)
+
+multi_val_performance = dict()
+multi_performance = dict()
+
+# autoregressive RNN
+feedback_model = FeedBack(32, OUT_STEPS, 4)
+prediction, state = feedback_model.warmup(multi_window.example[0])
+print(prediction.shape)
+print('Output shape (batch, time, features): ', feedback_model(multi_window.example[0]).shape)
+history = compile_and_fit(feedback_model, multi_window)
+
+IPython.display.clear_output()
+
+multi_val_performance['AR LSTM'] = feedback_model.evaluate(multi_window.val, return_dict=True)
+multi_performance['AR LSTM'] = feedback_model.evaluate(multi_window.test, verbose=0, return_dict=True)
+multi_window.plot(hormone, feedback_model)
+
+feedback_model.predict()
+
+# artificial version
+# this is too slow and much worse as well
+"""feedback_model_a = FeedBack(32, OUT_STEPS*24, 4)
+prediction, state = feedback_model_a.warmup(multi_window_a.example[0])
+print(prediction.shape)
+print('Output shape (batch, time, features): ', feedback_model_a(multi_window_a.example[0]).shape)
+history = compile_and_fit(feedback_model_a, multi_window_a)
+
+IPython.display.clear_output()
+
+multi_val_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.val, return_dict=True)
+multi_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.test, verbose=0, return_dict=True)
+multi_window_a.plot(hormone, feedback_model_a)"""
+
+
+# Performance
+x = np.arange(len(multi_performance))
+width = 0.3
+
+metric_name = 'mean_absolute_error'
+val_mae = [v[metric_name] for v in multi_val_performance.values()]
+test_mae = [v[metric_name] for v in multi_performance.values()]
+
+plt.bar(x - 0.17, val_mae, width, label='Validation')
+plt.bar(x + 0.17, test_mae, width, label='Test')
+plt.xticks(ticks=x, labels=multi_performance.keys(),
+           rotation=45)
+plt.ylabel(f'MAE (average over all times and outputs)')
+_ = plt.legend()
+plt.show()
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
 sampled_test_df = sampled_df[(sampled_df.index > data_tt_split_date) & (sampled_df.index <= data_stop_date)]
