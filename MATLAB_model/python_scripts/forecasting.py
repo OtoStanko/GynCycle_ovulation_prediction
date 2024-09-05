@@ -65,12 +65,12 @@ def sample_data(original_df, new_index, columns):
     return sampled_df
 
 
-def create_dataframe(input_files_directory, features, time_file_prefix):
-    time_file = os.path.join(input_files_directory, "{}_1.csv".format(time_file_prefix))
+def create_dataframe(input_files_directory, features, time_file_prefix, run_id=1):
+    time_file = os.path.join(input_files_directory, "{}_{}.csv".format(time_file_prefix, run_id))
     times = pd.read_csv(time_file, header=None, names=[time_file_prefix])
     hormone_levels = [times]
     for feature in features:
-        feature_file = os.path.join(input_files_directory, "{}_1.csv".format(feature))
+        feature_file = os.path.join(input_files_directory, "{}_{}.csv".format(feature, run_id))
         feature_values = pd.read_csv(feature_file, header=None, names=[feature])
         hormone_levels.append(feature_values)
     combined_df = pd.concat(hormone_levels, axis=1)
@@ -89,7 +89,7 @@ hormone = 'LH'
 features = ['LH']
 MAX_EPOCHS = 25
 
-combined_df = create_dataframe(workDir, features, 'Time')
+combined_df = create_dataframe(workDir, features, 'Time', 2)
 combined_df['Time'] = combined_df['Time'] * 24
 
 print('Num records in the loaded data:', len(combined_df[hormone]))

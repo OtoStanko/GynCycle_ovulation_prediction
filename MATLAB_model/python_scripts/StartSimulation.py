@@ -10,6 +10,7 @@ from SimulationSettings import SimulationSettings
 
 def StartSimulation():
     runnum = 1
+    SIM_OUT_NUM = 2
 
     settings = SimulationSettings(ShowPlots = 1, SaveSim = 0, SavePlotStuff = 1,
                                   SavePop = 0, NormalCycle = 1, LutStim = 0,
@@ -25,7 +26,7 @@ def StartSimulation():
     for runind in range(1, runnum + 1):
         # integration time beginning and end
         tb = 0
-        te = 300
+        te = 500
         # technical params
         # ODE function called to test(0) or not (1)
         # number of non-follicle equations (NO DRUG)
@@ -80,7 +81,7 @@ def StartSimulation():
             Simulation(para, paraPoi, parafoll, Par,
                        tb, te, StartValues, StartVec,
                        FSHVec, Stim,
-                       runind, settings)
+                       SIM_OUT_NUM, settings)
 
         if settings.savePop and runind % 10 == 0:
             FileName = 'ModelPopulation_Parameters.txt'
