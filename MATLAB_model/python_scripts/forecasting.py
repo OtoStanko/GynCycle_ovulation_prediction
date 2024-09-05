@@ -11,6 +11,7 @@ from models import Baseline, ResidualWrapper, FeedBack
 import IPython
 import IPython.display
 from scipy.optimize import curve_fit
+import supporting_scripts as sp
 
 
 def compile_and_fit(model, window, patience=2):
@@ -64,9 +65,16 @@ def sample_data(original_df, new_index, columns):
     return sampled_df
 
 
-def curve_function(x, a, b, c):
-    #return a * (c + np.sin(b * x))
-    return np.sin( (x * (2 * np.pi / (c * 24))) - b ) * a
+def create_dataframe(input_files_directory, features, time_file_prefix):
+    time_file = os.path.join(input_files_directory, "{}_1.csv".format(time_file_prefix))
+    times = pd.read_csv(time_file, header=None, names=[time_file_prefix])
+    hormone_levels = [times]
+    for feature in features:
+        feature_file = os.path.join(input_files_directory, "{}_1.csv".format(feature))
+        feature_values = pd.read_csv(feature_file, header=None, names=[feature])
+        hormone_levels.append(feature_values)
+    combined_df = pd.concat(hormone_levels, axis=1)
+    return combined_df
 
 
 # Set the parameters
@@ -81,16 +89,7 @@ hormone = 'LH'
 features = ['LH']
 MAX_EPOCHS = 25
 
-
-timeFile = os.path.join(workDir, "Time_1.csv")
-times = pd.read_csv(timeFile, header=None, names=['Time'])
-hormone_levels = [times]
-for feature in features:
-    feature_file = os.path.join(workDir, "{}_1.csv".format(feature))
-    feature_values = pd.read_csv(feature_file, header=None, names=[feature])
-    hormone_levels.append(feature_values)
-
-combined_df = pd.concat(hormone_levels, axis=1)
+combined_df = create_dataframe(workDir, features, 'Time')
 combined_df['Time'] = combined_df['Time'] * 24
 
 print('Num records in the loaded data:', len(combined_df[hormone]))
@@ -143,9 +142,9 @@ plt.show()"""
 
 
 
-sapmled_df_timeH_index = [i for i in range(num_initial_days_to_discard*24, test_days_end*24+1, sampling_frequency)]
-print(len(sapmled_df_timeH_index))
-sampled_df_timeH = sample_data(filtered_df_timeH, sapmled_df_timeH_index, features)
+sampled_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, test_days_end * 24 + 1, sampling_frequency)]
+print(len(sampled_df_timeH_index))
+sampled_df_timeH = sample_data(filtered_df_timeH, sampled_df_timeH_index, features)
 print('Num records in the sampled dataframe with raw hours:', len(sampled_df_timeH[hormone]))
 plt.plot(sampled_df_timeH.index, sampled_df_timeH[features], )
 plt.title('Sampled dataframe with raw hours')
@@ -203,22 +202,7 @@ plt.title('Sampled raw hours split {} levels normalized'.format(hormone))
 plt.ylabel('Time in hours')
 plt.show()
 
-x_data = train_df.index.values
-y_data = train_df[hormone].values
-x_all = sampled_df_timeH.index.values
-y_all = sampled_df_timeH[hormone].values
-popt, pcov = curve_fit(curve_function, x_data, y_data, p0=[1, 1, 25])
-a_opt, b_opt, c_opt = popt
-print(f"Optimal parameters: a={a_opt}, b={b_opt}, c={c_opt}")
-x_fit = np.linspace(min(x_all), max(x_all), 1000)
-y_fit = curve_function(x_fit, *popt)
-plt.plot(train_df.index, train_df[hormone], color='black')
-plt.plot(val_df.index, val_df[hormone], color='blue')
-plt.plot(test_df.index, test_df[hormone], color='red')
-plt.plot(x_fit, y_fit, label='Fitted Curve', color='orange')
-plt.title('Sampled dataframe with raw hours with fitted sin curve')
-plt.ylabel('Time in hours')
-plt.show()
+#sp.fit_sin_curve(train_df, hormone, val_df, test_df, sampled_df_timeH)
 
 # Tru adding artificial samples every hour from the sampled df
 """sampled_df_timeH_index_new = [i for i in range(num_initial_days_to_discard*24, test_days_end*24+1, 1)]
@@ -253,19 +237,6 @@ w2 = WindowGenerator(input_width=34, label_width=1, shift=1,
                      label_columns=[hormone])
 #print(w2)
 
-# Stack three slices, the length of the total window.
-#example_window = tf.stack([np.array(train_df[:w2.total_window_size]),
-#                           np.array(train_df[5:+w2.total_window_size]),
-#                           np.array(train_df[10:10+w2.total_window_size])])
-
-#example_inputs, example_labels = w2.split_window(example_window)
-#w2.example = example_inputs, example_labels
-#w2.plot()
-
-#print('All shapes are: (batch, time, features)')
-#print(f'Window shape: {example_window.shape}')
-#print(f'Inputs shape: {example_inputs.shape}')
-#print(f'Labels shape: {example_labels.shape}')
 
 print(w2.train.element_spec)
 for example_inputs, example_labels in w2.train.take(1):
@@ -295,9 +266,12 @@ wide_window = WindowGenerator(
     label_columns=[hormone])
 
 #print(wide_window)
-wide_window.plot(hormone, baseline)
+wide_window.plot(hormone, 'Baseline model predictions', baseline)
 
+
+"""
 # Linear model
+"""
 linear = tf.keras.Sequential([
     tf.keras.layers.Dense(units=1)
 ])
@@ -306,7 +280,7 @@ history = compile_and_fit(linear, single_step_window)
 val_performance['Linear'] = linear.evaluate(single_step_window.val, return_dict=True)
 performance['Linear'] = linear.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
-wide_window.plot(hormone, linear)
+wide_window.plot(hormone, 'Linear model predictions', linear)
 
 plt.bar(x = range(len(train_df.columns)),
         height=linear.layers[0].kernel[:,0].numpy())
@@ -316,7 +290,9 @@ _ = axis.set_xticklabels(train_df.columns, rotation=90)
 plt.show()
 
 
+"""
 # Dense model
+"""
 dense = tf.keras.Sequential([
     tf.keras.layers.Dense(units=64, activation='relu'),
     tf.keras.layers.Dense(units=64, activation='relu'),
@@ -327,16 +303,19 @@ history = compile_and_fit(dense, single_step_window)
 val_performance['Dense'] = dense.evaluate(single_step_window.val, return_dict=True)
 performance['Dense'] = dense.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
-wide_window.plot(hormone, dense)
+wide_window.plot(hormone, 'Dense model predictions', dense)
 
 
+"""
 # Multistep dense
+"""
+"""
 # CNN
+"""
 CONV_WIDTH = 3
 conv_window = WindowGenerator(input_width=CONV_WIDTH, label_width=1, shift=1,
                               train_df=train_df, val_df=val_df, test_df=test_df,
                               label_columns=[hormone])
-
 print(conv_window)
 conv_model = tf.keras.Sequential([
     tf.keras.layers.Conv1D(filters=32,
@@ -357,12 +336,41 @@ wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH, label_width=LABEL_W
                                     train_df=train_df, val_df=val_df, test_df=test_df,
                                     label_columns=[hormone])
 
-wide_conv_window.plot(hormone, conv_model)
+wide_conv_window.plot(hormone, 'CNN model predictions', conv_model)
 
+"""
+# CNN Wide window
+"""
+CONV_WIDTH_WIDE = 9
+conv_window_wide = WindowGenerator(input_width=CONV_WIDTH_WIDE, label_width=1, shift=1,
+                              train_df=train_df, val_df=val_df, test_df=test_df,
+                              label_columns=[hormone])
+print(conv_window)
+conv_model_wide = tf.keras.Sequential([
+    tf.keras.layers.Conv1D(filters=32,
+                           kernel_size=(CONV_WIDTH_WIDE,),
+                           activation='relu'),
+    tf.keras.layers.Dense(units=32, activation='relu'),
+    tf.keras.layers.Dense(units=1),
+])
+history = compile_and_fit(conv_model_wide, conv_window_wide)
 
+IPython.display.clear_output()
+val_performance['Conv_wide'] = conv_model_wide.evaluate(conv_window_wide.val, return_dict=True)
+performance['Conv_wide'] = conv_model_wide.evaluate(conv_window_wide.test, verbose=0, return_dict=True)
 
+LABEL_WIDTH_WIDE = 24
+INPUT_WIDTH_WIDE = LABEL_WIDTH + (CONV_WIDTH_WIDE - 1)
+wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH_WIDE, label_width=LABEL_WIDTH_WIDE, shift=1,
+                                    train_df=train_df, val_df=val_df, test_df=test_df,
+                                    label_columns=[hormone])
+
+wide_conv_window.plot(hormone, 'CNN wide model predictions', conv_model_wide)
+
+"""
 # RNN model
 # LSTM long short-term memory
+"""
 lstm_model = tf.keras.models.Sequential([
     # Shape [batch, time, features] => [batch, time, lstm_units]
     tf.keras.layers.LSTM(32, return_sequences=True),
@@ -375,10 +383,12 @@ IPython.display.clear_output()
 val_performance['LSTM'] = lstm_model.evaluate(wide_window.val, return_dict=True)
 performance['LSTM'] = lstm_model.evaluate(wide_window.test, verbose=0, return_dict=True)
 
-wide_window.plot(hormone, lstm_model)
+wide_window.plot(hormone, 'RNN LSTM model predictions', lstm_model)
 
 
+"""
 # Residual connections
+"""
 residual_lstm = ResidualWrapper(
     tf.keras.Sequential([
     tf.keras.layers.LSTM(32, return_sequences=True),
@@ -395,9 +405,11 @@ IPython.display.clear_output()
 val_performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.val, return_dict=True)
 performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.test, verbose=0, return_dict=True)
 
+wide_window.plot(hormone, 'Residual LSTM model predictions', residual_lstm)
 
-
+"""
 # Performance
+"""
 x = np.arange(len(performance))
 width = 0.3
 metric_name = 'mean_absolute_error'
@@ -416,12 +428,14 @@ for name, value in performance.items():
     print(f'{name:12s}: {value[metric_name]:0.4f}')
 
 
+"""
 # Multi-step models
+"""
 OUT_STEPS = 24
 multi_window = WindowGenerator(input_width=24, label_width=OUT_STEPS,   shift=OUT_STEPS,
                                train_df=train_df, val_df=val_df, test_df=test_df,
                                label_columns=features)
-multi_window.plot(hormone)
+multi_window.plot(hormone, 'Multi window')
 
 # variant with the artificially added samples
 """OUT_STEPS_a = 24
@@ -433,7 +447,10 @@ multi_window_a.plot(hormone)"""
 multi_val_performance = dict()
 multi_performance = dict()
 
+
+"""
 # autoregressive RNN
+"""
 feedback_model = FeedBack(32, OUT_STEPS, len(features))
 prediction, state = feedback_model.warmup(multi_window.example[0])
 print(prediction.shape)
@@ -444,7 +461,7 @@ IPython.display.clear_output()
 
 multi_val_performance['AR LSTM'] = feedback_model.evaluate(multi_window.val, return_dict=True)
 multi_performance['AR LSTM'] = feedback_model.evaluate(multi_window.test, verbose=0, return_dict=True)
-multi_window.plot(hormone, feedback_model)
+multi_window.plot(hormone, 'Autoregressive model predictions', feedback_model)
 
 # artificial version
 # this is too slow and much worse as well
