@@ -86,7 +86,7 @@ class WindowGenerator():
 
             if n == 0:
                 plt.legend()
-        plt.xlabel('Time [h]')
+        plt.xlabel('Time [D]')
         plt.show()
 
 

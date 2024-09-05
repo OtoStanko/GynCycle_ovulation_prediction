@@ -10,6 +10,7 @@ from windowGenerator import WindowGenerator
 from models import Baseline, ResidualWrapper, FeedBack
 import IPython
 import IPython.display
+from scipy.optimize import curve_fit
 
 
 def compile_and_fit(model, window, patience=2):
@@ -63,15 +64,21 @@ def sample_data(original_df, new_index, columns):
     return sampled_df
 
 
+def curve_function(x, a, b, c):
+    #return a * (c + np.sin(b * x))
+    return np.sin( (x * (2 * np.pi / (c * 24))) - b ) * a
+
+
 # Set the parameters
 workDir = os.path.join(os.getcwd(), "../outputDir/")
-sampling_frequency = 12
+sampling_frequency = 24
 sampling_frequency_unit = 'H'
 num_initial_days_to_discard = 50
 train_test_split_days = 250
 test_days_end = 300
 hormone = 'LH'
-features = ['FSH', 'E2', 'P4', 'LH']
+#features = ['FSH', 'E2', 'P4', 'LH']
+features = ['LH']
 MAX_EPOCHS = 25
 
 
@@ -116,7 +123,7 @@ print(filtered_df[hormone])
 print(filtered_df_timeH[hormone])
 
 
-time_delta = pd.to_timedelta(filtered_df.index, unit='h')
+"""time_delta = pd.to_timedelta(filtered_df.index, unit='h')
 datetime_index = start_date + time_delta
 filtered_df.index = datetime_index
 filtered_df.index.name = 'DateTime'
@@ -132,7 +139,7 @@ sampled_df = sample_data(filtered_df, new_index, features)
 
 plt.plot(sampled_df.index, sampled_df[features], )
 plt.title('Sampled dataframe with datetime')
-plt.show()
+plt.show()"""
 
 
 
@@ -142,7 +149,10 @@ sampled_df_timeH = sample_data(filtered_df_timeH, sapmled_df_timeH_index, featur
 print('Num records in the sampled dataframe with raw hours:', len(sampled_df_timeH[hormone]))
 plt.plot(sampled_df_timeH.index, sampled_df_timeH[features], )
 plt.title('Sampled dataframe with raw hours')
+plt.ylabel('Time in hours')
 plt.show()
+
+
 """
 days = [23, 24, 25, 26, 27, 28, 29, 30]
 for day in days:
@@ -190,10 +200,28 @@ plt.plot(train_df.index, train_df[hormone], color='black')
 plt.plot(val_df.index, val_df[hormone], color='blue')
 plt.plot(test_df.index, test_df[hormone], color='red')
 plt.title('Sampled raw hours split {} levels normalized'.format(hormone))
+plt.ylabel('Time in hours')
+plt.show()
+
+x_data = train_df.index.values
+y_data = train_df[hormone].values
+x_all = sampled_df_timeH.index.values
+y_all = sampled_df_timeH[hormone].values
+popt, pcov = curve_fit(curve_function, x_data, y_data, p0=[1, 1, 25])
+a_opt, b_opt, c_opt = popt
+print(f"Optimal parameters: a={a_opt}, b={b_opt}, c={c_opt}")
+x_fit = np.linspace(min(x_all), max(x_all), 1000)
+y_fit = curve_function(x_fit, *popt)
+plt.plot(train_df.index, train_df[hormone], color='black')
+plt.plot(val_df.index, val_df[hormone], color='blue')
+plt.plot(test_df.index, test_df[hormone], color='red')
+plt.plot(x_fit, y_fit, label='Fitted Curve', color='orange')
+plt.title('Sampled dataframe with raw hours with fitted sin curve')
+plt.ylabel('Time in hours')
 plt.show()
 
 # Tru adding artificial samples every hour from the sampled df
-sampled_df_timeH_index_new = [i for i in range(num_initial_days_to_discard*24, test_days_end*24+1, 1)]
+"""sampled_df_timeH_index_new = [i for i in range(num_initial_days_to_discard*24, test_days_end*24+1, 1)]
 artificial_sampled = sample_data(sampled_df_timeH, sampled_df_timeH_index_new, features)
 # the plot them to compare them
 column_indices = {name: i for i, name in enumerate(artificial_sampled.columns)}
@@ -217,7 +245,7 @@ plt.plot(train_df_a.index, train_df_a[hormone], color='black')
 plt.plot(val_df_a.index, val_df_a[hormone], color='blue')
 plt.plot(test_df_a.index, test_df_a[hormone], color='red')
 plt.title('Sampled raw hours split {} levels normalized artificially added records'.format(hormone))
-plt.show()
+plt.show()"""
 
 # Window
 w2 = WindowGenerator(input_width=34, label_width=1, shift=1,
@@ -396,17 +424,17 @@ multi_window = WindowGenerator(input_width=24, label_width=OUT_STEPS,   shift=OU
 multi_window.plot(hormone)
 
 # variant with the artificially added samples
-OUT_STEPS_a = 24
+"""OUT_STEPS_a = 24
 multi_window_a = WindowGenerator(input_width=24*24, label_width=OUT_STEPS_a*24,   shift=OUT_STEPS_a*24,
                                train_df=train_df_a, val_df=val_df_a, test_df=test_df_a,
                                label_columns=features)
-multi_window_a.plot(hormone)
+multi_window_a.plot(hormone)"""
 
 multi_val_performance = dict()
 multi_performance = dict()
 
 # autoregressive RNN
-feedback_model = FeedBack(32, OUT_STEPS, 4)
+feedback_model = FeedBack(32, OUT_STEPS, len(features))
 prediction, state = feedback_model.warmup(multi_window.example[0])
 print(prediction.shape)
 print('Output shape (batch, time, features): ', feedback_model(multi_window.example[0]).shape)
@@ -417,8 +445,6 @@ IPython.display.clear_output()
 multi_val_performance['AR LSTM'] = feedback_model.evaluate(multi_window.val, return_dict=True)
 multi_performance['AR LSTM'] = feedback_model.evaluate(multi_window.test, verbose=0, return_dict=True)
 multi_window.plot(hormone, feedback_model)
-
-feedback_model.predict()
 
 # artificial version
 # this is too slow and much worse as well
@@ -436,7 +462,7 @@ multi_window_a.plot(hormone, feedback_model_a)"""
 
 
 # Performance
-x = np.arange(len(multi_performance))
+"""x = np.arange(len(multi_performance))
 width = 0.3
 
 metric_name = 'mean_absolute_error'
@@ -449,7 +475,7 @@ plt.xticks(ticks=x, labels=multi_performance.keys(),
            rotation=45)
 plt.ylabel(f'MAE (average over all times and outputs)')
 _ = plt.legend()
-plt.show()
+plt.show()"""
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
 sampled_test_df = sampled_df[(sampled_df.index > data_tt_split_date) & (sampled_df.index <= data_stop_date)]
