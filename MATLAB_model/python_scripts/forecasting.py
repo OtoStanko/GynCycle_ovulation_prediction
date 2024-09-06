@@ -77,6 +77,24 @@ def create_dataframe(input_files_directory, features, time_file_prefix, run_id=1
     return combined_df
 
 
+def test_model(model, test_df, train_df_mean, train_df_std, num_days, hormone):
+    print(train_df_mean, train_df_std)
+    test_df = (test_df - train_df_mean) / train_df_std
+    plt.plot(test_df.index, test_df[hormone])
+    plt.show()
+    input = np.array(test_df[hormone][:num_days], dtype=np.float32)
+    for i in range(num_days):
+        input_data = input[i:num_days+i]
+        input_data = input_data.reshape(1, NUM_DAYS, 1)
+        y = model(input_data)[0][0]
+        input = np.append(input, y)
+    plt.plot(test_df.index[:2*num_days], test_df[hormone][:2*num_days])
+    plt.plot(test_df.index[num_days:2*num_days], input[num_days:2*num_days])
+    plt.title('Prediction on {} days'.format(num_days))
+    plt.plot()
+    # first 35 days are the base on which we are predicting one time step
+
+
 # Set the parameters
 workDir = os.path.join(os.getcwd(), "../outputDir/")
 sampling_frequency = 24
@@ -89,6 +107,8 @@ hormone = 'LH'
 features = ['LH']
 MAX_EPOCHS = 25
 
+test_dataframe = create_dataframe(workDir, features, 'Time', 1)
+test_dataframe['Time'] = test_dataframe['Time'] * 24
 combined_df = create_dataframe(workDir, features, 'Time', 2)
 combined_df['Time'] = combined_df['Time'] * 24
 
@@ -115,6 +135,9 @@ data_stop_date = start_date + pd.to_timedelta(test_days_end * 24, 'h')
 # First 50 days of the simulation may be a bit messy and thus we ignore them
 filtered_df = combined_df[combined_df['Time'] > num_initial_days_to_discard*24]
 filtered_df.set_index('Time', inplace=True)
+
+filtered_test_df = test_dataframe[test_dataframe['Time'] > num_initial_days_to_discard*24]
+filtered_test_df.set_index('Time', inplace=True)
 
 print(filtered_df.describe().transpose())
 filtered_df_timeH = filtered_df.copy()
@@ -150,6 +173,8 @@ plt.plot(sampled_df_timeH.index, sampled_df_timeH[features], )
 plt.title('Sampled dataframe with raw hours')
 plt.ylabel('Time in hours')
 plt.show()
+
+sampled_test_df = sample_data(filtered_test_df, sampled_df_timeH_index, features)
 
 
 """
@@ -248,104 +273,111 @@ single_step_window = WindowGenerator(
     train_df=train_df, val_df=val_df, test_df=test_df,
     label_columns=[hormone])
 
-# Baseline model
-baseline = Baseline(label_index=column_indices[hormone])
-
-baseline.compile(loss=tf.keras.losses.MeanSquaredError(),
-                 metrics=[tf.keras.metrics.MeanAbsoluteError()])
 
 val_performance = {}
 performance = {}
-val_performance['Baseline'] = baseline.evaluate(single_step_window.val, return_dict=True)
-performance['Baseline'] = baseline.evaluate(single_step_window.test, verbose=0, return_dict=True)
-
-
 wide_window = WindowGenerator(
-    input_width=24, label_width=24, shift=1,
-    train_df=train_df, val_df=val_df, test_df=test_df,
-    label_columns=[hormone])
-
-#print(wide_window)
-wide_window.plot(hormone, 'Baseline model predictions', baseline)
+        input_width=24, label_width=24, shift=1,
+        train_df=train_df, val_df=val_df, test_df=test_df,
+        label_columns=[hormone])
 
 
-"""
-# Linear model
-"""
-linear = tf.keras.Sequential([
-    tf.keras.layers.Dense(units=1)
-])
-history = compile_and_fit(linear, single_step_window)
+def baseline_model():
+    """
+    # Baseline model
+    """
+    baseline = Baseline(label_index=column_indices[hormone])
 
-val_performance['Linear'] = linear.evaluate(single_step_window.val, return_dict=True)
-performance['Linear'] = linear.evaluate(single_step_window.test, verbose=0, return_dict=True)
+    baseline.compile(loss=tf.keras.losses.MeanSquaredError(),
+                     metrics=[tf.keras.metrics.MeanAbsoluteError()])
 
-wide_window.plot(hormone, 'Linear model predictions', linear)
+    val_performance['Baseline'] = baseline.evaluate(single_step_window.val, return_dict=True)
+    performance['Baseline'] = baseline.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
-plt.bar(x = range(len(train_df.columns)),
-        height=linear.layers[0].kernel[:,0].numpy())
-axis = plt.gca()
-axis.set_xticks(range(len(train_df.columns)))
-_ = axis.set_xticklabels(train_df.columns, rotation=90)
-plt.show()
+    #print(wide_window)
+    wide_window.plot(hormone, 'Baseline model predictions', baseline)
 
 
-"""
-# Dense model
-"""
-dense = tf.keras.Sequential([
-    tf.keras.layers.Dense(units=64, activation='relu'),
-    tf.keras.layers.Dense(units=64, activation='relu'),
-    tf.keras.layers.Dense(units=1)
-])
-history = compile_and_fit(dense, single_step_window)
+def linear_model():
+    """
+    # Linear model
+    """
+    linear = tf.keras.Sequential([
+        tf.keras.layers.Dense(units=1)
+    ])
+    history = compile_and_fit(linear, single_step_window)
 
-val_performance['Dense'] = dense.evaluate(single_step_window.val, return_dict=True)
-performance['Dense'] = dense.evaluate(single_step_window.test, verbose=0, return_dict=True)
+    val_performance['Linear'] = linear.evaluate(single_step_window.val, return_dict=True)
+    performance['Linear'] = linear.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
-wide_window.plot(hormone, 'Dense model predictions', dense)
+    wide_window.plot(hormone, 'Linear model predictions', linear)
+
+    plt.bar(x = range(len(train_df.columns)),
+            height=linear.layers[0].kernel[:,0].numpy())
+    axis = plt.gca()
+    axis.set_xticks(range(len(train_df.columns)))
+    _ = axis.set_xticklabels(train_df.columns, rotation=90)
+    plt.show()
+
+
+def dense_model():
+    """
+    # Dense model
+    """
+    dense = tf.keras.Sequential([
+        tf.keras.layers.Dense(units=64, activation='relu'),
+        tf.keras.layers.Dense(units=64, activation='relu'),
+        tf.keras.layers.Dense(units=1)
+    ])
+    history = compile_and_fit(dense, single_step_window)
+
+    val_performance['Dense'] = dense.evaluate(single_step_window.val, return_dict=True)
+    performance['Dense'] = dense.evaluate(single_step_window.test, verbose=0, return_dict=True)
+
+    wide_window.plot(hormone, 'Dense model predictions', dense)
 
 
 """
 # Multistep dense
 """
+LABEL_WIDTH = 24
 """
 # CNN
 """
-CONV_WIDTH = 3
-conv_window = WindowGenerator(input_width=CONV_WIDTH, label_width=1, shift=1,
-                              train_df=train_df, val_df=val_df, test_df=test_df,
-                              label_columns=[hormone])
-print(conv_window)
-conv_model = tf.keras.Sequential([
-    tf.keras.layers.Conv1D(filters=32,
-                           kernel_size=(CONV_WIDTH,),
-                           activation='relu'),
-    tf.keras.layers.Dense(units=32, activation='relu'),
-    tf.keras.layers.Dense(units=1),
-])
-history = compile_and_fit(conv_model, conv_window)
+def cnn_model():
+    CONV_WIDTH = 3
+    conv_window = WindowGenerator(input_width=CONV_WIDTH, label_width=1, shift=1,
+                                  train_df=train_df, val_df=val_df, test_df=test_df,
+                                  label_columns=[hormone])
+    print(conv_window)
+    conv_model = tf.keras.Sequential([
+        tf.keras.layers.Conv1D(filters=32,
+                               kernel_size=(CONV_WIDTH,),
+                               activation='relu'),
+        tf.keras.layers.Dense(units=32, activation='relu'),
+        tf.keras.layers.Dense(units=1),
+    ])
+    history = compile_and_fit(conv_model, conv_window)
 
-IPython.display.clear_output()
-val_performance['Conv'] = conv_model.evaluate(conv_window.val, return_dict=True)
-performance['Conv'] = conv_model.evaluate(conv_window.test, verbose=0, return_dict=True)
+    IPython.display.clear_output()
+    val_performance['Conv'] = conv_model.evaluate(conv_window.val, return_dict=True)
+    performance['Conv'] = conv_model.evaluate(conv_window.test, verbose=0, return_dict=True)
+    INPUT_WIDTH = LABEL_WIDTH + (CONV_WIDTH - 1)
+    wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH, label_width=LABEL_WIDTH, shift=1,
+                                        train_df=train_df, val_df=val_df, test_df=test_df,
+                                        label_columns=[hormone])
 
-LABEL_WIDTH = 24
-INPUT_WIDTH = LABEL_WIDTH + (CONV_WIDTH - 1)
-wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH, label_width=LABEL_WIDTH, shift=1,
-                                    train_df=train_df, val_df=val_df, test_df=test_df,
-                                    label_columns=[hormone])
-
-wide_conv_window.plot(hormone, 'CNN model predictions', conv_model)
+    wide_conv_window.plot(hormone, 'CNN model predictions', conv_model)
 
 """
 # CNN Wide window
 """
-CONV_WIDTH_WIDE = 9
+NUM_DAYS = 35
+CONV_WIDTH_WIDE = NUM_DAYS
 conv_window_wide = WindowGenerator(input_width=CONV_WIDTH_WIDE, label_width=1, shift=1,
                               train_df=train_df, val_df=val_df, test_df=test_df,
                               label_columns=[hormone])
-print(conv_window)
+print(conv_window_wide)
 conv_model_wide = tf.keras.Sequential([
     tf.keras.layers.Conv1D(filters=32,
                            kernel_size=(CONV_WIDTH_WIDE,),
@@ -367,65 +399,71 @@ wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH_WIDE, label_width=LA
 
 wide_conv_window.plot(hormone, 'CNN wide model predictions', conv_model_wide)
 
-"""
-# RNN model
-# LSTM long short-term memory
-"""
-lstm_model = tf.keras.models.Sequential([
-    # Shape [batch, time, features] => [batch, time, lstm_units]
-    tf.keras.layers.LSTM(32, return_sequences=True),
-    # Shape => [batch, time, features]
-    tf.keras.layers.Dense(units=1)
-])
-history = compile_and_fit(lstm_model, wide_window)
+test_model(conv_model_wide, sampled_test_df, train_mean, train_std, NUM_DAYS, hormone)
 
-IPython.display.clear_output()
-val_performance['LSTM'] = lstm_model.evaluate(wide_window.val, return_dict=True)
-performance['LSTM'] = lstm_model.evaluate(wide_window.test, verbose=0, return_dict=True)
+def lstm_model():
+    """
+    # RNN model
+    # LSTM long short-term memory
+    """
+    lstm_model = tf.keras.models.Sequential([
+        # Shape [batch, time, features] => [batch, time, lstm_units]
+        tf.keras.layers.LSTM(32, return_sequences=True),
+        # Shape => [batch, time, features]
+        tf.keras.layers.Dense(units=1)
+    ])
+    history = compile_and_fit(lstm_model, wide_window)
 
-wide_window.plot(hormone, 'RNN LSTM model predictions', lstm_model)
+    IPython.display.clear_output()
+    val_performance['LSTM'] = lstm_model.evaluate(wide_window.val, return_dict=True)
+    performance['LSTM'] = lstm_model.evaluate(wide_window.test, verbose=0, return_dict=True)
+
+    wide_window.plot(hormone, 'RNN LSTM model predictions', lstm_model)
 
 
-"""
-# Residual connections
-"""
-residual_lstm = ResidualWrapper(
-    tf.keras.Sequential([
-    tf.keras.layers.LSTM(32, return_sequences=True),
-    tf.keras.layers.Dense(
-        num_features,
-        # The predicted deltas should start small.
-        # Therefore, initialize the output layer with zeros.
-        kernel_initializer=tf.initializers.zeros())
-]))
+def residual_connections_model():
+    """
+    # Residual connections
+    """
+    residual_lstm = ResidualWrapper(
+        tf.keras.Sequential([
+        tf.keras.layers.LSTM(32, return_sequences=True),
+        tf.keras.layers.Dense(
+            num_features,
+            # The predicted deltas should start small.
+            # Therefore, initialize the output layer with zeros.
+            kernel_initializer=tf.initializers.zeros())
+    ]))
 
-history = compile_and_fit(residual_lstm, wide_window)
+    history = compile_and_fit(residual_lstm, wide_window)
 
-IPython.display.clear_output()
-val_performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.val, return_dict=True)
-performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.test, verbose=0, return_dict=True)
+    IPython.display.clear_output()
+    val_performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.val, return_dict=True)
+    performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.test, verbose=0, return_dict=True)
 
-wide_window.plot(hormone, 'Residual LSTM model predictions', residual_lstm)
+    wide_window.plot(hormone, 'Residual LSTM model predictions', residual_lstm)
 
-"""
-# Performance
-"""
-x = np.arange(len(performance))
-width = 0.3
-metric_name = 'mean_absolute_error'
-val_mae = [v[metric_name] for v in val_performance.values()]
-test_mae = [v[metric_name] for v in performance.values()]
 
-plt.ylabel('mean_absolute_error [{}, normalized]'.format(hormone))
-plt.bar(x - 0.17, val_mae, width, label='Validation')
-plt.bar(x + 0.17, test_mae, width, label='Test')
-plt.xticks(ticks=x, labels=performance.keys(),
-           rotation=45)
-_ = plt.legend()
-plt.show()
+def show_performance():
+    """
+    # Performance
+    """
+    x = np.arange(len(performance))
+    width = 0.3
+    metric_name = 'mean_absolute_error'
+    val_mae = [v[metric_name] for v in val_performance.values()]
+    test_mae = [v[metric_name] for v in performance.values()]
 
-for name, value in performance.items():
-    print(f'{name:12s}: {value[metric_name]:0.4f}')
+    plt.ylabel('mean_absolute_error [{}, normalized]'.format(hormone))
+    plt.bar(x - 0.17, val_mae, width, label='Validation')
+    plt.bar(x + 0.17, test_mae, width, label='Test')
+    plt.xticks(ticks=x, labels=performance.keys(),
+               rotation=45)
+    _ = plt.legend()
+    plt.show()
+
+    for name, value in performance.items():
+        print(f'{name:12s}: {value[metric_name]:0.4f}')
 
 
 """
@@ -448,20 +486,21 @@ multi_val_performance = dict()
 multi_performance = dict()
 
 
-"""
-# autoregressive RNN
-"""
-feedback_model = FeedBack(32, OUT_STEPS, len(features))
-prediction, state = feedback_model.warmup(multi_window.example[0])
-print(prediction.shape)
-print('Output shape (batch, time, features): ', feedback_model(multi_window.example[0]).shape)
-history = compile_and_fit(feedback_model, multi_window)
+def autoregressive_model():
+    """
+    # autoregressive RNN
+    """
+    feedback_model = FeedBack(32, OUT_STEPS, len(features))
+    prediction, state = feedback_model.warmup(multi_window.example[0])
+    print(prediction.shape)
+    print('Output shape (batch, time, features): ', feedback_model(multi_window.example[0]).shape)
+    history = compile_and_fit(feedback_model, multi_window)
 
-IPython.display.clear_output()
+    IPython.display.clear_output()
 
-multi_val_performance['AR LSTM'] = feedback_model.evaluate(multi_window.val, return_dict=True)
-multi_performance['AR LSTM'] = feedback_model.evaluate(multi_window.test, verbose=0, return_dict=True)
-multi_window.plot(hormone, 'Autoregressive model predictions', feedback_model)
+    multi_val_performance['AR LSTM'] = feedback_model.evaluate(multi_window.val, return_dict=True)
+    multi_performance['AR LSTM'] = feedback_model.evaluate(multi_window.test, verbose=0, return_dict=True)
+    multi_window.plot(hormone, 'Autoregressive model predictions', feedback_model)
 
 # artificial version
 # this is too slow and much worse as well
