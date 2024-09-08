@@ -77,21 +77,30 @@ def create_dataframe(input_files_directory, features, time_file_prefix, run_id=1
     return combined_df
 
 
-def test_model(model, test_df, train_df_mean, train_df_std, num_days, hormone):
+def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=170):
     print(train_df_mean, train_df_std)
     test_df = (test_df - train_df_mean) / train_df_std
     plt.plot(test_df.index, test_df[hormone])
     plt.show()
-    input = np.array(test_df[hormone][:num_days], dtype=np.float32)
-    for i in range(num_days):
-        input_data = input[i:num_days+i]
-        input_data = input_data.reshape(1, NUM_DAYS, 1)
-        y = model(input_data)[0][0]
-        input = np.append(input, y)
-    plt.plot(test_df.index[:2*num_days], test_df[hormone][:2*num_days])
-    plt.plot(test_df.index[num_days:2*num_days], input[num_days:2*num_days])
-    plt.title('Prediction on {} days'.format(num_days))
-    plt.plot()
+    for offset in range(0,duration,5):
+        input = np.array(test_df[hormone][offset:input_length + offset], dtype=np.float32)
+        for i in range(pred_length):
+            input_data = input[i:input_length + i]
+            input_data = input_data.reshape(1, NUM_DAYS, 1)
+            y = model(input_data)[0][0]
+            input = np.append(input, y)
+        gt_time = test_df.index[offset:input_length + pred_length + offset]
+        gt_time = gt_time / 24
+        first_elem = gt_time[0]
+        gt_time = gt_time - first_elem
+        pred_time = test_df.index[input_length + offset:input_length + pred_length + offset]
+        pred_time = pred_time / 24
+        pred_time = pred_time - first_elem
+        plt.plot(gt_time, test_df[hormone][offset:input_length + pred_length + offset])
+        plt.plot(pred_time, input[input_length:input_length + pred_length + offset])
+        plt.axvline(x=input_length, color='r', linestyle='--',)
+        plt.title('Prediction on {} days with offset {} days'.format(input_length, offset))
+        plt.show()
     # first 35 days are the base on which we are predicting one time step
 
 
@@ -107,8 +116,10 @@ hormone = 'LH'
 features = ['LH']
 MAX_EPOCHS = 25
 
+# test on a small TS
 test_dataframe = create_dataframe(workDir, features, 'Time', 1)
 test_dataframe['Time'] = test_dataframe['Time'] * 24
+# train on a long TS
 combined_df = create_dataframe(workDir, features, 'Time', 2)
 combined_df['Time'] = combined_df['Time'] * 24
 
@@ -122,15 +133,6 @@ plt.plot(combined_df['Time'], combined_df[features], )
 plt.title('Loaded combined dataframe')
 plt.show()
 
-
-# Set some starting date that will be needed for index
-start_date = pd.Timestamp('2024-01-01')
-# We will not use first 50 days of the simulation
-data_start_date = start_date + pd.to_timedelta(num_initial_days_to_discard*24, 'h')
-# Set the split date for the train and test data
-data_tt_split_date = start_date + pd.to_timedelta(train_test_split_days*24, 'h')
-# Set the stop date for the test data (end day of the data)
-data_stop_date = start_date + pd.to_timedelta(test_days_end * 24, 'h')
 
 # First 50 days of the simulation may be a bit messy and thus we ignore them
 filtered_df = combined_df[combined_df['Time'] > num_initial_days_to_discard*24]
@@ -211,7 +213,6 @@ test_df = sampled_df_timeH[int(n*0.9):]
 
 num_features = sampled_df_timeH.shape[1]
 print(num_features)
-
 
 train_mean = train_df.mean()
 train_std = train_df.std()
@@ -399,7 +400,8 @@ wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH_WIDE, label_width=LA
 
 wide_conv_window.plot(hormone, 'CNN wide model predictions', conv_model_wide)
 
-test_model(conv_model_wide, sampled_test_df, train_mean, train_std, NUM_DAYS, hormone)
+prediction_length = 35
+test_model(conv_model_wide, sampled_test_df, train_mean, train_std, NUM_DAYS, prediction_length, hormone)
 
 def lstm_model():
     """

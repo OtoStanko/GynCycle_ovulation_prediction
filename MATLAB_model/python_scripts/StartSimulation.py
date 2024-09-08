@@ -26,7 +26,7 @@ def StartSimulation():
     for runind in range(1, runnum + 1):
         # integration time beginning and end
         tb = 0
-        te = 500
+        te = 2000
         # technical params
         # ODE function called to test(0) or not (1)
         # number of non-follicle equations (NO DRUG)
