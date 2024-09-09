@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import tensorflow as tf
-from statsmodels.tsa.seasonal import seasonal_decompose
-from statsmodels.tsa.statespace.sarimax import SARIMAX
+#from statsmodels.tsa.seasonal import seasonal_decompose
+#from statsmodels.tsa.statespace.sarimax import SARIMAX
 from windowGenerator import WindowGenerator
 from models import Baseline, ResidualWrapper, FeedBack
 import IPython
@@ -81,6 +81,8 @@ def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_l
     print(train_df_mean, train_df_std)
     test_df = (test_df - train_df_mean) / train_df_std
     plt.plot(test_df.index, test_df[hormone])
+    plt.xlabel('Time [hours]')
+    plt.title('Test {} data'.format(hormone))
     plt.show()
     for offset in range(0,duration,5):
         input = np.array(test_df[hormone][offset:input_length + offset], dtype=np.float32)
@@ -123,14 +125,14 @@ test_dataframe['Time'] = test_dataframe['Time'] * 24
 combined_df = create_dataframe(workDir, features, 'Time', 2)
 combined_df['Time'] = combined_df['Time'] * 24
 
-print('Num records in the loaded data:', len(combined_df[hormone]))
+print('Num records in the loaded data for training:', len(combined_df[hormone]))
 # Plot the loaded data
 sns.set()
 plt.ylabel('{} levels'.format('Hormones'))
 plt.xticks(rotation=45)
 plt.xlabel('Time in hours')
 plt.plot(combined_df['Time'], combined_df[features], )
-plt.title('Loaded combined dataframe')
+plt.title('Loaded combined dataframe for training')
 plt.show()
 
 
@@ -165,18 +167,20 @@ plt.plot(sampled_df.index, sampled_df[features], )
 plt.title('Sampled dataframe with datetime')
 plt.show()"""
 
+print(test_days_end * 24 + 1)
+print(filtered_df_timeH.index[-1])
 
-
-sampled_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, test_days_end * 24 + 1, sampling_frequency)]
+sampled_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, int(filtered_df_timeH.index[-1]) + 1, sampling_frequency)]
 print(len(sampled_df_timeH_index))
 sampled_df_timeH = sample_data(filtered_df_timeH, sampled_df_timeH_index, features)
 print('Num records in the sampled dataframe with raw hours:', len(sampled_df_timeH[hormone]))
 plt.plot(sampled_df_timeH.index, sampled_df_timeH[features], )
 plt.title('Sampled dataframe with raw hours')
-plt.ylabel('Time in hours')
+plt.xlabel('Time in hours')
 plt.show()
 
-sampled_test_df = sample_data(filtered_test_df, sampled_df_timeH_index, features)
+sampled_test_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, test_days_end * 24 + 1, sampling_frequency)]
+sampled_test_df = sample_data(filtered_test_df, sampled_test_df_timeH_index, features)
 
 
 """
@@ -225,7 +229,7 @@ plt.plot(train_df.index, train_df[hormone], color='black')
 plt.plot(val_df.index, val_df[hormone], color='blue')
 plt.plot(test_df.index, test_df[hormone], color='red')
 plt.title('Sampled raw hours split {} levels normalized'.format(hormone))
-plt.ylabel('Time in hours')
+plt.xlabel('Time in hours')
 plt.show()
 
 #sp.fit_sin_curve(train_df, hormone, val_df, test_df, sampled_df_timeH)
