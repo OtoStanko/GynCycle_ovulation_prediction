@@ -77,14 +77,48 @@ def create_dataframe(input_files_directory, features, time_file_prefix, run_id=1
     return combined_df
 
 
-def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=170):
+def test_model2(model, test_df, train_df_mean, train_df_std, detecting_thr,
+                input_length, pred_length, hormone, duration=250, step=5):
+    test_df = (test_df - train_df_mean) / train_df_std
+    plt.plot(test_df.index, test_df[hormone])
+    plt.axhline(y=detecting_thr, color='black', linestyle='--', label='Train mean')
+    plt.xlabel('Time [hours]')
+    plt.title('Test {} data on {} model'.format(hormone, model.name))
+    plt.show()
+    for offset in range(0, duration-pred_length-input_length, step):
+        input = np.array(test_df[hormone][offset:input_length + offset], dtype=np.float32)
+        tensor = tf.convert_to_tensor(input, dtype=tf.float32)  # Ensure dtype is compatible
+        reshaped_tensor = tf.reshape(tensor, (1, 35, 1))
+        prediction = model(reshaped_tensor)
+        """for i in range(pred_length):
+            input_data = input[i:input_length + i]
+            input_data = input_data.reshape(1, input_length, 1)
+            y = model(input_data)[0][0]
+            input = np.append(input, y)"""
+        prediction = prediction[0][:,0]
+        gt_time = test_df.index[offset:input_length + pred_length + offset]
+        gt_time = gt_time / 24
+        first_elem = gt_time[0]
+        gt_time = gt_time - first_elem
+        pred_time = test_df.index[input_length + offset:input_length + pred_length + offset]
+        pred_time = pred_time / 24
+        pred_time = pred_time - first_elem
+        plt.plot(gt_time, test_df[hormone][offset:input_length + pred_length + offset], marker='.',)
+        plt.plot(pred_time, prediction, marker='.',)
+        plt.axvline(x=input_length, color='r', linestyle='--',)
+        plt.axhline(y=detecting_thr, color='black', linestyle='--', label='Train mean')
+        plt.title('Prediction on {} days with offset {} days'.format(input_length, offset))
+        plt.show()
+
+
+def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=250, step=5):
     print(train_df_mean, train_df_std)
     test_df = (test_df - train_df_mean) / train_df_std
     plt.plot(test_df.index, test_df[hormone])
     plt.xlabel('Time [hours]')
     plt.title('Test {} data'.format(hormone))
     plt.show()
-    for offset in range(0,duration,5):
+    for offset in range(0, duration-pred_length, step):
         input = np.array(test_df[hormone][offset:input_length + offset], dtype=np.float32)
         for i in range(pred_length):
             input_data = input[i:input_length + i]
@@ -216,7 +250,7 @@ val_df = sampled_df_timeH[int(n*0.7):int(n*0.9)]
 test_df = sampled_df_timeH[int(n*0.9):]
 
 num_features = sampled_df_timeH.shape[1]
-print(num_features)
+print("Num features", num_features)
 
 train_mean = train_df.mean()
 train_std = train_df.std()
@@ -225,9 +259,13 @@ train_df = (train_df - train_mean) / train_std
 val_df = (val_df - train_mean) / train_std
 test_df = (test_df - train_mean) / train_std
 
-plt.plot(train_df.index, train_df[hormone], color='black')
+fdf = train_df[train_df > 0]
+new_mean = fdf.mean()[hormone]
+
+plt.plot(train_df.index, train_df[hormone], color='yellow')
 plt.plot(val_df.index, val_df[hormone], color='blue')
 plt.plot(test_df.index, test_df[hormone], color='red')
+plt.axhline(y=new_mean, color='black', linestyle='--', label='Train mean')
 plt.title('Sampled raw hours split {} levels normalized'.format(hormone))
 plt.xlabel('Time in hours')
 plt.show()
@@ -525,7 +563,8 @@ def autoregressive_model():
 
     multi_val_performance['AR LSTM'] = feedback_model.evaluate(multi_window.val, return_dict=True)
     multi_performance['AR LSTM'] = feedback_model.evaluate(multi_window.test, verbose=0, return_dict=True)
-    multi_window.plot(hormone, 'Autoregressive model predictions', feedback_model)
+    multi_window.plot(hormone, 'Autoregressive model predictions', feedback_model, plotYline=True, y=new_mean)
+    return feedback_model
 
 
 def multistep_cnn():
@@ -535,7 +574,8 @@ def multistep_cnn():
 
     multi_val_performance['CNN'] = multi_cnn.evaluate(multi_window.val, return_dict=True)
     multi_performance['CNN'] = multi_cnn.evaluate(multi_window.test, verbose=0, return_dict=True)
-    multi_window.plot(hormone, 'CNN model predictions', multi_cnn)
+    multi_window.plot(hormone, 'CNN model predictions', multi_cnn, plotYline=True, y=new_mean)
+    return multi_cnn
 
 # artificial version
 # this is too slow and much worse as well
@@ -550,8 +590,14 @@ IPython.display.clear_output()
 multi_val_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.val, return_dict=True)
 multi_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.test, verbose=0, return_dict=True)
 multi_window_a.plot(hormone, feedback_model_a)"""
-autoregressive_model()
-multistep_cnn()
+
+feedback_model = autoregressive_model()
+multi_cnn_model = multistep_cnn()
+
+test_model2(feedback_model, sampled_test_df, train_mean, train_std, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
+test_model2(multi_cnn_model, sampled_test_df, train_mean, train_std, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
+#test_model2(model, test_df, train_df_mean, train_df_std, detecting_thr, input_length, pred_length, hormone, duration=170):
+#test_model(conv_model_wide, sampled_test_df, train_mean, train_std, NUM_DAYS, prediction_length, hormone)
 
 # Performance
 x = np.arange(len(multi_performance))
