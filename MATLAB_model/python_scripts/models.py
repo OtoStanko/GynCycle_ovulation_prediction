@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 
 class Baseline(tf.keras.Model):
@@ -69,4 +70,38 @@ class FeedBack(tf.keras.Model):
         predictions = tf.stack(predictions)
         # predictions.shape => (batch, time, features)
         predictions = tf.transpose(predictions, [1, 0, 2])
+        return predictions
+
+
+class Wide_CNN(tf.keras.Model):
+    def __init__(self, input_length, out_steps, num_features):
+        super().__init__()
+        self.input_length = input_length
+        self.out_steps = out_steps
+        self.num_features = num_features
+        conv_model_wide = tf.keras.Sequential([
+            tf.keras.layers.Conv1D(filters=32,
+                                   kernel_size=(input_length,),
+                                   activation='relu'),
+            tf.keras.layers.Dense(units=32, activation='relu'),
+            tf.keras.layers.Dense(units=num_features),
+        ])
+        self.cnn = conv_model_wide
+
+    def call(self, inputs):
+        #input = np.array(inputs)
+        #input.append(inputs)
+        inputs = tf.convert_to_tensor(inputs, dtype=tf.float32)
+        input_tensor = inputs
+        for i in range(self.out_steps):
+            input_data = input_tensor[:, -self.input_length:, :]
+            #input_data = [input_tensor[0][-self.input_length+i] for i in range(self.input_length)]
+            #input_data = tf.stack(input_data)
+            #input_data = tf.expand_dims(input_data, axis=0)
+            #input_data = input_tensor[-self.input_length:]
+            y = self.cnn(input_data)
+            input_tensor = tf.concat([input_tensor, y], axis=1)
+        predictions = input_tensor[:, -self.out_steps:, :]
+        #predictions = tf.stack(predictions)
+        #predictions = tf.transpose(predictions, [1, 0, 2])
         return predictions
