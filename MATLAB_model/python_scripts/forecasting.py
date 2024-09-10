@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 #from statsmodels.tsa.seasonal import seasonal_decompose
 #from statsmodels.tsa.statespace.sarimax import SARIMAX
+from statsmodels.tsa.arima.model import ARIMA
 from windowGenerator import WindowGenerator
 from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN, Linear_CNN_FB
 import IPython
@@ -606,28 +607,29 @@ multi_val_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.va
 multi_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.test, verbose=0, return_dict=True)
 multi_window_a.plot(hormone, feedback_model_a)"""
 
-feedback_model = autoregressive_model()
-feedback_model.name = 'Feedback_model'
-multi_cnn_model = multistep_cnn()
-multi_cnn_model.name = 'Multistep_CNN'
-compare_multiple_models([feedback_model, multi_cnn_model], sampled_test_df, train_mean, train_std, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
+#feedback_model = autoregressive_model()
+#feedback_model.name = 'Feedback_model'
+#multi_cnn_model = multistep_cnn()
+#multi_cnn_model.name = 'Multistep_CNN'
+#compare_multiple_models([feedback_model, multi_cnn_model], sampled_test_df, train_mean, train_std, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
 
 
-# Performance
-x = np.arange(len(multi_performance))
-width = 0.3
+def multistep_performance():
+    # Performance
+    x = np.arange(len(multi_performance))
+    width = 0.3
 
-metric_name = 'mean_absolute_error'
-val_mae = [v[metric_name] for v in multi_val_performance.values()]
-test_mae = [v[metric_name] for v in multi_performance.values()]
+    metric_name = 'mean_absolute_error'
+    val_mae = [v[metric_name] for v in multi_val_performance.values()]
+    test_mae = [v[metric_name] for v in multi_performance.values()]
 
-plt.bar(x - 0.17, val_mae, width, label='Validation')
-plt.bar(x + 0.17, test_mae, width, label='Test')
-plt.xticks(ticks=x, labels=multi_performance.keys(),
-           rotation=45)
-plt.ylabel(f'MAE (average over all times and outputs)')
-_ = plt.legend()
-plt.show()
+    plt.bar(x - 0.17, val_mae, width, label='Validation')
+    plt.bar(x + 0.17, test_mae, width, label='Test')
+    plt.xticks(ticks=x, labels=multi_performance.keys(),
+               rotation=45)
+    plt.ylabel(f'MAE (average over all times and outputs)')
+    _ = plt.legend()
+    plt.show()
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
 sampled_test_df = sampled_df[(sampled_df.index > data_tt_split_date) & (sampled_df.index <= data_stop_date)]
@@ -646,3 +648,11 @@ mod = SARIMAX(sampled_train_df[hormone], trend='c', order=order, seasonal_order=
 res = mod.fit(disp=False)
 print(res.summary())
 """
+print(train_df[hormone])
+arima_model = ARIMA(train_df[hormone], order=(1,1,0), seasonal_order=(1,1,0,36),)
+fitted_arima = arima_model.fit()
+arima_predictions = fitted_arima.get_forecast(30)
+arima_predictions_series = arima_predictions.predicted_mean
+print(arima_predictions_series)
+plt.plot(arima_predictions_series.index, arima_predictions_series.values)
+plt.show()
