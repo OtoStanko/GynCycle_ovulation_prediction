@@ -1,3 +1,5 @@
+from cProfile import label
+
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
@@ -7,7 +9,7 @@ import tensorflow as tf
 #from statsmodels.tsa.seasonal import seasonal_decompose
 #from statsmodels.tsa.statespace.sarimax import SARIMAX
 from windowGenerator import WindowGenerator
-from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN
+from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN, Linear_CNN_FB
 import IPython
 import IPython.display
 from scipy.optimize import curve_fit
@@ -77,25 +79,23 @@ def create_dataframe(input_files_directory, features, time_file_prefix, run_id=1
     return combined_df
 
 
-def test_model2(model, test_df, train_df_mean, train_df_std, detecting_thr,
-                input_length, pred_length, hormone, duration=250, step=5):
+def compare_multiple_models(list_of_models, test_df, train_df_mean, train_df_std, detecting_thr,
+                            input_length, pred_length, hormone, duration=250, step=5):
     test_df = (test_df - train_df_mean) / train_df_std
     plt.plot(test_df.index, test_df[hormone])
     plt.axhline(y=detecting_thr, color='black', linestyle='--', label='Train mean')
     plt.xlabel('Time [hours]')
-    plt.title('Test {} data on {} model'.format(hormone, model.name))
+    plt.title('Test {} data'.format(hormone))
     plt.show()
     for offset in range(0, duration-pred_length-input_length, step):
         input = np.array(test_df[hormone][offset:input_length + offset], dtype=np.float32)
         tensor = tf.convert_to_tensor(input, dtype=tf.float32)  # Ensure dtype is compatible
         reshaped_tensor = tf.reshape(tensor, (1, 35, 1))
-        prediction = model(reshaped_tensor)
-        """for i in range(pred_length):
-            input_data = input[i:input_length + i]
-            input_data = input_data.reshape(1, input_length, 1)
-            y = model(input_data)[0][0]
-            input = np.append(input, y)"""
-        prediction = prediction[0][:,0]
+        list_of_model_predictions = []
+        for model in list_of_models:
+            predictions = model.predict(reshaped_tensor)
+            predictions = predictions[0][:,0]
+            list_of_model_predictions.append(predictions)
         gt_time = test_df.index[offset:input_length + pred_length + offset]
         gt_time = gt_time / 24
         first_elem = gt_time[0]
@@ -104,9 +104,11 @@ def test_model2(model, test_df, train_df_mean, train_df_std, detecting_thr,
         pred_time = pred_time / 24
         pred_time = pred_time - first_elem
         plt.plot(gt_time, test_df[hormone][offset:input_length + pred_length + offset], marker='.',)
-        plt.plot(pred_time, prediction, marker='.',)
+        for i in range(len(list_of_model_predictions)):
+            plt.plot(pred_time, list_of_model_predictions[i], marker='.', label=list_of_models[i].name)
         plt.axvline(x=input_length, color='r', linestyle='--',)
         plt.axhline(y=detecting_thr, color='black', linestyle='--', label='Train mean')
+        plt.legend()
         plt.title('Prediction on {} days with offset {} days'.format(input_length, offset))
         plt.show()
 
@@ -454,24 +456,25 @@ def wide_cnn(width=35):
     prediction_length = 35
     test_model(conv_model_wide, sampled_test_df, train_mean, train_std, NUM_DAYS, prediction_length, hormone)
 
-    def lstm_model():
-        """
-        # RNN model
-        # LSTM long short-term memory
-        """
-        lstm_model = tf.keras.models.Sequential([
-            # Shape [batch, time, features] => [batch, time, lstm_units]
-            tf.keras.layers.LSTM(32, return_sequences=True),
-            # Shape => [batch, time, features]
-            tf.keras.layers.Dense(units=1)
-        ])
-        history = compile_and_fit(lstm_model, wide_window)
 
-        IPython.display.clear_output()
-        val_performance['LSTM'] = lstm_model.evaluate(wide_window.val, return_dict=True)
-        performance['LSTM'] = lstm_model.evaluate(wide_window.test, verbose=0, return_dict=True)
+def lstm_model():
+    """
+    # RNN model
+    # LSTM long short-term memory
+    """
+    lstm_model = tf.keras.models.Sequential([
+        # Shape [batch, time, features] => [batch, time, lstm_units]
+        tf.keras.layers.LSTM(32, return_sequences=True),
+        # Shape => [batch, time, features]
+        tf.keras.layers.Dense(units=1)
+    ])
+    history = compile_and_fit(lstm_model, wide_window)
 
-        wide_window.plot(hormone, 'RNN LSTM model predictions', lstm_model)
+    IPython.display.clear_output()
+    val_performance['LSTM'] = lstm_model.evaluate(wide_window.val, return_dict=True)
+    performance['LSTM'] = lstm_model.evaluate(wide_window.test, verbose=0, return_dict=True)
+
+    wide_window.plot(hormone, 'RNN LSTM model predictions', lstm_model)
 
 
 def residual_connections_model():
@@ -577,6 +580,18 @@ def multistep_cnn():
     multi_window.plot(hormone, 'CNN model predictions', multi_cnn, plotYline=True, y=new_mean)
     return multi_cnn
 
+
+def combinational_model(model1, model2):
+    cnn_fb_model = Linear_CNN_FB(INPUT_WIDTH, OUT_STEPS, len(features), model1, model2)
+    IPython.display.clear_output()
+    history = compile_and_fit(cnn_fb_model, multi_window)
+
+    multi_val_performance['combination'] = cnn_fb_model.evaluate(multi_window.val, return_dict=True)
+    multi_performance['combination'] = cnn_fb_model.evaluate(multi_window.test, verbose=0, return_dict=True)
+    multi_window.plot(hormone, 'Combination model predictions', cnn_fb_model, plotYline=True, y=new_mean)
+    return cnn_fb_model
+
+
 # artificial version
 # this is too slow and much worse as well
 """feedback_model_a = FeedBack(32, OUT_STEPS*24, 4)
@@ -592,12 +607,11 @@ multi_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.test, 
 multi_window_a.plot(hormone, feedback_model_a)"""
 
 feedback_model = autoregressive_model()
+feedback_model.name = 'Feedback_model'
 multi_cnn_model = multistep_cnn()
+multi_cnn_model.name = 'Multistep_CNN'
+compare_multiple_models([feedback_model, multi_cnn_model], sampled_test_df, train_mean, train_std, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
 
-test_model2(feedback_model, sampled_test_df, train_mean, train_std, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
-test_model2(multi_cnn_model, sampled_test_df, train_mean, train_std, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
-#test_model2(model, test_df, train_df_mean, train_df_std, detecting_thr, input_length, pred_length, hormone, duration=170):
-#test_model(conv_model_wide, sampled_test_df, train_mean, train_std, NUM_DAYS, prediction_length, hormone)
 
 # Performance
 x = np.arange(len(multi_performance))

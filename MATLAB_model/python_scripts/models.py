@@ -105,3 +105,32 @@ class Wide_CNN(tf.keras.Model):
         #predictions = tf.stack(predictions)
         #predictions = tf.transpose(predictions, [1, 0, 2])
         return predictions
+
+
+class Linear_CNN_FB(tf.keras.Model):
+    def __init__(self, input_length, out_steps, num_features, model1, model2):
+        super().__init__()
+        self.input_length = input_length
+        self.out_steps = out_steps
+        self.num_features = num_features
+        self.model1 = model1
+        self.model2 = model2
+        dense = tf.keras.Sequential([
+            # Shape [batch, time, features] => [batch, 1, features]
+            tf.keras.layers.Lambda(lambda x: x[:, -1:, :]),
+            # Shape => [batch, 1, out_steps*features]
+            tf.keras.layers.Dense(out_steps*num_features,
+                                  kernel_initializer=tf.initializers.zeros()),
+            # Shape => [batch, out_steps, features]
+            tf.keras.layers.Reshape([out_steps, num_features])
+            ])
+        self.dense = dense
+
+    def call(self, inputs):
+        inputs = tf.convert_to_tensor(inputs, dtype=tf.float32)
+        model1_output = self.model1(inputs)
+        model2_output = self.model2(inputs)
+        combined = tf.concat([model1_output, model2_output], axis=1)
+        prediction = self.dense(combined)
+        return prediction
+
