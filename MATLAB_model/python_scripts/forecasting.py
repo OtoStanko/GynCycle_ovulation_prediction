@@ -114,7 +114,7 @@ def compare_multiple_models(list_of_models, test_df, train_df_mean, train_df_std
         plt.show()
 
 
-def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=250, step=5):
+def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=170, step=5):
     print(train_df_mean, train_df_std)
     test_df = (test_df - train_df_mean) / train_df_std
     plt.plot(test_df.index, test_df[hormone])
@@ -455,7 +455,7 @@ def wide_cnn(width=35):
     wide_conv_window.plot(hormone, 'CNN wide model predictions', conv_model_wide)
 
     prediction_length = 35
-    test_model(conv_model_wide, sampled_test_df, train_mean, train_std, NUM_DAYS, prediction_length, hormone)
+    #test_model(conv_model_wide, sampled_test_df, train_mean, train_std, NUM_DAYS, prediction_length, hormone)
 
 
 def lstm_model():
@@ -524,13 +524,13 @@ def show_performance():
         print(f'{name:12s}: {value[metric_name]:0.4f}')
 
 
-#baseline_model()
-#linear_model()
-#dense_model()
-#cnn_model()
-#wide_cnn()
-#residual_connections_model()
-#show_performance()
+baseline_model()
+linear_model()
+dense_model()
+cnn_model()
+wide_cnn()
+residual_connections_model()
+show_performance()
 
 """
 # Multi-step models
@@ -607,11 +607,11 @@ multi_val_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.va
 multi_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.test, verbose=0, return_dict=True)
 multi_window_a.plot(hormone, feedback_model_a)"""
 
-#feedback_model = autoregressive_model()
-#feedback_model.name = 'Feedback_model'
-#multi_cnn_model = multistep_cnn()
-#multi_cnn_model.name = 'Multistep_CNN'
-#compare_multiple_models([feedback_model, multi_cnn_model], sampled_test_df, train_mean, train_std, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
+feedback_model = autoregressive_model()
+feedback_model.name = 'Feedback_model'
+multi_cnn_model = multistep_cnn()
+multi_cnn_model.name = 'Multistep_CNN'
+compare_multiple_models([feedback_model, multi_cnn_model], sampled_test_df, train_mean, train_std, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
 
 
 def multistep_performance():
@@ -630,6 +630,9 @@ def multistep_performance():
     plt.ylabel(f'MAE (average over all times and outputs)')
     _ = plt.legend()
     plt.show()
+
+
+multistep_performance()
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
 sampled_test_df = sampled_df[(sampled_df.index > data_tt_split_date) & (sampled_df.index <= data_stop_date)]
@@ -649,10 +652,10 @@ res = mod.fit(disp=False)
 print(res.summary())
 """
 print(train_df[hormone])
-arima_model = ARIMA(train_df[hormone], order=(1,1,0), seasonal_order=(1,1,0,36),)
+arima_model = ARIMA(train_df[hormone], order=(4,2,0), seasonal_order=(4,2,0,12),)
 fitted_arima = arima_model.fit()
-arima_predictions = fitted_arima.get_forecast(30)
+arima_predictions = fitted_arima.get_forecast(35)
 arima_predictions_series = arima_predictions.predicted_mean
-print(arima_predictions_series)
+#print(arima_predictions_series)
 plt.plot(arima_predictions_series.index, arima_predictions_series.values)
 plt.show()
