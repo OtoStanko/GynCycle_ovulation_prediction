@@ -3,6 +3,7 @@ from cProfile import label
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+import scipy.signal
 import seaborn as sns
 import numpy as np
 import tensorflow as tf
@@ -80,14 +81,20 @@ def create_dataframe(input_files_directory, features, time_file_prefix, run_id=1
     return combined_df
 
 
-def compare_multiple_models(list_of_models, test_df, train_df_mean, train_df_std, detecting_thr,
+def compare_multiple_models(list_of_models, test_df, detecting_thr,
                             input_length, pred_length, hormone, duration=250, step=5):
-    test_df = (test_df - train_df_mean) / train_df_std
+    peaks, properties = scipy.signal.find_peaks(test_df[hormone], distance=20)
     plt.plot(test_df.index, test_df[hormone])
-    plt.axhline(y=detecting_thr, color='black', linestyle='--', label='Train mean')
+    plt.scatter(test_df.index[peaks], test_df[hormone].iloc[peaks],
+                color='red', zorder=5, label='Highlighted Points')
+    #plt.axhline(y=detecting_thr, color='black', linestyle='--', label='Train mean')
     plt.xlabel('Time [hours]')
     plt.title('Test {} data'.format(hormone))
     plt.show()
+    model_peaks_mae = {}
+    model_peaks_rmse = {}
+    peaks_within_threshold = {}
+    peaks_outside_threshold = {}
     for offset in range(0, duration-pred_length-input_length, step):
         input = np.array(test_df[hormone][offset:input_length + offset], dtype=np.float32)
         tensor = tf.convert_to_tensor(input, dtype=tf.float32)  # Ensure dtype is compatible
@@ -104,14 +111,39 @@ def compare_multiple_models(list_of_models, test_df, train_df_mean, train_df_std
         pred_time = test_df.index[input_length + offset:input_length + pred_length + offset]
         pred_time = pred_time / 24
         pred_time = pred_time - first_elem
-        plt.plot(gt_time, test_df[hormone][offset:input_length + pred_length + offset], marker='.',)
+        ground_truth = test_df[hormone][offset:input_length + pred_length + offset]
+        ground_truth_pred_part = test_df[hormone][offset+input_length:input_length + pred_length + offset]
+        peaks, properties = scipy.signal.find_peaks(ground_truth_pred_part, distance=20)
+        peaks = peaks + input_length
+        plt.plot(gt_time, ground_truth, marker='.',)
+        plt.scatter(gt_time[peaks], ground_truth.iloc[peaks],
+                    color='red', zorder=5, label='Test data peaks')
         for i in range(len(list_of_model_predictions)):
-            plt.plot(pred_time, list_of_model_predictions[i], marker='.', label=list_of_models[i].name)
+            model = list_of_models[i]
+            model_predictions = list_of_model_predictions[i]
+            pred_peaks, properties = scipy.signal.find_peaks(model_predictions, distance=20)
+            line, = plt.plot(pred_time, model_predictions, marker='.', label=model.name)
+            line_color = line.get_color()
+            darker_line_color = sp.darken_color(line_color, 0.5)
+            plt.scatter(pred_time[pred_peaks], model_predictions[pred_peaks],
+                        color=darker_line_color, zorder=5, label='{} prediction peaks'.format(list_of_models[i].name))
+            offset_pred_peaks = pred_peaks + input_length
+            distances = sp.get_filtered_distances(peaks, offset_pred_peaks, 2)
+            mae = np.mean(distances) if len(distances) > 0 else 0
+            rmse = np.sqrt(np.mean(distances ** 2)) if len(distances) > 0 else 0
+            model_peaks_mae[model.name] = model_peaks_mae.get(model.name, 0) + mae
+            model_peaks_rmse[model.name] = model_peaks_rmse.get(model.name, 0) + rmse
+            peaks_within_threshold[model.name] = peaks_within_threshold.get(model.name, 0) + len(distances)
+            peaks_outside_threshold[model.name] = peaks_outside_threshold.get(model.name, 0) + len(pred_peaks) - len(distances)
         plt.axvline(x=input_length, color='r', linestyle='--',)
-        plt.axhline(y=detecting_thr, color='black', linestyle='--', label='Train mean')
+        #plt.axhline(y=detecting_thr, color='black', linestyle='--', label='Train mean')
         plt.legend()
         plt.title('Prediction on {} days with offset {} days'.format(input_length, offset))
         plt.show()
+    print(model_peaks_mae)
+    print(model_peaks_rmse)
+    print(peaks_within_threshold)
+    print(peaks_outside_threshold)
 
 
 def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=170, step=5):
@@ -142,6 +174,32 @@ def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_l
         plt.show()
     # first 35 days are the base on which we are predicting one time step
 
+
+def normalize_df(df, method='standard', values=None):
+    """
+    methods: standardization, mean and std may be provided, otherwise are calculated values=(mean, std) is expected
+             minmax, if no values are provided, the scale to [0, 1] is done, otherwise to [a, b]
+    """
+    prop = (None, None)
+    if method == 'standard':
+        if values is None:
+            df_mean = df.mean()
+            df_std = df.std()
+        else:
+            df_mean, df_std = values
+        df = (df - df_mean) / df_std
+        prop = (df_mean, df_std)
+    elif method == 'minmax':
+        min_val = np.min(df)
+        max_val = np.max(df)
+        if values is None:
+            a = 0
+            b = 1
+        else:
+            a, b = values
+        df = a + ((df - min_val) * (b - a) / (max_val - min_val))
+        prop = (min_val, max_val)
+    return df, prop
 
 # Set the parameters
 workDir = os.path.join(os.getcwd(), "../outputDir/")
@@ -258,9 +316,9 @@ print("Num features", num_features)
 train_mean = train_df.mean()
 train_std = train_df.std()
 
-train_df = (train_df - train_mean) / train_std
-val_df = (val_df - train_mean) / train_std
-test_df = (test_df - train_mean) / train_std
+train_df, (train_min, train_max) = normalize_df(train_df, method='minmax', values=(0, 1))
+val_df, _ = normalize_df(val_df, method='minmax', values=(0, 1))
+test_df, _ = normalize_df(test_df, method='minmax', values=(0, 1))
 
 fdf = train_df[train_df > 0]
 new_mean = fdf.mean()[hormone]
@@ -607,11 +665,6 @@ multi_val_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.va
 multi_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.test, verbose=0, return_dict=True)
 multi_window_a.plot(hormone, feedback_model_a)"""
 
-feedback_model = autoregressive_model()
-feedback_model.name = 'Feedback_model'
-multi_cnn_model = multistep_cnn()
-multi_cnn_model.name = 'Multistep_CNN'
-compare_multiple_models([feedback_model, multi_cnn_model], sampled_test_df, train_mean, train_std, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
 
 
 def multistep_performance():
@@ -632,6 +685,12 @@ def multistep_performance():
     plt.show()
 
 
+feedback_model = autoregressive_model()
+#feedback_model.name = 'Feedback_model'
+multi_cnn_model = multistep_cnn()
+#multi_cnn_model.name = 'Multistep_CNN'
+sampled_test_df, (min_val, max_val) = normalize_df(sampled_test_df, method='standard', values=(0, train_max))
+compare_multiple_models([feedback_model, multi_cnn_model], sampled_test_df, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
 multistep_performance()
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
@@ -651,6 +710,7 @@ mod = SARIMAX(sampled_train_df[hormone], trend='c', order=order, seasonal_order=
 res = mod.fit(disp=False)
 print(res.summary())
 """
+"""
 print(train_df[hormone])
 arima_model = ARIMA(train_df[hormone], order=(4,2,0), seasonal_order=(4,2,0,12),)
 fitted_arima = arima_model.fit()
@@ -658,4 +718,13 @@ arima_predictions = fitted_arima.get_forecast(35)
 arima_predictions_series = arima_predictions.predicted_mean
 #print(arima_predictions_series)
 plt.plot(arima_predictions_series.index, arima_predictions_series.values)
+plt.show()
+"""
+
+peaks, properties = scipy.signal.find_peaks(sampled_test_df[hormone], distance=20)
+print(peaks)
+print(properties)
+
+plt.plot(sampled_test_df.index, sampled_test_df[hormone])
+plt.scatter(sampled_test_df.index[peaks], sampled_test_df[hormone].iloc[peaks], color='red', zorder=5, label='Highlighted Points')
 plt.show()

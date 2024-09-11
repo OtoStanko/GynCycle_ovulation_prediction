@@ -1,6 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
+import matplotlib.colors as mcolors
 
 def curve_function(x, a, b, c):
     #return a * (c + np.sin(b * x))
@@ -25,3 +26,23 @@ def fit_sin_curve(train_df, feature, val_df, test_df, original_df):
     plt.title('Sampled dataframe with raw hours with fitted sin curve')
     plt.ylabel('Time in hours')
     plt.show()
+
+
+def darken_color(color, factor=0.7):
+    # Convert color to RGB if necessary
+    if isinstance(color, str):
+        color = mcolors.to_rgb(color)  # Convert named color to RGB
+    elif isinstance(color, tuple):
+        color = mcolors.to_rgb(color)
+    darkened_color = tuple(c * factor for c in color)
+    return darkened_color
+
+
+def get_filtered_distances(gt_peaks, pred_peaks, distance_threshold):
+    distances = []
+    for p in pred_peaks:
+        # Find the closest ground truth peak
+        closest_gt = np.min(np.abs(gt_peaks - p))
+        if closest_gt <= distance_threshold:
+            distances.append(closest_gt)
+    return np.array(distances)
