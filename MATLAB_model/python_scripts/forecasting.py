@@ -125,21 +125,31 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
             model = list_of_models[i]
             model_predictions = list_of_model_predictions[i]
             pred_peaks, properties = scipy.signal.find_peaks(model_predictions, distance=MIN_PEAK_DISTANCE)
+            offset_pred_peaks = pred_peaks + input_length
+            unfiltered_distances = sp.get_distances(curr_peaks, offset_pred_peaks)
+            if len(curr_peaks) > 0:
+                filtered_distances = np.array([distance for distance in unfiltered_distances if distance <= peak_comparison_distance])
+                mae = np.mean(filtered_distances) if len(filtered_distances) > 0 else 0
+                rmse = np.sqrt(np.mean(filtered_distances ** 2)) if len(filtered_distances) > 0 else 0
+                model_peaks_mae[model.name] = model_peaks_mae.get(model.name, 0) + mae
+                model_peaks_rmse[model.name] = model_peaks_rmse.get(model.name, 0) + rmse
+                peaks_within_threshold[model.name] = peaks_within_threshold.get(model.name, 0) + len(filtered_distances)
+                peaks_outside_threshold[model.name] = peaks_outside_threshold.get(model.name, 0) + len(pred_peaks) - len(filtered_distances)
             if plot:
                 line, = plt.plot(pred_time, model_predictions, marker='.', label=model.name)
                 line_color = line.get_color()
                 darker_line_color = sp.darken_color(line_color, 0.5)
-                plt.scatter(pred_time[pred_peaks], model_predictions[pred_peaks],
-                            color=darker_line_color, zorder=5, label='{} prediction peaks'.format(list_of_models[i].name))
-            offset_pred_peaks = pred_peaks + input_length
-            if len(curr_peaks) > 0:
-                distances = sp.get_filtered_distances(curr_peaks, offset_pred_peaks, peak_comparison_distance)
-                mae = np.mean(distances) if len(distances) > 0 else 0
-                rmse = np.sqrt(np.mean(distances ** 2)) if len(distances) > 0 else 0
-                model_peaks_mae[model.name] = model_peaks_mae.get(model.name, 0) + mae
-                model_peaks_rmse[model.name] = model_peaks_rmse.get(model.name, 0) + rmse
-                peaks_within_threshold[model.name] = peaks_within_threshold.get(model.name, 0) + len(distances)
-                peaks_outside_threshold[model.name] = peaks_outside_threshold.get(model.name, 0) + len(pred_peaks) - len(distances)
+                if len(unfiltered_distances) != 0:
+                    for j in range(len(pred_peaks)):
+                        if unfiltered_distances[j] <= peak_comparison_distance:
+                            plt.scatter(pred_time[pred_peaks[j]], model_predictions[pred_peaks[j]],
+                                        color='yellow', zorder=5)
+                        else:
+                            plt.scatter(pred_time[pred_peaks[j]], model_predictions[pred_peaks[j]],
+                                        color=darker_line_color, zorder=5)
+                else:
+                    plt.scatter(pred_time[pred_peaks], model_predictions[pred_peaks],
+                                color=darker_line_color, zorder=5)
         if plot:
             plt.axvline(x=input_length, color='r', linestyle='--',)
             plt.legend(loc='upper left')
@@ -690,7 +700,15 @@ def multistep_performance():
     _ = plt.legend()
     plt.show()
 
-
+from collections import Counter
+peaks, properties = scipy.signal.find_peaks(train_df[features[0]], distance=10, height=0.3)
+distances = [peaks[i+1] - peaks[i] for i in range(len(peaks)-1)]
+count = Counter(distances)
+print("Number of cycles:", len(distances))
+numbers = list(count.keys())
+frequencies = list(count.values())
+plt.bar(numbers, frequencies, color='skyblue')
+plt.show()
 
 sampled_test_df, (min_val, max_val) = normalize_df(sampled_test_df, method='standard', values=(0, train_max))
 peaks_within_threshold = {}
@@ -698,9 +716,9 @@ peaks_outside_threshold = {}
 PEAK_COMPARISON_DISTANCE = 2
 for _ in range(20):
     feedback_model = autoregressive_model()
-    feedback_model.name = 'feed_back'
+    feedback_model._name = 'feed_back'
     multi_cnn_model = multistep_cnn()
-    multi_cnn_model.name = 'wide_cnn'
+    multi_cnn_model._name = 'wide_cnn'
     within, outside = compare_multiple_models([feedback_model, multi_cnn_model],
                                               sampled_test_df, INPUT_WIDTH, OUT_STEPS, features[0], plot=False,
                                               peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
@@ -740,11 +758,3 @@ arima_predictions_series = arima_predictions.predicted_mean
 plt.plot(arima_predictions_series.index, arima_predictions_series.values)
 plt.show()
 """
-
-peaks, properties = scipy.signal.find_peaks(sampled_test_df[features[0]], distance=20)
-print(peaks)
-print(properties)
-
-plt.plot(sampled_test_df.index, sampled_test_df[features])
-plt.scatter(sampled_test_df.index[peaks], sampled_test_df[features].iloc[peaks], color='red', zorder=5, label='Highlighted Points')
-plt.show()
