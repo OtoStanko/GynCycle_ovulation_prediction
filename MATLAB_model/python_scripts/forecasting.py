@@ -225,7 +225,7 @@ MAX_EPOCHS = 25
 test_dataframe = create_dataframe(workDir, features, 'Time', 1)
 test_dataframe['Time'] = test_dataframe['Time'] * 24
 # train on a long TS
-combined_df = create_dataframe(workDir, features, 'Time', 2)
+combined_df = create_dataframe(workDir, features, 'Time', 3)
 combined_df['Time'] = combined_df['Time'] * 24
 
 print('Num records in the loaded data for training:', len(combined_df['Time']))
@@ -595,13 +595,13 @@ def show_performance():
         print(f'{name:12s}: {value[metric_name]:0.4f}')
 
 
-baseline_model()
-linear_model()
-dense_model()
-cnn_model()
-wide_cnn()
-residual_connections_model()
-show_performance()
+#baseline_model()
+#linear_model()
+#dense_model()
+#cnn_model()
+#wide_cnn()
+#residual_connections_model()
+#show_performance()
 
 """
 # Multi-step models
@@ -610,7 +610,7 @@ OUT_STEPS = 35
 INPUT_WIDTH = 35
 multi_window = WindowGenerator(input_width=INPUT_WIDTH, label_width=OUT_STEPS,   shift=OUT_STEPS,
                                train_df=train_df, val_df=val_df, test_df=test_df,
-                               label_columns=features)
+                               label_columns=hormones)
 for hormone in hormones:
     multi_window.plot(hormone, 'Multi window')
 
@@ -629,11 +629,12 @@ def autoregressive_model():
     """
     # autoregressive RNN
     """
-    feedback_model = FeedBack(32, OUT_STEPS, len(features))
+    feedback_model = FeedBack(32, OUT_STEPS, len(hormones))
     prediction, state = feedback_model.warmup(multi_window.example[0])
     print(prediction.shape)
     print('Output shape (batch, time, features): ', feedback_model(multi_window.example[0]).shape)
     history = compile_and_fit(feedback_model, multi_window)
+    print(feedback_model.summary())
 
     IPython.display.clear_output()
 
@@ -645,15 +646,42 @@ def autoregressive_model():
 
 
 def multistep_cnn():
-    multi_cnn = Wide_CNN(INPUT_WIDTH, OUT_STEPS, len(features))
+    multi_cnn = Wide_CNN(INPUT_WIDTH, OUT_STEPS, len(hormones))
     IPython.display.clear_output()
     history = compile_and_fit(multi_cnn, multi_window)
+    print(multi_cnn.summary())
 
     multi_val_performance['CNN'] = multi_cnn.evaluate(multi_window.val, return_dict=True)
     multi_performance['CNN'] = multi_cnn.evaluate(multi_window.test, verbose=0, return_dict=True)
     for hormone in hormones:
         multi_window.plot(hormone, 'CNN model predictions of {}'.format(hormone), multi_cnn)
     return multi_cnn
+
+
+def single_shot_cnn():
+    one_shot_cnn = tf.keras.Sequential([
+        # Shape [batch, time, features] => [batch, CONV_WIDTH, features]
+        tf.keras.layers.Lambda(lambda x: x[:, -INPUT_WIDTH:, :]),
+        # Shape => [batch, 1, conv_units]
+        tf.keras.layers.Conv1D(256, activation='relu', kernel_size=(INPUT_WIDTH)),
+        tf.keras.layers.Reshape([256, 1]),
+        tf.keras.layers.MaxPool1D(pool_size=7, strides=7),
+        tf.keras.layers.Flatten(),
+        # Shape => [batch, 1,  out_steps*features]
+        tf.keras.layers.Dense(OUT_STEPS*len(hormones),
+                              kernel_initializer=tf.initializers.zeros()),
+        # Shape => [batch, out_steps, features]
+        tf.keras.layers.Reshape([OUT_STEPS, len(hormones)])
+        ])
+    IPython.display.clear_output()
+    history = compile_and_fit(one_shot_cnn, multi_window)
+    print(one_shot_cnn.summary())
+
+    multi_val_performance['CNN_single_show'] = one_shot_cnn.evaluate(multi_window.val, return_dict=True)
+    multi_performance['CNN_single_show'] = one_shot_cnn.evaluate(multi_window.test, verbose=0, return_dict=True)
+    for hormone in hormones:
+        multi_window.plot(hormone, 'CNN_single_show model predictions of {}'.format(hormone), one_shot_cnn)
+    return one_shot_cnn
 
 
 def combinational_model(model1, model2):
@@ -701,14 +729,25 @@ def multistep_performance():
     plt.show()
 
 
-#feedback_model = autoregressive_model()
-#feedback_model.name = 'Feedback_model'
-#multi_cnn_model = multistep_cnn()
-#multi_cnn_model.name = 'Multistep_CNN'
-#sampled_test_df, (min_val, max_val) = normalize_df(sampled_test_df, method='standard', values=(0, train_max))
-#compare_multiple_models([feedback_model, multi_cnn_model], sampled_test_df,
-#                        INPUT_WIDTH, OUT_STEPS, hormones, features)
-#multistep_performance()
+peaks, _ = peaks, properties = scipy.signal.find_peaks(train_df[hormones[0]], height=0.3, distance=10)
+print(peaks)
+distances = [peaks[i+1] - peaks[i] for i in range(len(peaks)-1)]
+print(distances)
+distances.sort()
+print(distances)
+from collections import Counter
+value_counts = Counter(distances)
+labels, counts = zip(*value_counts.items())
+plt.bar(labels, counts, color='skyblue')
+plt.show()
+
+feedback_model = autoregressive_model()
+multi_cnn_model = multistep_cnn()
+one_show_cnn = single_shot_cnn()
+sampled_test_df, (min_val, max_val) = normalize_df(sampled_test_df, method='standard', values=(0, train_max))
+compare_multiple_models([feedback_model, multi_cnn_model, one_show_cnn], sampled_test_df,
+                        INPUT_WIDTH, OUT_STEPS, hormones, features)
+multistep_performance()
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
 sampled_test_df = sampled_df[(sampled_df.index > data_tt_split_date) & (sampled_df.index <= data_stop_date)]
