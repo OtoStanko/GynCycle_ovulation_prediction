@@ -57,7 +57,7 @@ class WindowGenerator():
         labels.set_shape([None, self.label_width, None])
         return inputs, labels
 
-    def plot(self, plot_col, title, model=None, max_subplots=3, plotYline=False, y=0):
+    def plot(self, plot_col, title, model=None, max_subplots=3):
         inputs, labels = self.example
         plt.figure(figsize=(12, 8))
         plot_col_index = self.column_indices[plot_col]
@@ -67,8 +67,6 @@ class WindowGenerator():
             plt.ylabel(f'{plot_col} [normed]')
             plt.plot(self.input_indices, inputs[n, :, plot_col_index],
                    label='Inputs', marker='.', zorder=-10)
-            if plotYline:
-                plt.axhline(y=y, color='black', linestyle='--', label='Train mean')
 
             if self.label_columns:
                 label_col_index = self.label_columns_indices.get(plot_col, None)
