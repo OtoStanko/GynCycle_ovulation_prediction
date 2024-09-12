@@ -81,24 +81,26 @@ def create_dataframe(input_files_directory, features, time_file_prefix, run_id=1
     return combined_df
 
 
-def compare_multiple_models(list_of_models, test_df, detecting_thr,
-                            input_length, pred_length, hormone, duration=250, step=5):
-    peaks, properties = scipy.signal.find_peaks(test_df[hormone], distance=20)
-    plt.plot(test_df.index, test_df[hormone])
-    plt.scatter(test_df.index[peaks], test_df[hormone].iloc[peaks],
-                color='red', zorder=5, label='Highlighted Points')
-    #plt.axhline(y=detecting_thr, color='black', linestyle='--', label='Train mean')
-    plt.xlabel('Time [hours]')
-    plt.title('Test {} data'.format(hormone))
-    plt.show()
+def compare_multiple_models(list_of_models, test_df, input_length, pred_length, hormone,
+                            duration=250, step=5, plot=True, peak_comparison_distance=2):
+    MIN_PEAK_DISTANCE = 20
+    MIN_PEAK_HEIGHT = 0.3
+    peaks, properties = scipy.signal.find_peaks(test_df[hormone], distance=MIN_PEAK_DISTANCE/2, height=MIN_PEAK_HEIGHT)
+    if plot:
+        plt.plot(test_df.index, test_df[hormone])
+        plt.scatter(test_df.index[peaks], test_df[hormone].iloc[peaks],
+                    color='red', zorder=5, label='Highlighted Points')
+        plt.xlabel('Time [hours]')
+        plt.title('Test {} data'.format(hormone))
+        plt.show()
     model_peaks_mae = {}
     model_peaks_rmse = {}
     peaks_within_threshold = {}
     peaks_outside_threshold = {}
-    for offset in range(0, duration-pred_length-input_length, step):
+    for offset in range(0, duration-pred_length-input_length+1, step):
         input = np.array(test_df[hormone][offset:input_length + offset], dtype=np.float32)
         tensor = tf.convert_to_tensor(input, dtype=tf.float32)  # Ensure dtype is compatible
-        reshaped_tensor = tf.reshape(tensor, (1, 35, 1))
+        reshaped_tensor = tf.reshape(tensor, (1, input_length, 1))
         list_of_model_predictions = []
         for model in list_of_models:
             predictions = model.predict(reshaped_tensor)
@@ -112,38 +114,42 @@ def compare_multiple_models(list_of_models, test_df, detecting_thr,
         pred_time = pred_time / 24
         pred_time = pred_time - first_elem
         ground_truth = test_df[hormone][offset:input_length + pred_length + offset]
-        ground_truth_pred_part = test_df[hormone][offset+input_length:input_length + pred_length + offset]
-        peaks, properties = scipy.signal.find_peaks(ground_truth_pred_part, distance=20)
-        peaks = peaks + input_length
-        plt.plot(gt_time, ground_truth, marker='.',)
-        plt.scatter(gt_time[peaks], ground_truth.iloc[peaks],
-                    color='red', zorder=5, label='Test data peaks')
+        curr_peaks = np.array([x for x in peaks if offset + input_length <= x < input_length + pred_length + offset])
+        curr_peaks = curr_peaks - offset
+        if plot:
+            plt.plot(gt_time, ground_truth, marker='.',)
+        if len(curr_peaks) > 0 and plot:
+            plt.scatter(gt_time[curr_peaks], ground_truth.iloc[curr_peaks],
+                        color='red', zorder=5, label='Test data peaks')
         for i in range(len(list_of_model_predictions)):
             model = list_of_models[i]
             model_predictions = list_of_model_predictions[i]
-            pred_peaks, properties = scipy.signal.find_peaks(model_predictions, distance=20)
-            line, = plt.plot(pred_time, model_predictions, marker='.', label=model.name)
-            line_color = line.get_color()
-            darker_line_color = sp.darken_color(line_color, 0.5)
-            plt.scatter(pred_time[pred_peaks], model_predictions[pred_peaks],
-                        color=darker_line_color, zorder=5, label='{} prediction peaks'.format(list_of_models[i].name))
+            pred_peaks, properties = scipy.signal.find_peaks(model_predictions, distance=MIN_PEAK_DISTANCE)
+            if plot:
+                line, = plt.plot(pred_time, model_predictions, marker='.', label=model.name)
+                line_color = line.get_color()
+                darker_line_color = sp.darken_color(line_color, 0.5)
+                plt.scatter(pred_time[pred_peaks], model_predictions[pred_peaks],
+                            color=darker_line_color, zorder=5, label='{} prediction peaks'.format(list_of_models[i].name))
             offset_pred_peaks = pred_peaks + input_length
-            distances = sp.get_filtered_distances(peaks, offset_pred_peaks, 2)
-            mae = np.mean(distances) if len(distances) > 0 else 0
-            rmse = np.sqrt(np.mean(distances ** 2)) if len(distances) > 0 else 0
-            model_peaks_mae[model.name] = model_peaks_mae.get(model.name, 0) + mae
-            model_peaks_rmse[model.name] = model_peaks_rmse.get(model.name, 0) + rmse
-            peaks_within_threshold[model.name] = peaks_within_threshold.get(model.name, 0) + len(distances)
-            peaks_outside_threshold[model.name] = peaks_outside_threshold.get(model.name, 0) + len(pred_peaks) - len(distances)
-        plt.axvline(x=input_length, color='r', linestyle='--',)
-        #plt.axhline(y=detecting_thr, color='black', linestyle='--', label='Train mean')
-        plt.legend()
-        plt.title('Prediction on {} days with offset {} days'.format(input_length, offset))
-        plt.show()
+            if len(curr_peaks) > 0:
+                distances = sp.get_filtered_distances(curr_peaks, offset_pred_peaks, peak_comparison_distance)
+                mae = np.mean(distances) if len(distances) > 0 else 0
+                rmse = np.sqrt(np.mean(distances ** 2)) if len(distances) > 0 else 0
+                model_peaks_mae[model.name] = model_peaks_mae.get(model.name, 0) + mae
+                model_peaks_rmse[model.name] = model_peaks_rmse.get(model.name, 0) + rmse
+                peaks_within_threshold[model.name] = peaks_within_threshold.get(model.name, 0) + len(distances)
+                peaks_outside_threshold[model.name] = peaks_outside_threshold.get(model.name, 0) + len(pred_peaks) - len(distances)
+        if plot:
+            plt.axvline(x=input_length, color='r', linestyle='--',)
+            plt.legend(loc='upper left')
+            plt.title('Prediction on {} days with offset {} days'.format(input_length, offset))
+            plt.show()
     print(model_peaks_mae)
     print(model_peaks_rmse)
     print(peaks_within_threshold)
     print(peaks_outside_threshold)
+    return peaks_within_threshold, peaks_outside_threshold
 
 
 def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=170, step=5):
@@ -208,7 +214,7 @@ sampling_frequency_unit = 'H'
 num_initial_days_to_discard = 50
 train_test_split_days = 250
 test_days_end = 300
-hormone = 'LH'
+#hormone = 'LH'
 #features = ['FSH', 'E2', 'P4', 'LH']
 features = ['LH']
 MAX_EPOCHS = 25
@@ -220,7 +226,7 @@ test_dataframe['Time'] = test_dataframe['Time'] * 24
 combined_df = create_dataframe(workDir, features, 'Time', 2)
 combined_df['Time'] = combined_df['Time'] * 24
 
-print('Num records in the loaded data for training:', len(combined_df[hormone]))
+print('Num records in the loaded data for training:', len(combined_df['Time']))
 # Plot the loaded data
 sns.set()
 plt.ylabel('{} levels'.format('Hormones'))
@@ -240,8 +246,8 @@ filtered_test_df.set_index('Time', inplace=True)
 
 print(filtered_df.describe().transpose())
 filtered_df_timeH = filtered_df.copy()
-print(filtered_df[hormone])
-print(filtered_df_timeH[hormone])
+print(filtered_df[features])
+print(filtered_df_timeH[features])
 
 
 """time_delta = pd.to_timedelta(filtered_df.index, unit='h')
@@ -268,7 +274,7 @@ print(filtered_df_timeH.index[-1])
 sampled_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, int(filtered_df_timeH.index[-1]) + 1, sampling_frequency)]
 print(len(sampled_df_timeH_index))
 sampled_df_timeH = sample_data(filtered_df_timeH, sampled_df_timeH_index, features)
-print('Num records in the sampled dataframe with raw hours:', len(sampled_df_timeH[hormone]))
+print('Num records in the sampled dataframe with raw hours:', len(sampled_df_timeH.index))
 plt.plot(sampled_df_timeH.index, sampled_df_timeH[features], )
 plt.title('Sampled dataframe with raw hours')
 plt.xlabel('Time in hours')
@@ -321,13 +327,12 @@ val_df, _ = normalize_df(val_df, method='minmax', values=(0, 1))
 test_df, _ = normalize_df(test_df, method='minmax', values=(0, 1))
 
 fdf = train_df[train_df > 0]
-new_mean = fdf.mean()[hormone]
+#new_mean = fdf.mean()[hormone]
 
-plt.plot(train_df.index, train_df[hormone], color='yellow')
-plt.plot(val_df.index, val_df[hormone], color='blue')
-plt.plot(test_df.index, test_df[hormone], color='red')
-plt.axhline(y=new_mean, color='black', linestyle='--', label='Train mean')
-plt.title('Sampled raw hours split {} levels normalized'.format(hormone))
+plt.plot(train_df.index, train_df[features], color='yellow')
+plt.plot(val_df.index, val_df[features], color='blue')
+plt.plot(test_df.index, test_df[features], color='red')
+plt.title('Sampled raw hours split {} levels normalized'.format(features))
 plt.xlabel('Time in hours')
 plt.show()
 
@@ -363,7 +368,7 @@ plt.show()"""
 # Window
 w2 = WindowGenerator(input_width=34, label_width=1, shift=1,
                      train_df=train_df, val_df=val_df, test_df=test_df,
-                     label_columns=[hormone])
+                     label_columns=features)
 #print(w2)
 
 
@@ -375,7 +380,7 @@ for example_inputs, example_labels in w2.train.take(1):
 single_step_window = WindowGenerator(
     input_width=1, label_width=1, shift=1,
     train_df=train_df, val_df=val_df, test_df=test_df,
-    label_columns=[hormone])
+    label_columns=features)
 
 
 val_performance = {}
@@ -383,7 +388,7 @@ performance = {}
 wide_window = WindowGenerator(
         input_width=24, label_width=24, shift=1,
         train_df=train_df, val_df=val_df, test_df=test_df,
-        label_columns=[hormone])
+        label_columns=features)
 
 
 def baseline_model():
@@ -391,7 +396,7 @@ def baseline_model():
     # Baseline model
     Returns the previous value
     """
-    baseline = Baseline(label_index=column_indices[hormone])
+    baseline = Baseline(label_index=column_indices[features[0]])
 
     baseline.compile(loss=tf.keras.losses.MeanSquaredError(),
                      metrics=[tf.keras.metrics.MeanAbsoluteError()])
@@ -400,7 +405,7 @@ def baseline_model():
     performance['Baseline'] = baseline.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
     #print(wide_window)
-    wide_window.plot(hormone, 'Baseline model predictions', baseline)
+    wide_window.plot(features[0], 'Baseline model predictions', baseline)
 
 
 def linear_model():
@@ -416,7 +421,7 @@ def linear_model():
     val_performance['Linear'] = linear.evaluate(single_step_window.val, return_dict=True)
     performance['Linear'] = linear.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
-    wide_window.plot(hormone, 'Linear model predictions', linear)
+    wide_window.plot(features[0], 'Linear model predictions', linear)
 
     plt.bar(x = range(len(train_df.columns)),
             height=linear.layers[0].kernel[:,0].numpy())
@@ -441,7 +446,7 @@ def dense_model():
     val_performance['Dense'] = dense.evaluate(single_step_window.val, return_dict=True)
     performance['Dense'] = dense.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
-    wide_window.plot(hormone, 'Dense model predictions', dense)
+    wide_window.plot(features[0], 'Dense model predictions', dense)
 
 
 """
@@ -457,7 +462,7 @@ def cnn_model():
     CONV_WIDTH = 3
     conv_window = WindowGenerator(input_width=CONV_WIDTH, label_width=1, shift=1,
                                   train_df=train_df, val_df=val_df, test_df=test_df,
-                                  label_columns=[hormone])
+                                  label_columns=features)
     print(conv_window)
     conv_model = tf.keras.Sequential([
         tf.keras.layers.Conv1D(filters=32,
@@ -474,9 +479,9 @@ def cnn_model():
     INPUT_WIDTH = LABEL_WIDTH + (CONV_WIDTH - 1)
     wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH, label_width=LABEL_WIDTH, shift=1,
                                         train_df=train_df, val_df=val_df, test_df=test_df,
-                                        label_columns=[hormone])
+                                        label_columns=features)
 
-    wide_conv_window.plot(hormone, 'CNN model predictions', conv_model)
+    wide_conv_window.plot(features[0], 'CNN model predictions', conv_model)
 
 
 def wide_cnn(width=35):
@@ -489,7 +494,7 @@ def wide_cnn(width=35):
     CONV_WIDTH_WIDE = NUM_DAYS
     conv_window_wide = WindowGenerator(input_width=CONV_WIDTH_WIDE, label_width=1, shift=1,
                                   train_df=train_df, val_df=val_df, test_df=test_df,
-                                  label_columns=[hormone])
+                                  label_columns=features)
     print(conv_window_wide)
     conv_model_wide = tf.keras.Sequential([
         tf.keras.layers.Conv1D(filters=32,
@@ -508,9 +513,9 @@ def wide_cnn(width=35):
     INPUT_WIDTH_WIDE = LABEL_WIDTH + (CONV_WIDTH_WIDE - 1)
     wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH_WIDE, label_width=LABEL_WIDTH_WIDE, shift=1,
                                         train_df=train_df, val_df=val_df, test_df=test_df,
-                                        label_columns=[hormone])
+                                        label_columns=features)
 
-    wide_conv_window.plot(hormone, 'CNN wide model predictions', conv_model_wide)
+    wide_conv_window.plot(features[0], 'CNN wide model predictions', conv_model_wide)
 
     prediction_length = 35
     #test_model(conv_model_wide, sampled_test_df, train_mean, train_std, NUM_DAYS, prediction_length, hormone)
@@ -533,7 +538,7 @@ def lstm_model():
     val_performance['LSTM'] = lstm_model.evaluate(wide_window.val, return_dict=True)
     performance['LSTM'] = lstm_model.evaluate(wide_window.test, verbose=0, return_dict=True)
 
-    wide_window.plot(hormone, 'RNN LSTM model predictions', lstm_model)
+    wide_window.plot(features[0], 'RNN LSTM model predictions', lstm_model)
 
 
 def residual_connections_model():
@@ -557,7 +562,7 @@ def residual_connections_model():
     val_performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.val, return_dict=True)
     performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.test, verbose=0, return_dict=True)
 
-    wide_window.plot(hormone, 'Residual LSTM model predictions', residual_lstm)
+    wide_window.plot(features[0], 'Residual LSTM model predictions', residual_lstm)
 
 
 def show_performance():
@@ -570,7 +575,7 @@ def show_performance():
     val_mae = [v[metric_name] for v in val_performance.values()]
     test_mae = [v[metric_name] for v in performance.values()]
 
-    plt.ylabel('mean_absolute_error [{}, normalized]'.format(hormone))
+    plt.ylabel('mean_absolute_error {}, normalized'.format(features))
     plt.bar(x - 0.17, val_mae, width, label='Validation')
     plt.bar(x + 0.17, test_mae, width, label='Test')
     plt.xticks(ticks=x, labels=performance.keys(),
@@ -582,13 +587,13 @@ def show_performance():
         print(f'{name:12s}: {value[metric_name]:0.4f}')
 
 
-baseline_model()
-linear_model()
-dense_model()
-cnn_model()
-wide_cnn()
-residual_connections_model()
-show_performance()
+#baseline_model()
+#linear_model()
+#dense_model()
+#cnn_model()
+#wide_cnn()
+#residual_connections_model()
+#show_performance()
 
 """
 # Multi-step models
@@ -598,7 +603,7 @@ INPUT_WIDTH = 35
 multi_window = WindowGenerator(input_width=INPUT_WIDTH, label_width=OUT_STEPS,   shift=OUT_STEPS,
                                train_df=train_df, val_df=val_df, test_df=test_df,
                                label_columns=features)
-multi_window.plot(hormone, 'Multi window')
+multi_window.plot(features[0], 'Multi window')
 
 # variant with the artificially added samples
 """OUT_STEPS_a = 24
@@ -625,18 +630,19 @@ def autoregressive_model():
 
     multi_val_performance['AR LSTM'] = feedback_model.evaluate(multi_window.val, return_dict=True)
     multi_performance['AR LSTM'] = feedback_model.evaluate(multi_window.test, verbose=0, return_dict=True)
-    multi_window.plot(hormone, 'Autoregressive model predictions', feedback_model, plotYline=True, y=new_mean)
+    multi_window.plot(features[0], 'Autoregressive model predictions', feedback_model)
     return feedback_model
 
 
 def multistep_cnn():
     multi_cnn = Wide_CNN(INPUT_WIDTH, OUT_STEPS, len(features))
     IPython.display.clear_output()
+    print('Output shape (batch, time, features): ', multi_cnn(multi_window.example[0]).shape)
     history = compile_and_fit(multi_cnn, multi_window)
 
     multi_val_performance['CNN'] = multi_cnn.evaluate(multi_window.val, return_dict=True)
     multi_performance['CNN'] = multi_cnn.evaluate(multi_window.test, verbose=0, return_dict=True)
-    multi_window.plot(hormone, 'CNN model predictions', multi_cnn, plotYline=True, y=new_mean)
+    multi_window.plot(features[0], 'CNN model predictions', multi_cnn)
     return multi_cnn
 
 
@@ -647,7 +653,7 @@ def combinational_model(model1, model2):
 
     multi_val_performance['combination'] = cnn_fb_model.evaluate(multi_window.val, return_dict=True)
     multi_performance['combination'] = cnn_fb_model.evaluate(multi_window.test, verbose=0, return_dict=True)
-    multi_window.plot(hormone, 'Combination model predictions', cnn_fb_model, plotYline=True, y=new_mean)
+    multi_window.plot(features[0], 'Combination model predictions', cnn_fb_model)
     return cnn_fb_model
 
 
@@ -685,12 +691,26 @@ def multistep_performance():
     plt.show()
 
 
-feedback_model = autoregressive_model()
-#feedback_model.name = 'Feedback_model'
-multi_cnn_model = multistep_cnn()
-#multi_cnn_model.name = 'Multistep_CNN'
+
 sampled_test_df, (min_val, max_val) = normalize_df(sampled_test_df, method='standard', values=(0, train_max))
-compare_multiple_models([feedback_model, multi_cnn_model], sampled_test_df, new_mean, INPUT_WIDTH, OUT_STEPS, hormone)
+peaks_within_threshold = {}
+peaks_outside_threshold = {}
+PEAK_COMPARISON_DISTANCE = 2
+for _ in range(20):
+    feedback_model = autoregressive_model()
+    feedback_model.name = 'feed_back'
+    multi_cnn_model = multistep_cnn()
+    multi_cnn_model.name = 'wide_cnn'
+    within, outside = compare_multiple_models([feedback_model, multi_cnn_model],
+                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features[0], plot=False,
+                                              peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
+    for model_name, value in within.items():
+        peaks_within_threshold[model_name] = peaks_within_threshold.get(model_name, 0) + value
+    for model_name, value in outside.items():
+        peaks_outside_threshold[model_name] = peaks_outside_threshold.get(model_name, 0) + value
+print(peaks_within_threshold)
+print(peaks_outside_threshold)
+sp.print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, PEAK_COMPARISON_DISTANCE)
 multistep_performance()
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
@@ -721,10 +741,10 @@ plt.plot(arima_predictions_series.index, arima_predictions_series.values)
 plt.show()
 """
 
-peaks, properties = scipy.signal.find_peaks(sampled_test_df[hormone], distance=20)
+peaks, properties = scipy.signal.find_peaks(sampled_test_df[features[0]], distance=20)
 print(peaks)
 print(properties)
 
-plt.plot(sampled_test_df.index, sampled_test_df[hormone])
-plt.scatter(sampled_test_df.index[peaks], sampled_test_df[hormone].iloc[peaks], color='red', zorder=5, label='Highlighted Points')
+plt.plot(sampled_test_df.index, sampled_test_df[features])
+plt.scatter(sampled_test_df.index[peaks], sampled_test_df[features].iloc[peaks], color='red', zorder=5, label='Highlighted Points')
 plt.show()

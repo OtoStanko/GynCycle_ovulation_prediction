@@ -46,3 +46,31 @@ def get_filtered_distances(gt_peaks, pred_peaks, distance_threshold):
         if closest_gt <= distance_threshold:
             distances.append(closest_gt)
     return np.array(distances)
+
+
+def print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, peak_comparison_distance=2):
+    model_name_length = max([len(key) for key in peaks_within_threshold.keys()] + [10])
+    #model_name_length = max(model_name_length, 10)
+    peaks_in_length = max([len(str(value)) for value in peaks_within_threshold.values()] + [16])
+    peaks_out_length = max([len(str(value)) for value in peaks_outside_threshold.values()] + [17])
+    thr_width = len(str(peak_comparison_distance))
+    print("+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length+thr_width+5) * "-", peaks_out_length * "-"))
+    print('| {:{model_width}} | {:{in_width}} (<={:{thr_width}}) | {:{out_width}} |'.format(f"Model name", f"peaks within thr",
+                                                                            peak_comparison_distance,
+                                                                            f"peaks outside thr",
+                                                                            model_width=model_name_length,
+                                                                            in_width=peaks_in_length,
+                                                                            thr_width=thr_width,
+                                                                            out_width=peaks_out_length))
+    print("+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length+thr_width+5) * "-", peaks_out_length * "-"))
+    for model_name, value in peaks_within_threshold.items():
+        print('| {:{model_width}} | {:{in_width}}    {:{thr_width}}  | {:{out_width}} |'.format(model_name, value,
+                                                                "",
+                                                                peaks_outside_threshold[model_name],
+                                                                model_width=model_name_length,
+                                                                in_width=peaks_in_length,
+                                                                thr_width=thr_width,
+                                                                out_width=peaks_out_length))
+    print("+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length+thr_width+5) * "-", peaks_out_length * "-"))
+
+#print_peak_statistics({"key 1": 5, "a very long key": 4}, {"key 1": 2, "a very long key": 4}, 10)
