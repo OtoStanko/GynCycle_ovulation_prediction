@@ -79,13 +79,14 @@ class Wide_CNN(tf.keras.Model):
         self.input_length = input_length
         self.out_steps = out_steps
         self.num_features = num_features
-        self.cnn = tf.keras.Sequential([
+        conv_model_wide = tf.keras.Sequential([
             tf.keras.layers.Conv1D(filters=32,
                                    kernel_size=(input_length,),
                                    activation='relu'),
             tf.keras.layers.Dense(units=32, activation='relu', kernel_initializer=tf.initializers.he_normal()),
             tf.keras.layers.Dense(units=num_features),
         ])
+        self.cnn = conv_model_wide
 
     def call(self, inputs):
         #input = np.array(inputs)
