@@ -9,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 #from statsmodels.tsa.seasonal import seasonal_decompose
 #from statsmodels.tsa.statespace.sarimax import SARIMAX
+from statsmodels.tsa.arima.model import ARIMA
 from windowGenerator import WindowGenerator
 from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN, Linear_CNN_FB
 import IPython
@@ -83,10 +84,7 @@ def create_dataframe(input_files_directory, features, time_file_prefix, run_id=1
 def compare_multiple_models(list_of_models, test_df,
                             input_length, pred_length, hormones, features, duration=250, step=5):
     hormone = hormones[0]
-    min_peak_distance = 20
-    min_peak_height = 0.3
-    peaks, properties = scipy.signal.find_peaks(test_df[hormone], height=min_peak_height)
-    print(peaks)
+    peaks, properties = scipy.signal.find_peaks(test_df[hormone], distance=20)
     plt.plot(test_df.index, test_df[hormone])
     plt.scatter(test_df.index[peaks], test_df[hormone].iloc[peaks],
                 color='red', zorder=5, label='Highlighted Points')
@@ -98,12 +96,12 @@ def compare_multiple_models(list_of_models, test_df,
     model_peaks_rmse = {}
     peaks_within_threshold = {}
     peaks_outside_threshold = {}
-    for offset in range(0, duration-pred_length-input_length+1, step):
+    for offset in range(0, duration-pred_length-input_length, step):
         input = []
         for feature in features:
             input.append(np.array(test_df[feature][offset:input_length + offset], dtype=np.float32))
         tensor = tf.convert_to_tensor(input, dtype=tf.float32)  # Ensure dtype is compatible
-        reshaped_tensor = tf.reshape(tensor, (1, input_length, len(features)))
+        reshaped_tensor = tf.reshape(tensor, (1, 35, len(features)))
         list_of_model_predictions = []
         for model in list_of_models:
             predictions = model.predict(reshaped_tensor)
@@ -118,34 +116,31 @@ def compare_multiple_models(list_of_models, test_df,
         pred_time = pred_time - first_elem
         ground_truth = test_df[hormone][offset:input_length + pred_length + offset]
         ground_truth_pred_part = test_df[hormone][offset+input_length:input_length + pred_length + offset]
-        curr_peaks = np.array([x for x in peaks if offset+input_length <= x < input_length + pred_length + offset])
-        #peaks, properties = scipy.signal.find_peaks(ground_truth_pred_part, distance=20)
-        curr_peaks = curr_peaks - offset
+        peaks, properties = scipy.signal.find_peaks(ground_truth_pred_part, distance=20)
+        peaks = peaks + input_length
         plt.plot(gt_time, ground_truth, marker='.',)
-        if len(curr_peaks) > 0:
-            plt.scatter(gt_time[curr_peaks], ground_truth.iloc[curr_peaks],
-                        color='red', zorder=5, label='Test data peaks')
+        plt.scatter(gt_time[peaks], ground_truth.iloc[peaks],
+                    color='red', zorder=5, label='Test data peaks')
         for i in range(len(list_of_model_predictions)):
             model = list_of_models[i]
             model_predictions = list_of_model_predictions[i]
-            pred_peaks, properties = scipy.signal.find_peaks(model_predictions, distance=min_peak_distance)
+            pred_peaks, properties = scipy.signal.find_peaks(model_predictions, distance=20)
             line, = plt.plot(pred_time, model_predictions, marker='.', label=model.name)
             line_color = line.get_color()
             darker_line_color = sp.darken_color(line_color, 0.5)
             plt.scatter(pred_time[pred_peaks], model_predictions[pred_peaks],
                         color=darker_line_color, zorder=5, label='{} prediction peaks'.format(list_of_models[i].name))
             offset_pred_peaks = pred_peaks + input_length
-            if len(curr_peaks) > 0:
-                distances = sp.get_filtered_distances(curr_peaks, offset_pred_peaks, 2)
-                mae = np.mean(distances) if len(distances) > 0 else 0
-                rmse = np.sqrt(np.mean(distances ** 2)) if len(distances) > 0 else 0
-                model_peaks_mae[model.name] = model_peaks_mae.get(model.name, 0) + mae
-                model_peaks_rmse[model.name] = model_peaks_rmse.get(model.name, 0) + rmse
-                peaks_within_threshold[model.name] = peaks_within_threshold.get(model.name, 0) + len(distances)
-                peaks_outside_threshold[model.name] = peaks_outside_threshold.get(model.name, 0) + len(pred_peaks) - len(distances)
+            distances = sp.get_filtered_distances(peaks, offset_pred_peaks, 2)
+            mae = np.mean(distances) if len(distances) > 0 else 0
+            rmse = np.sqrt(np.mean(distances ** 2)) if len(distances) > 0 else 0
+            model_peaks_mae[model.name] = model_peaks_mae.get(model.name, 0) + mae
+            model_peaks_rmse[model.name] = model_peaks_rmse.get(model.name, 0) + rmse
+            peaks_within_threshold[model.name] = peaks_within_threshold.get(model.name, 0) + len(distances)
+            peaks_outside_threshold[model.name] = peaks_outside_threshold.get(model.name, 0) + len(pred_peaks) - len(distances)
         plt.axvline(x=input_length, color='r', linestyle='--',)
         #plt.axhline(y=detecting_thr, color='black', linestyle='--', label='Train mean')
-        plt.legend(loc='upper left')
+        plt.legend()
         plt.title('Prediction on {} days with offset {} days'.format(input_length, offset))
         plt.show()
     print(model_peaks_mae)
@@ -218,7 +213,7 @@ train_test_split_days = 250
 test_days_end = 300
 hormones = ['LH']
 #features = ['FSH', 'E2', 'P4', 'LH']
-features = ['LH']
+features = ['LH', 'E2']
 MAX_EPOCHS = 25
 
 # test on a small TS
@@ -228,7 +223,7 @@ test_dataframe['Time'] = test_dataframe['Time'] * 24
 combined_df = create_dataframe(workDir, features, 'Time', 2)
 combined_df['Time'] = combined_df['Time'] * 24
 
-print('Num records in the loaded data for training:', len(combined_df['Time']))
+print('Num records in the loaded data for training:', len(combined_df[hormones]))
 # Plot the loaded data
 sns.set()
 plt.ylabel('{} levels'.format('Hormones'))
@@ -556,7 +551,7 @@ def residual_connections_model():
         tf.keras.Sequential([
         tf.keras.layers.LSTM(32, return_sequences=True),
         tf.keras.layers.Dense(
-            len(hormones),
+            num_features,
             # The predicted deltas should start small.
             # Therefore, initialize the output layer with zeros.
             kernel_initializer=tf.initializers.zeros())

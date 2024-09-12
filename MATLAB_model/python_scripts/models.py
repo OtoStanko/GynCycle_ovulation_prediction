@@ -35,7 +35,7 @@ class FeedBack(tf.keras.Model):
         self.lstm_cell = tf.keras.layers.LSTMCell(units)
         # Also wrap the LSTMCell in an RNN to simplify the `warmup` method.
         self.lstm_rnn = tf.keras.layers.RNN(self.lstm_cell, return_state=True)
-        self.dense = tf.keras.layers.Dense(num_features, kernel_initializer=tf.initializers.he_normal())
+        self.dense = tf.keras.layers.Dense(num_features)
 
     def warmup(self, inputs):
         # inputs.shape => (batch, time, features)
@@ -83,7 +83,7 @@ class Wide_CNN(tf.keras.Model):
             tf.keras.layers.Conv1D(filters=32,
                                    kernel_size=(input_length,),
                                    activation='relu'),
-            tf.keras.layers.Dense(units=32, activation='relu', kernel_initializer=tf.initializers.he_normal()),
+            tf.keras.layers.Dense(units=32, activation='relu'),
             tf.keras.layers.Dense(units=num_features),
         ])
         self.cnn = conv_model_wide
