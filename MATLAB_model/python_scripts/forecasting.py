@@ -85,7 +85,7 @@ def compare_multiple_models(list_of_models, test_df,
     hormone = hormones[0]
     min_peak_distance = 20
     min_peak_height = 0.3
-    peaks, properties = scipy.signal.find_peaks(test_df[hormone], height=min_peak_height)
+    peaks, properties = scipy.signal.find_peaks(test_df[hormone], height=min_peak_height, distance=10)
     print(peaks)
     plt.plot(test_df.index, test_df[hormone])
     plt.scatter(test_df.index[peaks], test_df[hormone].iloc[peaks],
@@ -216,9 +216,9 @@ sampling_frequency_unit = 'H'
 num_initial_days_to_discard = 50
 train_test_split_days = 250
 test_days_end = 300
-hormones = ['LH']
+hormones = ['LH'] # what we want to predict
 #features = ['FSH', 'E2', 'P4', 'LH']
-features = ['LH']
+features = ['LH'] # on what we train, what to load
 MAX_EPOCHS = 25
 
 # test on a small TS
@@ -282,7 +282,7 @@ plt.title('Sampled dataframe with raw hours')
 plt.xlabel('Time in hours')
 plt.show()
 
-sampled_test_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, test_days_end * 24 + 1, sampling_frequency)]
+sampled_test_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, int(filtered_test_df.index[-1]) + 1, sampling_frequency)]
 sampled_test_df = sample_data(filtered_test_df, sampled_test_df_timeH_index, features)
 
 
@@ -318,8 +318,8 @@ train_df = sampled_df_timeH[0:int(n*0.7)]
 val_df = sampled_df_timeH[int(n*0.7):int(n*0.9)]
 test_df = sampled_df_timeH[int(n*0.9):]
 
-num_features = sampled_df_timeH.shape[1]
-print("Num features", num_features)
+num_features = sampled_df_timeH.shape[1] # alternatively len(features)
+print("Num features for training:", num_features)
 
 train_mean = train_df.mean()
 train_std = train_df.std()
@@ -335,8 +335,9 @@ plt.plot(train_df.index, train_df[hormones], color='yellow')
 plt.plot(val_df.index, val_df[hormones], color='blue')
 plt.plot(test_df.index, test_df[hormones], color='red')
 #plt.axhline(y=new_mean, color='black', linestyle='--', label='Train mean')
-plt.title('Sampled raw hours split {} levels normalized'.format(hormones))
+plt.title('Sampled normalized training data of {}'.format(hormones))
 plt.xlabel('Time in hours')
+plt.legend()
 plt.show()
 
 #sp.fit_sin_curve(train_df, hormone, val_df, test_df, sampled_df_timeH)
@@ -399,7 +400,7 @@ def baseline_model():
     # Baseline model
     Returns the previous value
     """
-    baseline = Baseline(label_index=column_indices[hormones])
+    baseline = Baseline(label_index=column_indices[hormones[0]])
 
     baseline.compile(loss=tf.keras.losses.MeanSquaredError(),
                      metrics=[tf.keras.metrics.MeanAbsoluteError()])
@@ -408,7 +409,7 @@ def baseline_model():
     performance['Baseline'] = baseline.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
     #print(wide_window)
-    wide_window.plot(hormones, 'Baseline model predictions', baseline)
+    wide_window.plot(hormones[0], 'Baseline model predictions', baseline)
 
 
 def linear_model():
@@ -502,7 +503,7 @@ def wide_cnn(width=35):
                                        label_columns=hormones)
     print(conv_window_wide)
     conv_model_wide = tf.keras.Sequential([
-        tf.keras.layers.Conv1D(filters=32,
+        tf.keras.layers.Conv1D(filters=256,
                                kernel_size=(CONV_WIDTH_WIDE,),
                                activation='relu'),
         tf.keras.layers.Dense(units=32, activation='relu'),
@@ -515,7 +516,7 @@ def wide_cnn(width=35):
     performance['Conv_wide'] = conv_model_wide.evaluate(conv_window_wide.test, verbose=0, return_dict=True)
 
     LABEL_WIDTH_WIDE = 24
-    INPUT_WIDTH_WIDE = LABEL_WIDTH + (CONV_WIDTH_WIDE - 1)
+    INPUT_WIDTH_WIDE = LABEL_WIDTH_WIDE + (CONV_WIDTH_WIDE - 1)
     wide_conv_window = WindowGenerator(input_width=INPUT_WIDTH_WIDE, label_width=LABEL_WIDTH_WIDE, shift=1,
                                        train_df=train_df, val_df=val_df, test_df=test_df,
                                        label_columns=hormones)
@@ -594,7 +595,7 @@ def show_performance():
         print(f'{name:12s}: {value[metric_name]:0.4f}')
 
 
-#baseline_model()
+baseline_model()
 linear_model()
 dense_model()
 cnn_model()
@@ -700,14 +701,14 @@ def multistep_performance():
     plt.show()
 
 
-feedback_model = autoregressive_model()
+#feedback_model = autoregressive_model()
 #feedback_model.name = 'Feedback_model'
-multi_cnn_model = multistep_cnn()
+#multi_cnn_model = multistep_cnn()
 #multi_cnn_model.name = 'Multistep_CNN'
-sampled_test_df, (min_val, max_val) = normalize_df(sampled_test_df, method='standard', values=(0, train_max))
-compare_multiple_models([feedback_model, multi_cnn_model], sampled_test_df,
-                        INPUT_WIDTH, OUT_STEPS, hormones, features)
-multistep_performance()
+#sampled_test_df, (min_val, max_val) = normalize_df(sampled_test_df, method='standard', values=(0, train_max))
+#compare_multiple_models([feedback_model, multi_cnn_model], sampled_test_df,
+#                        INPUT_WIDTH, OUT_STEPS, hormones, features)
+#multistep_performance()
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
 sampled_test_df = sampled_df[(sampled_df.index > data_tt_split_date) & (sampled_df.index <= data_stop_date)]
