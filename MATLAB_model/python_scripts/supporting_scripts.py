@@ -49,26 +49,30 @@ def get_distances(gt_peaks, pred_peaks):
     return np.array(unfiltered_distances)
 
 
-def print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, peak_comparison_distance=2):
+def print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak,
+                          peak_comparison_distance=2):
     model_name_length = max([len(key) for key in peaks_within_threshold.keys()] + [10])
     #model_name_length = max(model_name_length, 10)
     peaks_in_length = max([len(str(value)) for value in peaks_within_threshold.values()] + [16])
     peaks_out_length = max([len(str(value)) for value in peaks_outside_threshold.values()] + [17])
     thr_width = len(str(peak_comparison_distance))
-    print("+-{}-+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length+thr_width+5) * "-",
-                                         peaks_out_length * "-", 10 * "-"))
-    print('| {:{model_width}} | {:{in_width}} (<={:{thr_width}}) | {:{out_width}} | {:{percent_width}} |'.format(
+    distances_width = max([len(str(value)) for value in sum_of_dists_to_nearest_peak.values()] + [7])
+    print("+-{}-+-{}-+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length + thr_width + 5) * "-",
+                                              peaks_out_length * "-", 10 * "-", distances_width * "-"))
+    print('| {:{model_width}} | {:{in_width}} (<={:{thr_width}}) | {:{out_width}} | {:{percent_width}} | {:{distances_width}} |'.format(
         f"Model name", f"peaks within thr", peak_comparison_distance, f"peaks outside thr", "Percentage",
+            f"SoDttNP",
             model_width=model_name_length, in_width=peaks_in_length, thr_width=thr_width, out_width=peaks_out_length,
-            percent_width=10))
-    print("+-{}-+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length + thr_width + 5) * "-",
-                                         peaks_out_length * "-", 10 * "-"))
+            percent_width=10, distances_width=distances_width))
+    print("+-{}-+-{}-+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length + thr_width + 5) * "-",
+                                         peaks_out_length * "-", 10 * "-", distances_width * "-"))
     for model_name, value in peaks_within_threshold.items():
-        print('| {:{model_width}} | {:{in_width}}    {:{thr_width}}  | {:{out_width}} | {:{percent_width}} |'.format(
+        print('| {:{model_width}} | {:{in_width}}    {:{thr_width}}  | {:{out_width}} | {:{percent_width}} | {:{distances_width}} |'.format(
             model_name, value, "", peaks_outside_threshold[model_name],
                 str(round(value/(value+peaks_outside_threshold[model_name]), 4)*100)[:5],
+                str(sum_of_dists_to_nearest_peak[model_name]),
                 model_width=model_name_length, in_width=peaks_in_length, thr_width=thr_width,
-                out_width=peaks_out_length, percent_width=10))
-    print("+-{}-+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length + thr_width + 5) * "-",
-                                         peaks_out_length * "-", 10 * "-"))
+                out_width=peaks_out_length, percent_width=10, distances_width=distances_width))
+    print("+-{}-+-{}-+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length + thr_width + 5) * "-",
+                                              peaks_out_length * "-", 10 * "-", distances_width * "-"))
 #print_peak_statistics({"key 1": 5, "a very long key": 4}, {"key 1": 2, "a very long key": 4}, 10)

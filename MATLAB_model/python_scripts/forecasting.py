@@ -97,7 +97,9 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
     model_peaks_rmse = {}
     peaks_within_threshold = {}
     peaks_outside_threshold = {}
+    sum_of_dists_to_nearest_peak = {}
     for offset in range(0, duration-pred_length-input_length+1, step):
+        # Get the input data based on the offset and make a prediction
         input = np.array(test_df[hormone][offset:input_length + offset], dtype=np.float32)
         tensor = tf.convert_to_tensor(input, dtype=tf.float32)  # Ensure dtype is compatible
         reshaped_tensor = tf.reshape(tensor, (1, input_length, 1))
@@ -106,18 +108,25 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
             predictions = model.predict(reshaped_tensor)
             predictions = predictions[0][:,0]
             list_of_model_predictions.append(predictions)
+        # ground-truth time in days shifted to start with 0
         gt_time = test_df.index[offset:input_length + pred_length + offset]
         gt_time = gt_time / 24
         first_elem = gt_time[0]
         gt_time = gt_time - first_elem
+        # prediction time in days shifted so that is starts with input_length th day
         pred_time = test_df.index[input_length + offset:input_length + pred_length + offset]
         pred_time = pred_time / 24
         pred_time = pred_time - first_elem
+        #
         ground_truth = test_df[hormone][offset:input_length + pred_length + offset]
-        curr_peaks = np.array([x for x in peaks if offset + input_length <= x < input_length + pred_length + offset])
+        # take only the peaks in the prediction window
+        curr_peaks = np.array([x for x in peaks if offset <= x < input_length + pred_length + offset])
         curr_peaks = curr_peaks - offset
+        # Try all the peaks, shift them to match the predicted data
+        all_peaks_offset = np.array([x for x in peaks]) - offset
         if plot:
             plt.plot(gt_time, ground_truth, marker='.',)
+        # Plot the tips of the peaks that are in the input-prediction window
         if len(curr_peaks) > 0 and plot:
             plt.scatter(gt_time[curr_peaks], ground_truth.iloc[curr_peaks],
                         color='red', zorder=5, label='Test data peaks')
@@ -126,15 +135,24 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
             model_predictions = list_of_model_predictions[i]
             pred_peaks, properties = scipy.signal.find_peaks(model_predictions, distance=MIN_PEAK_DISTANCE)
             offset_pred_peaks = pred_peaks + input_length
-            unfiltered_distances = sp.get_distances(curr_peaks, offset_pred_peaks)
+            unfiltered_distances = sp.get_distances(all_peaks_offset, offset_pred_peaks)
             if len(curr_peaks) > 0:
                 filtered_distances = np.array([distance for distance in unfiltered_distances if distance <= peak_comparison_distance])
+                print(curr_peaks)
+                print(offset_pred_peaks)
+                print(all_peaks_offset)
+                print(unfiltered_distances)
+                print(filtered_distances)
                 mae = np.mean(filtered_distances) if len(filtered_distances) > 0 else 0
                 rmse = np.sqrt(np.mean(filtered_distances ** 2)) if len(filtered_distances) > 0 else 0
                 model_peaks_mae[model.name] = model_peaks_mae.get(model.name, 0) + mae
                 model_peaks_rmse[model.name] = model_peaks_rmse.get(model.name, 0) + rmse
-                peaks_within_threshold[model.name] = peaks_within_threshold.get(model.name, 0) + len(filtered_distances)
-                peaks_outside_threshold[model.name] = peaks_outside_threshold.get(model.name, 0) + len(pred_peaks) - len(filtered_distances)
+                peaks_within_threshold[model.name] = (
+                        peaks_within_threshold.get(model.name, 0) + len(filtered_distances))
+                peaks_outside_threshold[model.name] = (
+                        peaks_outside_threshold.get(model.name, 0) + len(pred_peaks) - len(filtered_distances))
+                sum_of_dists_to_nearest_peak[model.name] = (
+                        sum_of_dists_to_nearest_peak.get(model.name, 0) + sum(unfiltered_distances))
             if plot:
                 line, = plt.plot(pred_time, model_predictions, marker='.', label=model.name)
                 line_color = line.get_color()
@@ -159,7 +177,7 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
     print(model_peaks_rmse)
     print(peaks_within_threshold)
     print(peaks_outside_threshold)
-    return peaks_within_threshold, peaks_outside_threshold
+    return peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak
 
 
 def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=170, step=5):
@@ -222,7 +240,6 @@ workDir = os.path.join(os.getcwd(), "../outputDir/")
 sampling_frequency = 24
 sampling_frequency_unit = 'H'
 num_initial_days_to_discard = 50
-train_test_split_days = 250
 test_days_end = 300
 #hormone = 'LH'
 #features = ['FSH', 'E2', 'P4', 'LH']
@@ -233,7 +250,7 @@ MAX_EPOCHS = 25
 test_dataframe = create_dataframe(workDir, features, 'Time', 1)
 test_dataframe['Time'] = test_dataframe['Time'] * 24
 # train on a long TS
-combined_df = create_dataframe(workDir, features, 'Time', 2)
+combined_df = create_dataframe(workDir, features, 'Time', 3)
 combined_df['Time'] = combined_df['Time'] * 24
 
 print('Num records in the loaded data for training:', len(combined_df['Time']))
@@ -254,10 +271,7 @@ filtered_df.set_index('Time', inplace=True)
 filtered_test_df = test_dataframe[test_dataframe['Time'] > num_initial_days_to_discard*24]
 filtered_test_df.set_index('Time', inplace=True)
 
-print(filtered_df.describe().transpose())
 filtered_df_timeH = filtered_df.copy()
-print(filtered_df[features])
-print(filtered_df_timeH[features])
 
 
 """time_delta = pd.to_timedelta(filtered_df.index, unit='h')
@@ -282,16 +296,17 @@ print(test_days_end * 24 + 1)
 print(filtered_df_timeH.index[-1])
 
 sampled_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, int(filtered_df_timeH.index[-1]) + 1, sampling_frequency)]
-print(len(sampled_df_timeH_index))
+print("Number of days in the training data:", len(sampled_df_timeH_index))
 sampled_df_timeH = sample_data(filtered_df_timeH, sampled_df_timeH_index, features)
-print('Num records in the sampled dataframe with raw hours:', len(sampled_df_timeH.index))
+print('Num records in the sampled dataframe with raw hours: (Should be the same as the above number)', len(sampled_df_timeH.index))
 plt.plot(sampled_df_timeH.index, sampled_df_timeH[features], )
 plt.title('Sampled dataframe with raw hours')
 plt.xlabel('Time in hours')
 plt.show()
 
-sampled_test_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, test_days_end * 24 + 1, sampling_frequency)]
+sampled_test_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, int(filtered_test_df.index[-1]) + 1, sampling_frequency)]
 sampled_test_df = sample_data(filtered_test_df, sampled_test_df_timeH_index, features)
+print("Number of days in the testing data:", len(sampled_test_df_timeH_index))
 
 
 """
@@ -713,22 +728,26 @@ plt.show()
 sampled_test_df, (min_val, max_val) = normalize_df(sampled_test_df, method='standard', values=(0, train_max))
 peaks_within_threshold = {}
 peaks_outside_threshold = {}
+sum_of_dists_to_nearest_peak = {}
 PEAK_COMPARISON_DISTANCE = 2
-for _ in range(20):
+for _ in range(1):
     feedback_model = autoregressive_model()
     feedback_model._name = 'feed_back'
     multi_cnn_model = multistep_cnn()
     multi_cnn_model._name = 'wide_cnn'
-    within, outside = compare_multiple_models([feedback_model, multi_cnn_model],
-                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features[0], plot=False,
+    within, outside, nearest_dists = compare_multiple_models([feedback_model, multi_cnn_model],
+                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features[0], plot=True,
                                               peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
     for model_name, value in within.items():
         peaks_within_threshold[model_name] = peaks_within_threshold.get(model_name, 0) + value
     for model_name, value in outside.items():
         peaks_outside_threshold[model_name] = peaks_outside_threshold.get(model_name, 0) + value
+    for model_name, value in nearest_dists.items():
+        sum_of_dists_to_nearest_peak[model_name] = sum_of_dists_to_nearest_peak.get(model_name, 0) + value
 print(peaks_within_threshold)
 print(peaks_outside_threshold)
-sp.print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, PEAK_COMPARISON_DISTANCE)
+sp.print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak,
+                         PEAK_COMPARISON_DISTANCE)
 multistep_performance()
 """
 sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
