@@ -11,7 +11,7 @@ import tensorflow as tf
 #from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.arima.model import ARIMA
 from windowGenerator import WindowGenerator
-from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN, Linear_CNN_FB
+from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN
 import IPython
 import IPython.display
 from scipy.optimize import curve_fit
@@ -102,7 +102,7 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
         # Get the input data based on the offset and make a prediction
         input = np.array(test_df[hormone][offset:input_length + offset], dtype=np.float32)
         tensor = tf.convert_to_tensor(input, dtype=tf.float32)  # Ensure dtype is compatible
-        reshaped_tensor = tf.reshape(tensor, (1, input_length, 1))
+        reshaped_tensor = tf.reshape(tensor, (1, input_length, len(features)))
         list_of_model_predictions = []
         for model in list_of_models:
             predictions = model.predict(reshaped_tensor)
@@ -214,25 +214,31 @@ def normalize_df(df, method='standard', values=None):
     methods: standardization, mean and std may be provided, otherwise are calculated values=(mean, std) is expected
              minmax, if no values are provided, the scale to [0, 1] is done, otherwise to [a, b]
     """
-    prop = (None, None)
+    prop = {}
     if method == 'standard':
-        if values is None:
-            df_mean = df.mean()
-            df_std = df.std()
-        else:
-            df_mean, df_std = values
-        df = (df - df_mean) / df_std
-        prop = (df_mean, df_std)
+        for feature in df.columns:
+            if values[feature] is None:
+                df_mean = df[feature].mean()
+                df_std = df[feature].std()
+            else:
+                df_mean, df_std = values[feature]
+            df[feature] = (df[feature] - df_mean) / df_std
+            prop[feature] = (df_mean, df_std)
     elif method == 'minmax':
-        min_val = np.min(df)
-        max_val = np.max(df)
-        if values is None:
-            a = 0
-            b = 1
-        else:
-            a, b = values
-        df = a + ((df - min_val) * (b - a) / (max_val - min_val))
-        prop = (min_val, max_val)
+        for feature in df.columns:
+            min_val = np.min(df[feature])
+            max_val = np.max(df[feature])
+            if values[feature] is None:
+                a = 0
+                b = 1
+            else:
+                a, b = values[feature]
+            df[feature] = a + ((df[feature] - min_val) * (b - a) / (max_val - min_val))
+            prop[feature] = (min_val, max_val)
+    elif method == 'own':
+        for feature in df.columns:
+            df[feature] = (df[feature] - values[feature][0]) / values[feature][1]
+        prop = values
     return df, prop
 
 # Set the parameters
@@ -243,7 +249,7 @@ num_initial_days_to_discard = 50
 test_days_end = 300
 #hormone = 'LH'
 #features = ['FSH', 'E2', 'P4', 'LH']
-features = ['LH']
+features = ['LH', 'E2']
 MAX_EPOCHS = 25
 
 # test on a small TS
@@ -347,48 +353,24 @@ print("Num features", num_features)
 train_mean = train_df.mean()
 train_std = train_df.std()
 
-train_df, (train_min, train_max) = normalize_df(train_df, method='minmax', values=(0, 1))
-val_df, _ = normalize_df(val_df, method='minmax', values=(0, 1))
-test_df, _ = normalize_df(test_df, method='minmax', values=(0, 1))
+train_df, properties = normalize_df(train_df, method='minmax', values={feature: (0, 1) for feature in features})
+# values = {feature: (0, properties[feature][1]) for feature in features}
+val_df, _ = normalize_df(val_df, method='own', values=properties)
+test_df, _ = normalize_df(test_df, method='own', values=properties)
 
 fdf = train_df[train_df > 0]
 #new_mean = fdf.mean()[hormone]
 
-plt.plot(train_df.index, train_df[features], color='yellow')
-plt.plot(val_df.index, val_df[features], color='blue')
-plt.plot(test_df.index, test_df[features], color='red')
-plt.title('Sampled raw hours split {} levels normalized'.format(features))
-plt.xlabel('Time in hours')
-plt.show()
+for feature in features:
+    plt.plot(train_df.index, train_df[feature], color='yellow')
+    plt.plot(val_df.index, val_df[feature], color='blue')
+    plt.plot(test_df.index, test_df[feature], color='red')
+    plt.title('Sampled raw hours split {} levels normalized'.format(feature))
+    plt.xlabel('Time in hours')
+    plt.show()
 
 #sp.fit_sin_curve(train_df, hormone, val_df, test_df, sampled_df_timeH)
 
-# Tru adding artificial samples every hour from the sampled df
-"""sampled_df_timeH_index_new = [i for i in range(num_initial_days_to_discard*24, test_days_end*24+1, 1)]
-artificial_sampled = sample_data(sampled_df_timeH, sampled_df_timeH_index_new, features)
-# the plot them to compare them
-column_indices = {name: i for i, name in enumerate(artificial_sampled.columns)}
-n = len(artificial_sampled)
-train_df_a = artificial_sampled[0:int(n*0.7)]
-val_df_a = artificial_sampled[int(n*0.7):int(n*0.9)]
-test_df_a = artificial_sampled[int(n*0.9):]
-
-num_features = artificial_sampled.shape[1]
-print(num_features)
-
-
-train_mean_a = train_df_a.mean()
-train_std_a = train_df_a.std()
-
-train_df_a = (train_df_a - train_mean_a) / train_std_a
-val_df_a = (val_df_a - train_mean_a) / train_std_a
-test_df_a = (test_df_a - train_mean_a) / train_std_a
-
-plt.plot(train_df_a.index, train_df_a[hormone], color='black')
-plt.plot(val_df_a.index, val_df_a[hormone], color='blue')
-plt.plot(test_df_a.index, test_df_a[hormone], color='red')
-plt.title('Sampled raw hours split {} levels normalized artificially added records'.format(hormone))
-plt.show()"""
 
 # Window
 w2 = WindowGenerator(input_width=34, label_width=1, shift=1,
@@ -439,14 +421,15 @@ def linear_model():
     One dense layer. Easily interpretable
     """
     linear = tf.keras.Sequential([
-        tf.keras.layers.Dense(units=1)
+        tf.keras.layers.Dense(units=len(features))
     ])
     history = compile_and_fit(linear, single_step_window)
 
     val_performance['Linear'] = linear.evaluate(single_step_window.val, return_dict=True)
     performance['Linear'] = linear.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
-    wide_window.plot(features[0], 'Linear model predictions', linear)
+    for feature in features:
+        wide_window.plot(feature, 'Linear model predictions', linear)
 
     plt.bar(x = range(len(train_df.columns)),
             height=linear.layers[0].kernel[:,0].numpy())
@@ -464,14 +447,14 @@ def dense_model():
     dense = tf.keras.Sequential([
         tf.keras.layers.Dense(units=64, activation='relu'),
         tf.keras.layers.Dense(units=64, activation='relu'),
-        tf.keras.layers.Dense(units=1)
+        tf.keras.layers.Dense(units=len(features))
     ])
     history = compile_and_fit(dense, single_step_window)
 
     val_performance['Dense'] = dense.evaluate(single_step_window.val, return_dict=True)
     performance['Dense'] = dense.evaluate(single_step_window.test, verbose=0, return_dict=True)
-
-    wide_window.plot(features[0], 'Dense model predictions', dense)
+    for feature in features:
+        wide_window.plot(feature, 'Dense model predictions', dense)
 
 
 """
@@ -494,7 +477,7 @@ def cnn_model():
                                kernel_size=(CONV_WIDTH,),
                                activation='relu'),
         tf.keras.layers.Dense(units=32, activation='relu'),
-        tf.keras.layers.Dense(units=1),
+        tf.keras.layers.Dense(units=len(features)),
     ])
     history = compile_and_fit(conv_model, conv_window)
 
@@ -505,8 +488,8 @@ def cnn_model():
     wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH, label_width=LABEL_WIDTH, shift=1,
                                         train_df=train_df, val_df=val_df, test_df=test_df,
                                         label_columns=features)
-
-    wide_conv_window.plot(features[0], 'CNN model predictions', conv_model)
+    for feature in features:
+        wide_conv_window.plot(feature, 'CNN model predictions', conv_model)
 
 
 def wide_cnn(width=35):
@@ -526,7 +509,7 @@ def wide_cnn(width=35):
                                kernel_size=(CONV_WIDTH_WIDE,),
                                activation='relu'),
         tf.keras.layers.Dense(units=32, activation='relu'),
-        tf.keras.layers.Dense(units=1),
+        tf.keras.layers.Dense(units=len(features)),
     ])
     history = compile_and_fit(conv_model_wide, conv_window_wide)
 
@@ -540,7 +523,8 @@ def wide_cnn(width=35):
                                         train_df=train_df, val_df=val_df, test_df=test_df,
                                         label_columns=features)
 
-    wide_conv_window.plot(features[0], 'CNN wide model predictions', conv_model_wide)
+    for feature in features:
+        wide_conv_window.plot(feature, 'CNN wide model predictions', conv_model_wide)
 
     prediction_length = 35
     #test_model(conv_model_wide, sampled_test_df, train_mean, train_std, NUM_DAYS, prediction_length, hormone)
@@ -555,7 +539,7 @@ def lstm_model():
         # Shape [batch, time, features] => [batch, time, lstm_units]
         tf.keras.layers.LSTM(32, return_sequences=True),
         # Shape => [batch, time, features]
-        tf.keras.layers.Dense(units=1)
+        tf.keras.layers.Dense(units=len(features))
     ])
     history = compile_and_fit(lstm_model, wide_window)
 
@@ -563,7 +547,8 @@ def lstm_model():
     val_performance['LSTM'] = lstm_model.evaluate(wide_window.val, return_dict=True)
     performance['LSTM'] = lstm_model.evaluate(wide_window.test, verbose=0, return_dict=True)
 
-    wide_window.plot(features[0], 'RNN LSTM model predictions', lstm_model)
+    for feature in features:
+        wide_window.plot(feature, 'RNN LSTM model predictions', lstm_model)
 
 
 def residual_connections_model():
@@ -575,7 +560,7 @@ def residual_connections_model():
         tf.keras.Sequential([
         tf.keras.layers.LSTM(32, return_sequences=True),
         tf.keras.layers.Dense(
-            num_features,
+            len(features),
             # The predicted deltas should start small.
             # Therefore, initialize the output layer with zeros.
             kernel_initializer=tf.initializers.zeros())
@@ -587,7 +572,8 @@ def residual_connections_model():
     val_performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.val, return_dict=True)
     performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.test, verbose=0, return_dict=True)
 
-    wide_window.plot(features[0], 'Residual LSTM model predictions', residual_lstm)
+    for feature in features:
+        wide_window.plot(feature, 'Residual LSTM model predictions', residual_lstm)
 
 
 def show_performance():
@@ -619,6 +605,7 @@ def show_performance():
 #wide_cnn()
 #residual_connections_model()
 #show_performance()
+print("Ok up to here")
 
 """
 # Multi-step models
@@ -628,7 +615,8 @@ INPUT_WIDTH = 35
 multi_window = WindowGenerator(input_width=INPUT_WIDTH, label_width=OUT_STEPS,   shift=OUT_STEPS,
                                train_df=train_df, val_df=val_df, test_df=test_df,
                                label_columns=features)
-multi_window.plot(features[0], 'Multi window')
+for feature in features:
+    multi_window.plot(feature, 'Multi window')
 
 # variant with the artificially added samples
 """OUT_STEPS_a = 24
@@ -655,7 +643,8 @@ def autoregressive_model():
 
     multi_val_performance['AR LSTM'] = feedback_model.evaluate(multi_window.val, return_dict=True)
     multi_performance['AR LSTM'] = feedback_model.evaluate(multi_window.test, verbose=0, return_dict=True)
-    multi_window.plot(features[0], 'Autoregressive model predictions', feedback_model)
+    for feature in features:
+        multi_window.plot(feature, 'Autoregressive model predictions', feedback_model)
     return feedback_model
 
 
@@ -667,35 +656,9 @@ def multistep_cnn():
 
     multi_val_performance['CNN'] = multi_cnn.evaluate(multi_window.val, return_dict=True)
     multi_performance['CNN'] = multi_cnn.evaluate(multi_window.test, verbose=0, return_dict=True)
-    multi_window.plot(features[0], 'CNN model predictions', multi_cnn)
+    for feature in features:
+        multi_window.plot(feature, 'CNN model predictions', multi_cnn)
     return multi_cnn
-
-
-def combinational_model(model1, model2):
-    cnn_fb_model = Linear_CNN_FB(INPUT_WIDTH, OUT_STEPS, len(features), model1, model2)
-    IPython.display.clear_output()
-    history = compile_and_fit(cnn_fb_model, multi_window)
-
-    multi_val_performance['combination'] = cnn_fb_model.evaluate(multi_window.val, return_dict=True)
-    multi_performance['combination'] = cnn_fb_model.evaluate(multi_window.test, verbose=0, return_dict=True)
-    multi_window.plot(features[0], 'Combination model predictions', cnn_fb_model)
-    return cnn_fb_model
-
-
-# artificial version
-# this is too slow and much worse as well
-"""feedback_model_a = FeedBack(32, OUT_STEPS*24, 4)
-prediction, state = feedback_model_a.warmup(multi_window_a.example[0])
-print(prediction.shape)
-print('Output shape (batch, time, features): ', feedback_model_a(multi_window_a.example[0]).shape)
-history = compile_and_fit(feedback_model_a, multi_window_a)
-
-IPython.display.clear_output()
-
-multi_val_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.val, return_dict=True)
-multi_performance['AR LSTM a'] = feedback_model_a.evaluate(multi_window_a.test, verbose=0, return_dict=True)
-multi_window_a.plot(hormone, feedback_model_a)"""
-
 
 
 def multistep_performance():
@@ -715,6 +678,7 @@ def multistep_performance():
     _ = plt.legend()
     plt.show()
 
+
 from collections import Counter
 peaks, properties = scipy.signal.find_peaks(train_df[features[0]], distance=10, height=0.3)
 distances = [peaks[i+1] - peaks[i] for i in range(len(peaks)-1)]
@@ -725,7 +689,7 @@ frequencies = list(count.values())
 plt.bar(numbers, frequencies, color='skyblue')
 plt.show()
 
-sampled_test_df, (min_val, max_val) = normalize_df(sampled_test_df, method='standard', values=(0, train_max))
+sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=properties)
 peaks_within_threshold = {}
 peaks_outside_threshold = {}
 sum_of_dists_to_nearest_peak = {}
