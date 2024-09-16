@@ -17,12 +17,30 @@ import IPython.display
 from scipy.optimize import curve_fit
 import supporting_scripts as sp
 
+class Custom_loss(tf.keras.Loss):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.threshold = 0.3
+
+    def call(self, y_true, y_pred):
+        squared_error = 0.5 * tf.square(y_true - y_pred)
+        quadruped_error = 2.0 * tf.square(y_true - y_pred) ** 2
+        absolute_error = tf.abs(y_true - y_pred)
+        mask = tf.greater_equal(y_true, self.threshold)
+        mask2 = tf.greater_equal(y_true, 0.5)
+        #loss = tf.where(mask, squared_error, absolute_error)
+        loss = tf.where(mask2, quadruped_error,
+                        tf.where(mask, squared_error, absolute_error))
+        return tf.reduce_mean(loss)
+
 
 def compile_and_fit(model, window, patience=2):
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                     patience=patience,
                                                     mode='min')
-    model.compile(loss=tf.keras.losses.MeanSquaredError(),
+    # MeanSquaredError(),
+    # Huber()
+    model.compile(loss=tf.keras.losses.Huber(),
                 optimizer=tf.keras.optimizers.Adam(),
                 metrics=[tf.keras.metrics.MeanAbsoluteError()])
     history = model.fit(window.train, epochs=MAX_EPOCHS,
@@ -81,7 +99,7 @@ def create_dataframe(input_files_directory, features, time_file_prefix, run_id=1
     return combined_df
 
 
-def compare_multiple_models(list_of_models, test_df, input_length, pred_length, hormone,
+def compare_multiple_models(list_of_models, test_df, input_length, pred_length, features, hormone,
                             duration=250, step=5, plot=True, peak_comparison_distance=2):
     MIN_PEAK_DISTANCE = 20
     MIN_PEAK_HEIGHT = 0.3
@@ -100,9 +118,13 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
     sum_of_dists_to_nearest_peak = {}
     for offset in range(0, duration-pred_length-input_length+1, step):
         # Get the input data based on the offset and make a prediction
-        input = np.array(test_df[hormone][offset:input_length + offset], dtype=np.float32)
-        tensor = tf.convert_to_tensor(input, dtype=tf.float32)  # Ensure dtype is compatible
-        reshaped_tensor = tf.reshape(tensor, (1, input_length, len(features)))
+        inputs = []
+        for feature in features:
+            input = np.array(test_df[feature][offset:input_length + offset], dtype=np.float32)
+            tensor = tf.convert_to_tensor(input, dtype=tf.float32)  # Ensure dtype is compatible
+            inputs.append(tensor)
+        tensor_inputs = tf.squeeze(inputs)
+        reshaped_tensor = tf.reshape(tensor_inputs, (1, input_length, len(features)))
         list_of_model_predictions = []
         for model in list_of_models:
             predictions = model.predict(reshaped_tensor)
@@ -138,23 +160,18 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
             unfiltered_distances = sp.get_distances(all_peaks_offset, offset_pred_peaks)
             if len(curr_peaks) > 0:
                 filtered_distances = np.array([distance for distance in unfiltered_distances if distance <= peak_comparison_distance])
-                print(curr_peaks)
-                print(offset_pred_peaks)
-                print(all_peaks_offset)
-                print(unfiltered_distances)
-                print(filtered_distances)
                 mae = np.mean(filtered_distances) if len(filtered_distances) > 0 else 0
                 rmse = np.sqrt(np.mean(filtered_distances ** 2)) if len(filtered_distances) > 0 else 0
-                model_peaks_mae[model.name] = model_peaks_mae.get(model.name, 0) + mae
-                model_peaks_rmse[model.name] = model_peaks_rmse.get(model.name, 0) + rmse
-                peaks_within_threshold[model.name] = (
-                        peaks_within_threshold.get(model.name, 0) + len(filtered_distances))
-                peaks_outside_threshold[model.name] = (
-                        peaks_outside_threshold.get(model.name, 0) + len(pred_peaks) - len(filtered_distances))
-                sum_of_dists_to_nearest_peak[model.name] = (
-                        sum_of_dists_to_nearest_peak.get(model.name, 0) + sum(unfiltered_distances))
+                model_peaks_mae[model._name] = model_peaks_mae.get(model._name, 0) + mae
+                model_peaks_rmse[model._name] = model_peaks_rmse.get(model._name, 0) + rmse
+                peaks_within_threshold[model._name] = (
+                        peaks_within_threshold.get(model._name, 0) + len(filtered_distances))
+                peaks_outside_threshold[model._name] = (
+                        peaks_outside_threshold.get(model._name, 0) + len(pred_peaks) - len(filtered_distances))
+                sum_of_dists_to_nearest_peak[model._name] = (
+                        sum_of_dists_to_nearest_peak.get(model._name, 0) + sum(unfiltered_distances))
             if plot:
-                line, = plt.plot(pred_time, model_predictions, marker='.', label=model.name)
+                line, = plt.plot(pred_time, model_predictions, marker='.', label=model._name)
                 line_color = line.get_color()
                 darker_line_color = sp.darken_color(line_color, 0.5)
                 if len(unfiltered_distances) != 0:
@@ -249,14 +266,14 @@ num_initial_days_to_discard = 50
 test_days_end = 300
 #hormone = 'LH'
 #features = ['FSH', 'E2', 'P4', 'LH']
-features = ['LH', 'E2']
+features = ['LH']
 MAX_EPOCHS = 25
 
 # test on a small TS
 test_dataframe = create_dataframe(workDir, features, 'Time', 1)
 test_dataframe['Time'] = test_dataframe['Time'] * 24
 # train on a long TS
-combined_df = create_dataframe(workDir, features, 'Time', 3)
+combined_df = create_dataframe(workDir, features, 'Time', 4)
 combined_df['Time'] = combined_df['Time'] * 24
 
 print('Num records in the loaded data for training:', len(combined_df['Time']))
@@ -353,10 +370,10 @@ print("Num features", num_features)
 train_mean = train_df.mean()
 train_std = train_df.std()
 
-train_df, properties = normalize_df(train_df, method='minmax', values={feature: (0, 1) for feature in features})
+train_df, norm_properties = normalize_df(train_df, method='minmax', values={feature: (0, 1) for feature in features})
 # values = {feature: (0, properties[feature][1]) for feature in features}
-val_df, _ = normalize_df(val_df, method='own', values=properties)
-test_df, _ = normalize_df(test_df, method='own', values=properties)
+val_df, _ = normalize_df(val_df, method='own', values=norm_properties)
+test_df, _ = normalize_df(test_df, method='own', values=norm_properties)
 
 fdf = train_df[train_df > 0]
 #new_mean = fdf.mean()[hormone]
@@ -689,7 +706,7 @@ frequencies = list(count.values())
 plt.bar(numbers, frequencies, color='skyblue')
 plt.show()
 
-sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=properties)
+sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
 peaks_within_threshold = {}
 peaks_outside_threshold = {}
 sum_of_dists_to_nearest_peak = {}
@@ -700,7 +717,7 @@ for _ in range(1):
     multi_cnn_model = multistep_cnn()
     multi_cnn_model._name = 'wide_cnn'
     within, outside, nearest_dists = compare_multiple_models([feedback_model, multi_cnn_model],
-                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features[0], plot=True,
+                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0], plot=True,
                                               peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
     for model_name, value in within.items():
         peaks_within_threshold[model_name] = peaks_within_threshold.get(model_name, 0) + value
