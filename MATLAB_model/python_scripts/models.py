@@ -27,6 +27,49 @@ class ResidualWrapper(tf.keras.Model):
         return inputs + delta
 
 
+class My_rnn(tf.keras.Model):
+    def __init__(self, units, out_steps, num_features):
+        super().__init__()
+        self.units = units
+        self.out_steps = out_steps
+        self.num_features = num_features
+        self.lstm = tf.keras.layers.LSTM(self.units, return_state=True)
+        self.lstm_cell = tf.keras.layers.LSTMCell(units)
+        self.rnn_cell = tf.keras.layers.LSTMCell(units)
+        self.rnn = tf.keras.layers.RNN(self.rnn_cell, return_state=True)
+        self.dense = tf.keras.Sequential([
+            tf.keras.layers.Dense(32, activation='relu', kernel_initializer=tf.initializers.he_normal()),
+            tf.keras.layers.Dense(num_features),
+        ])
+
+    def call(self, inputs, training=None):
+        predictions = []
+        x, *state_lstm = self.lstm(inputs)
+        #x2, *state_rnn = self.rnn(inputs)
+        state_rnn = state_lstm
+        prediction = self.dense((x))
+        predictions.append(prediction)
+        # Run the rest of the prediction steps.
+        for n in range(1, self.out_steps):
+            # Use the last prediction as input.
+            x = prediction
+            # Execute one lstm step.
+            x, state_lstm = self.lstm_cell(x, states=state_lstm,
+                                           training=training)
+            x, state_rnn = self.rnn_cell(x, states=state_rnn,
+                                         training=training)
+            # Convert the lstm output to a prediction.
+            prediction = self.dense(x)
+            # Add the prediction to the output.
+            predictions.append(prediction)
+
+        # predictions.shape => (time, batch, features)
+        predictions = tf.stack(predictions)
+        # predictions.shape => (batch, time, features)
+        predictions = tf.transpose(predictions, [1, 0, 2])
+        return predictions
+
+
 class FeedBack(tf.keras.Model):
     def __init__(self, units, out_steps, num_features):
         super().__init__()
@@ -80,7 +123,7 @@ class Wide_CNN(tf.keras.Model):
         self.out_steps = out_steps
         self.num_features = num_features
         conv_model_wide = tf.keras.Sequential([
-            tf.keras.layers.Conv1D(filters=32,
+            tf.keras.layers.Conv1D(filters=256,
                                    kernel_size=(input_length,),
                                    activation='relu'),
             tf.keras.layers.Dense(units=32, activation='relu'),

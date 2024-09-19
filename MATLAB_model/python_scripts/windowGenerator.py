@@ -18,10 +18,13 @@ class WindowGenerator():
         # Work out the label column indices.
         self.label_columns = label_columns
         if label_columns is not None:
-          self.label_columns_indices = {name: i for i, name in
+          label_columns_indices = {name: i for i, name in
                                         enumerate(label_columns)}
-        self.column_indices = {name: i for i, name in
+          self.label_columns_indices = \
+              {k: v for k, v in sorted(label_columns_indices.items(), key=lambda item: item[1])}
+        column_indices = {name: i for i, name in
                                enumerate(train_df.columns)}
+        self.column_indices = {k: v for k, v in sorted(column_indices.items(), key=lambda item: item[1])}
 
         # Work out the window parameters.
         self.input_width = input_width

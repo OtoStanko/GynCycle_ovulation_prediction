@@ -11,7 +11,7 @@ import tensorflow as tf
 #from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.arima.model import ARIMA
 from windowGenerator import WindowGenerator
-from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN
+from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN, My_rnn
 import IPython
 import IPython.display
 from scipy.optimize import curve_fit
@@ -234,7 +234,7 @@ def normalize_df(df, method='standard', values=None):
     prop = {}
     if method == 'standard':
         for feature in df.columns:
-            if values[feature] is None:
+            if values is None:
                 df_mean = df[feature].mean()
                 df_std = df[feature].std()
             else:
@@ -245,7 +245,7 @@ def normalize_df(df, method='standard', values=None):
         for feature in df.columns:
             min_val = np.min(df[feature])
             max_val = np.max(df[feature])
-            if values[feature] is None:
+            if values is None:
                 a = 0
                 b = 1
             else:
@@ -370,13 +370,17 @@ print("Num features", num_features)
 train_mean = train_df.mean()
 train_std = train_df.std()
 
+
 train_df, norm_properties = normalize_df(train_df, method='minmax', values={feature: (0, 1) for feature in features})
 # values = {feature: (0, properties[feature][1]) for feature in features}
 val_df, _ = normalize_df(val_df, method='own', values=norm_properties)
 test_df, _ = normalize_df(test_df, method='own', values=norm_properties)
-
-fdf = train_df[train_df > 0]
-#new_mean = fdf.mean()[hormone]
+"""
+train_df, norm_properties = normalize_df(train_df, method='standard')
+# values = {feature: (0, properties[feature][1]) for feature in features}
+val_df, _ = normalize_df(val_df, method='standard', values=norm_properties)
+test_df, _ = normalize_df(test_df, method='standard', values=norm_properties)
+"""
 
 for feature in features:
     plt.plot(train_df.index, train_df[feature], color='yellow')
@@ -678,6 +682,19 @@ def multistep_cnn():
     return multi_cnn
 
 
+def more_layers_rnn():
+    mlr = My_rnn(32, OUT_STEPS, len(features))
+    IPython.display.clear_output()
+    print('Output shape (batch, time, features): ', mlr(multi_window.example[0]).shape)
+    history = compile_and_fit(mlr, multi_window)
+
+    multi_val_performance['drnn'] = mlr.evaluate(multi_window.val, return_dict=True)
+    multi_performance['drnn'] = mlr.evaluate(multi_window.test, verbose=0, return_dict=True)
+    for feature in features:
+        multi_window.plot(feature, 'CNN model predictions', mlr)
+    return mlr
+
+
 def multistep_performance():
     # Performance
     x = np.arange(len(multi_performance))
@@ -711,13 +728,15 @@ peaks_within_threshold = {}
 peaks_outside_threshold = {}
 sum_of_dists_to_nearest_peak = {}
 PEAK_COMPARISON_DISTANCE = 2
-for _ in range(1):
-    feedback_model = autoregressive_model()
-    feedback_model._name = 'feed_back'
+for _ in range(20):
+    #feedback_model = autoregressive_model()
+    #feedback_model._name = 'feed_back'
     multi_cnn_model = multistep_cnn()
     multi_cnn_model._name = 'wide_cnn'
-    within, outside, nearest_dists = compare_multiple_models([feedback_model, multi_cnn_model],
-                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0], plot=True,
+    mrnn = more_layers_rnn()
+    mrnn._name = 'drnn'
+    within, outside, nearest_dists = compare_multiple_models([multi_cnn_model, mrnn],
+                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0], plot=False,
                                               peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
     for model_name, value in within.items():
         peaks_within_threshold[model_name] = peaks_within_threshold.get(model_name, 0) + value
