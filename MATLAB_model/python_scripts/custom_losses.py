@@ -33,10 +33,25 @@ class Peak_loss(tf.keras.Loss):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def call(selfself, y_true, y_pred):
+    def find_peaks(self, tensor, height):
+        # Shift tensor left and right to find peaks
+        tensor = tf.squeeze(tensor, axis=-1)
+        shifted_right = tf.roll(tensor, shift=1, axis=1)
+        shifted_left = tf.roll(tensor, shift=-1, axis=1)
+
+        peak_strength = tf.nn.relu(tensor - shifted_left) * tf.nn.relu(tensor - shifted_right)
+        min_val = tf.reduce_min(peak_strength)
+        max_val = tf.reduce_max(peak_strength)
+        normalized_tensor = (peak_strength - min_val) / (max_val - min_val)
+        peaks = tensor * (normalized_tensor + 0.01)
+        peak_indicator = tf.sigmoid(peaks)
+        peak_indicator = tf.expand_dims(peak_indicator, axis=-1)
+        return peak_indicator
+
+    def call(self, y_true, y_pred):
         MIN_PEAK_DISTANCE = 20
         MIN_PEAK_HEIGHT = 0.3
-        ALPHA = 1
+        ALPHA = 0.1
         """peaks, properties = scipy.signal.find_peaks(y_true, distance=MIN_PEAK_DISTANCE / 2,
                                                     height=MIN_PEAK_HEIGHT)
         pred_peaks, properties = scipy.signal.find_peaks(y_pred, distance=MIN_PEAK_DISTANCE)
@@ -44,27 +59,8 @@ class Peak_loss(tf.keras.Loss):
         loss = mse(peaks, pred_peaks)
         return loss"""
 
-        def find_peaks(tensor, height):
-            # Shift tensor left and right to find peaks
-            tensor = tf.squeeze(tensor, axis=-1)
-            shifted_right = tf.roll(tensor, shift=1, axis=1)
-            shifted_left = tf.roll(tensor, shift=-1, axis=1)
-
-            peak_strength = tf.nn.relu(tensor - shifted_left) * tf.nn.relu(tensor - shifted_right)
-            min_val = tf.reduce_min(peak_strength)
-            max_val = tf.reduce_max(peak_strength)
-            normalized_tensor = 2 * (peak_strength - min_val) / (max_val - min_val) - 1
-            peaks = tensor * normalized_tensor
-            # peaks = tf.nn.relu(peaks - height)
-            peak_indicator = tf.sigmoid(peaks - height)  # Smooth approximation
-
-            # Expand dims to keep the shape consistent
-            peak_indicator = tf.expand_dims(peak_indicator, axis=-1)
-
-            return peak_indicator
-
-        true_peaks = find_peaks(y_true, MIN_PEAK_HEIGHT)
-        pred_peaks = find_peaks(y_pred, MIN_PEAK_HEIGHT)
+        true_peaks = self.find_peaks(y_true, MIN_PEAK_HEIGHT)
+        pred_peaks = self.find_peaks(y_pred, MIN_PEAK_HEIGHT)
 
         mse = tf.keras.losses.MeanSquaredError()
         loss = ALPHA * mse(true_peaks, pred_peaks) + (1-ALPHA) * mse(y_true, y_pred)

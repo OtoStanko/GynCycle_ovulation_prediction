@@ -25,8 +25,8 @@ def compile_and_fit(model, window, patience=2):
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                     patience=patience,
                                                     mode='min')
-    # MeanSquaredError(),
-    # Huber()
+    # tf.keras.losses.MeanSquaredError(),
+    # tf.keras.losses.Huber()
     model.compile(loss=Peak_loss(),
                 optimizer=tf.keras.optimizers.Adam(),
                 metrics=[tf.keras.metrics.MeanAbsoluteError()])
