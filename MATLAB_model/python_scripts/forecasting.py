@@ -16,22 +16,9 @@ import IPython
 import IPython.display
 from scipy.optimize import curve_fit
 import supporting_scripts as sp
+from custom_losses import Peak_loss, MyLoss
 
-class Custom_loss(tf.keras.Loss):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.threshold = 0.3
 
-    def call(self, y_true, y_pred):
-        squared_error = 0.5 * tf.square(y_true - y_pred)
-        quadruped_error = 2.0 * tf.square(y_true - y_pred) ** 2
-        absolute_error = tf.abs(y_true - y_pred)
-        mask = tf.greater_equal(y_true, self.threshold)
-        mask2 = tf.greater_equal(y_true, 0.5)
-        #loss = tf.where(mask, squared_error, absolute_error)
-        loss = tf.where(mask2, quadruped_error,
-                        tf.where(mask, squared_error, absolute_error))
-        return tf.reduce_mean(loss)
 
 
 def compile_and_fit(model, window, patience=2):
@@ -40,7 +27,7 @@ def compile_and_fit(model, window, patience=2):
                                                     mode='min')
     # MeanSquaredError(),
     # Huber()
-    model.compile(loss=tf.keras.losses.Huber(),
+    model.compile(loss=Peak_loss(),
                 optimizer=tf.keras.optimizers.Adam(),
                 metrics=[tf.keras.metrics.MeanAbsoluteError()])
     history = model.fit(window.train, epochs=MAX_EPOCHS,
@@ -728,15 +715,15 @@ peaks_within_threshold = {}
 peaks_outside_threshold = {}
 sum_of_dists_to_nearest_peak = {}
 PEAK_COMPARISON_DISTANCE = 2
-for _ in range(20):
-    #feedback_model = autoregressive_model()
-    #feedback_model._name = 'feed_back'
+for _ in range(1):
+    feedback_model = autoregressive_model()
+    feedback_model._name = 'feed_back'
     multi_cnn_model = multistep_cnn()
     multi_cnn_model._name = 'wide_cnn'
-    mrnn = more_layers_rnn()
-    mrnn._name = 'drnn'
-    within, outside, nearest_dists = compare_multiple_models([multi_cnn_model, mrnn],
-                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0], plot=False,
+    #mrnn = more_layers_rnn()
+    #mrnn._name = 'drnn'
+    within, outside, nearest_dists = compare_multiple_models([feedback_model, multi_cnn_model],
+                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0], plot=True,
                                               peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
     for model_name, value in within.items():
         peaks_within_threshold[model_name] = peaks_within_threshold.get(model_name, 0) + value
