@@ -1,8 +1,9 @@
 import tensorflow as tf
 import scipy.signal
+from keras.losses import Loss
 
 
-class Custom_loss(tf.keras.Loss):
+class Custom_loss(Loss):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.threshold = 0.3
@@ -19,7 +20,7 @@ class Custom_loss(tf.keras.Loss):
         return tf.reduce_mean(loss)
 
 
-class MyLoss(tf.keras.Loss):
+class MyLoss(Loss):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -29,7 +30,7 @@ class MyLoss(tf.keras.Loss):
         return loss
 
 
-class Peak_loss(tf.keras.Loss):
+class Peak_loss(Loss):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
