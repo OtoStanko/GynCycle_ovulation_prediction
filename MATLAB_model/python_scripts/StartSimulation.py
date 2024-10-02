@@ -10,7 +10,7 @@ from SimulationSettings import SimulationSettings
 
 def StartSimulation():
     runnum = 1
-    SIM_OUT_NUM = 4
+    SIM_OUT_NUM = 7
 
     settings = SimulationSettings(ShowPlots = 1, SaveSim = 0, SavePlotStuff = 1,
                                   SavePop = 0, NormalCycle = 1, LutStim = 0,
@@ -26,7 +26,7 @@ def StartSimulation():
     for runind in range(1, runnum + 1):
         # integration time beginning and end
         tb = 0
-        te = 3650 + 50
+        te = 50 + 365*20
         # technical params
         # ODE function called to test(0) or not (1)
         # number of non-follicle equations (NO DRUG)

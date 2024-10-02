@@ -17,8 +17,27 @@ import IPython.display
 from scipy.optimize import curve_fit
 import supporting_scripts as sp
 from custom_losses import Peak_loss, MyLoss
+from collections import Counter
 
 
+"""
+    Parameters
+"""
+TRAIN_DATA_SUFFIX = 4
+TEST_DATA_SUFFIX = 1
+LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
+
+# Set the parameters
+workDir = os.path.join(os.getcwd(), "../outputDir/")
+SAMPLING_FREQUENCY = 24
+SAMPLING_FREQUENCY_UNIT = 'H'
+NUM_INITIAL_DAYS_TO_DISCARD = 50
+test_days_end = 300
+features = ['LH']
+MAX_EPOCHS = 25
+
+NUM_RUNS = 2
+PEAK_COMPARISON_DISTANCE = 2
 
 
 def compile_and_fit(model, window, patience=2):
@@ -28,18 +47,14 @@ def compile_and_fit(model, window, patience=2):
     # tf.keras.losses.MeanSquaredError(),
     # tf.keras.losses.Huber()
     # Peak_loss()
-    model.compile(loss=tf.keras.losses.MeanSquaredError(),
-                optimizer=tf.keras.optimizers.Adam(),
-                metrics=[tf.keras.metrics.MeanAbsoluteError()])
-    history = model.fit(window.train, epochs=MAX_EPOCHS,
-                      validation_data=window.val,
-                      callbacks=[early_stopping])
-    model.compile(loss=Peak_loss(),
-                  optimizer=tf.keras.optimizers.Adam(),
-                  metrics=[tf.keras.metrics.MeanAbsoluteError()])
-    history = model.fit(window.train, epochs=MAX_EPOCHS,
-                        validation_data=window.val,
-                        callbacks=[early_stopping])
+    history = None
+    for loss in LOSS_FUNCTIONS:
+        model.compile(loss=loss,
+                    optimizer=tf.keras.optimizers.Adam(),
+                    metrics=[tf.keras.metrics.MeanAbsoluteError()])
+        history = model.fit(window.train, epochs=MAX_EPOCHS,
+                          validation_data=window.val,
+                          callbacks=[early_stopping])
     return history
 
 
@@ -252,22 +267,12 @@ def normalize_df(df, method='standard', values=None):
         prop = values
     return df, prop
 
-# Set the parameters
-workDir = os.path.join(os.getcwd(), "../outputDir/")
-sampling_frequency = 24
-sampling_frequency_unit = 'H'
-num_initial_days_to_discard = 50
-test_days_end = 300
-#hormone = 'LH'
-#features = ['FSH', 'E2', 'P4', 'LH']
-features = ['LH']
-MAX_EPOCHS = 25
 
 # test on a small TS
-test_dataframe = create_dataframe(workDir, features, 'Time', 1)
+test_dataframe = create_dataframe(workDir, features, 'Time', TEST_DATA_SUFFIX)
 test_dataframe['Time'] = test_dataframe['Time'] * 24
 # train on a long TS
-combined_df = create_dataframe(workDir, features, 'Time', 4)
+combined_df = create_dataframe(workDir, features, 'Time', TRAIN_DATA_SUFFIX)
 combined_df['Time'] = combined_df['Time'] * 24
 
 print('Num records in the loaded data for training:', len(combined_df['Time']))
@@ -282,10 +287,10 @@ plt.show()
 
 
 # First 50 days of the simulation may be a bit messy and thus we ignore them
-filtered_df = combined_df[combined_df['Time'] > num_initial_days_to_discard*24]
+filtered_df = combined_df[combined_df['Time'] > NUM_INITIAL_DAYS_TO_DISCARD * 24]
 filtered_df.set_index('Time', inplace=True)
 
-filtered_test_df = test_dataframe[test_dataframe['Time'] > num_initial_days_to_discard*24]
+filtered_test_df = test_dataframe[test_dataframe['Time'] > NUM_INITIAL_DAYS_TO_DISCARD * 24]
 filtered_test_df.set_index('Time', inplace=True)
 
 filtered_df_timeH = filtered_df.copy()
@@ -312,7 +317,7 @@ plt.show()"""
 print(test_days_end * 24 + 1)
 print(filtered_df_timeH.index[-1])
 
-sampled_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, int(filtered_df_timeH.index[-1]) + 1, sampling_frequency)]
+sampled_df_timeH_index = [i for i in range(NUM_INITIAL_DAYS_TO_DISCARD * 24, int(filtered_df_timeH.index[-1]) + 1, SAMPLING_FREQUENCY)]
 print("Number of days in the training data:", len(sampled_df_timeH_index))
 sampled_df_timeH = sample_data(filtered_df_timeH, sampled_df_timeH_index, features)
 print('Num records in the sampled dataframe with raw hours: (Should be the same as the above number)', len(sampled_df_timeH.index))
@@ -321,7 +326,7 @@ plt.title('Sampled dataframe with raw hours')
 plt.xlabel('Time in hours')
 plt.show()
 
-sampled_test_df_timeH_index = [i for i in range(num_initial_days_to_discard * 24, int(filtered_test_df.index[-1]) + 1, sampling_frequency)]
+sampled_test_df_timeH_index = [i for i in range(NUM_INITIAL_DAYS_TO_DISCARD * 24, int(filtered_test_df.index[-1]) + 1, SAMPLING_FREQUENCY)]
 sampled_test_df = sample_data(filtered_test_df, sampled_test_df_timeH_index, features)
 print("Number of days in the testing data:", len(sampled_test_df_timeH_index))
 
@@ -620,7 +625,6 @@ def show_performance():
 #wide_cnn()
 #residual_connections_model()
 #show_performance()
-print("Ok up to here")
 
 """
 # Multi-step models
@@ -707,7 +711,6 @@ def multistep_performance():
     plt.show()
 
 
-from collections import Counter
 peaks, properties = scipy.signal.find_peaks(train_df[features[0]], distance=10, height=0.3)
 distances = [peaks[i+1] - peaks[i] for i in range(len(peaks)-1)]
 count = Counter(distances)
@@ -721,8 +724,7 @@ sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_pro
 peaks_within_threshold = {}
 peaks_outside_threshold = {}
 sum_of_dists_to_nearest_peak = {}
-PEAK_COMPARISON_DISTANCE = 2
-for _ in range(20):
+for _ in range(NUM_RUNS):
     feedback_model = autoregressive_model()
     feedback_model._name = 'feed_back'
     multi_cnn_model = multistep_cnn()
@@ -732,12 +734,12 @@ for _ in range(20):
     within, outside, nearest_dists = compare_multiple_models([feedback_model, multi_cnn_model],
                                               sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0], plot=False,
                                               peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
-    for model_name, value in within.items():
-        peaks_within_threshold[model_name] = peaks_within_threshold.get(model_name, 0) + value
-    for model_name, value in outside.items():
-        peaks_outside_threshold[model_name] = peaks_outside_threshold.get(model_name, 0) + value
-    for model_name, value in nearest_dists.items():
-        sum_of_dists_to_nearest_peak[model_name] = sum_of_dists_to_nearest_peak.get(model_name, 0) + value
+    for model_name, num_peaks_within in within.items():
+        peaks_within_threshold[model_name] = peaks_within_threshold.get(model_name, list()) + [num_peaks_within]
+    for model_name, num_peaks_outside in outside.items():
+        peaks_outside_threshold[model_name] = peaks_outside_threshold.get(model_name, list()) + [num_peaks_outside]
+    for model_name, nearest_peak_dist in nearest_dists.items():
+        sum_of_dists_to_nearest_peak[model_name] = sum_of_dists_to_nearest_peak.get(model_name, list()) + [nearest_peak_dist]
 print(peaks_within_threshold)
 print(peaks_outside_threshold)
 sp.print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak,
