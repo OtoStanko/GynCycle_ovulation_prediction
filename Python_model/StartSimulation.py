@@ -15,8 +15,8 @@ def StartSimulation():
     settings = SimulationSettings(ShowPlots = 1, SaveSim = 0, SavePlotStuff = 1,
                                   SavePop = 0, NormalCycle = 1, LutStim = 0,
                                   FollStim = 0, DoubStim = 0, Foll_ModelPop = 0,
-                                  Horm_ModelPop = 0, workDir=os.path.join(os.getcwd(), ".."),
-                                  outputDir=os.path.join(os.getcwd(), "../outputDir/"))
+                                  Horm_ModelPop = 0, workDir=os.getcwd(),
+                                  outputDir=os.path.join(os.getcwd(), "./outputDir/"))
 
     global ModelPop_Params
     ModelPop_Params = []
@@ -26,7 +26,7 @@ def StartSimulation():
     for runind in range(1, runnum + 1):
         # integration time beginning and end
         tb = 0
-        te = 50 + 365*20
+        te = 50 + 365*1
         # technical params
         # ODE function called to test(0) or not (1)
         # number of non-follicle equations (NO DRUG)
