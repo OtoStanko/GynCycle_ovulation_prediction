@@ -36,8 +36,9 @@ test_days_end = 300
 features = ['LH']
 MAX_EPOCHS = 25
 
-NUM_RUNS = 2
+NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
+PLOT_TESTING = True
 
 
 def compile_and_fit(model, window, patience=2):
@@ -732,8 +733,8 @@ for _ in range(NUM_RUNS):
     #mrnn = more_layers_rnn()
     #mrnn._name = 'drnn'
     within, outside, nearest_dists = compare_multiple_models([feedback_model, multi_cnn_model],
-                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0], plot=False,
-                                              peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
+                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
+                                              plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
     for model_name, num_peaks_within in within.items():
         peaks_within_threshold[model_name] = peaks_within_threshold.get(model_name, list()) + [num_peaks_within]
     for model_name, num_peaks_outside in outside.items():
