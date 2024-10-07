@@ -11,7 +11,7 @@ import tensorflow as tf
 #from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.arima.model import ARIMA
 from windowGenerator import WindowGenerator
-from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN, My_rnn
+from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN, My_rnn, Fit_sinCurve
 import IPython
 import IPython.display
 from scipy.optimize import curve_fit
@@ -36,9 +36,9 @@ test_days_end = 300
 features = ['LH']
 MAX_EPOCHS = 25
 
-NUM_RUNS = 10
+NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
-PLOT_TESTING = False
+PLOT_TESTING = True
 
 
 def compile_and_fit(model, window, patience=2):
@@ -297,24 +297,6 @@ filtered_test_df.set_index('Time', inplace=True)
 filtered_df_timeH = filtered_df.copy()
 
 
-"""time_delta = pd.to_timedelta(filtered_df.index, unit='h')
-datetime_index = start_date + time_delta
-filtered_df.index = datetime_index
-filtered_df.index.name = 'DateTime'
-print(filtered_df[hormone][0])
-
-
-# The records are not evenly distributed. We will do sampling with linear interpolation for the models
-new_index = pd.date_range(start=data_start_date,
-                          end=data_stop_date,
-                          freq="{}{}".format(sampling_frequency, sampling_frequency_unit))
-
-sampled_df = sample_data(filtered_df, new_index, features)
-
-plt.plot(sampled_df.index, sampled_df[features], )
-plt.title('Sampled dataframe with datetime')
-plt.show()"""
-
 print(test_days_end * 24 + 1)
 print(filtered_df_timeH.index[-1])
 
@@ -331,31 +313,6 @@ sampled_test_df_timeH_index = [i for i in range(NUM_INITIAL_DAYS_TO_DISCARD * 24
 sampled_test_df = sample_data(filtered_test_df, sampled_test_df_timeH_index, features)
 print("Number of days in the testing data:", len(sampled_test_df_timeH_index))
 
-
-"""
-days = [23, 24, 25, 26, 27, 28, 29, 30]
-for day in days:
-    sampled_df_timeH['{} days'.format(day)] = (np.sin((sampled_df_timeH.index * ((2 * np.pi / (day * 24))))) * 5) + 15
-    plt.plot(sampled_df_timeH['{} days'.format(day)])
-    plt.plot(sampled_df_timeH[hormone])
-    plt.title('{} days cycle sin function'.format(day))
-    plt.show()
-"""
-"""fft = tf.signal.rfft(sampled_df_timeH[hormone])
-f_per_dataset = np.arange(0, len(fft))
-n_samples_h = len(sampled_df_timeH[hormone])
-print(n_samples_h)
-hours_per_year = 24*365.2524
-years_per_dataset = n_samples_h/(hours_per_year)
-print(years_per_dataset)
-f_per_year = f_per_dataset/years_per_dataset
-plt.step(f_per_year, np.abs(fft))
-plt.xscale('log')
-plt.ylim(0, 25000)
-plt.xlim([0.1, max(plt.xlim())])
-plt.xticks([1, 365.2524/12, 365.2524], labels=['1/Year', '1/month', '1/day'])
-_ = plt.xlabel('Frequency (log scale)')
-plt.show()"""
 
 column_indices = {name: i for i, name in enumerate(sampled_df_timeH.columns)}
 
@@ -725,14 +682,17 @@ sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_pro
 peaks_within_threshold = {}
 peaks_outside_threshold = {}
 sum_of_dists_to_nearest_peak = {}
+tf.config.run_functions_eagerly(True)
 for _ in range(NUM_RUNS):
     feedback_model = autoregressive_model()
     feedback_model._name = 'feed_back'
-    multi_cnn_model = multistep_cnn()
-    multi_cnn_model._name = 'wide_cnn'
+    #multi_cnn_model = multistep_cnn()
+    #multi_cnn_model._name = 'wide_cnn'
+    fitted_sin = Fit_sinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0])
+    fitted_sin._name = 'sin_curve'
     #mrnn = more_layers_rnn()
     #mrnn._name = 'drnn'
-    within, outside, nearest_dists = compare_multiple_models([feedback_model, multi_cnn_model],
+    within, outside, nearest_dists = compare_multiple_models([feedback_model, fitted_sin],
                                               sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                               plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
     for model_name, num_peaks_within in within.items():
@@ -746,31 +706,3 @@ print(peaks_outside_threshold)
 sp.print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak,
                          PEAK_COMPARISON_DISTANCE)
 multistep_performance()
-"""
-sampled_train_df = sampled_df[(sampled_df.index > data_start_date) & (sampled_df.index <= data_tt_split_date)]
-sampled_test_df = sampled_df[(sampled_df.index > data_tt_split_date) & (sampled_df.index <= data_stop_date)]
-
-plt.plot(sampled_train_df.index, sampled_train_df[hormone], color = "black")
-plt.plot(sampled_test_df.index, sampled_test_df[hormone], color = "red")
-plt.show()
-"""
-
-"""
-# Fit the model
-order = (1,1,0)
-seasonal_order = (1,1,0,36)
-mod = SARIMAX(sampled_train_df[hormone], trend='c', order=order, seasonal_order=seasonal_order,
-              freq="{}{}".format(sampling_frequency, sampling_frequency_unit))
-res = mod.fit(disp=False)
-print(res.summary())
-"""
-"""
-print(train_df[hormone])
-arima_model = ARIMA(train_df[hormone], order=(4,2,0), seasonal_order=(4,2,0,12),)
-fitted_arima = arima_model.fit()
-arima_predictions = fitted_arima.get_forecast(35)
-arima_predictions_series = arima_predictions.predicted_mean
-#print(arima_predictions_series)
-plt.plot(arima_predictions_series.index, arima_predictions_series.values)
-plt.show()
-"""

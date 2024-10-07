@@ -1,5 +1,9 @@
 import numpy as np
 import tensorflow as tf
+from matplotlib import pyplot as plt
+from scipy.optimize import curve_fit
+
+from supporting_scripts import curve_function
 
 class Baseline(tf.keras.Model):
     def __init__(self, label_index=None):
@@ -128,3 +132,41 @@ class Wide_CNN(tf.keras.Model):
             input_tensor = tf.concat([input_tensor, y], axis=1)
         predictions = input_tensor[:, -self.out_steps:, :]
         return predictions
+
+class Fit_sinCurve(tf.keras.Model):
+    def __init__(self, input_length, out_steps, num_features, train_df, feature):
+        super().__init__()
+        self.input_length = input_length
+        self.out_steps = out_steps
+        self.num_features = num_features
+        x_data = train_df.index.values
+        y_data = train_df[feature].values
+        popt, _ = curve_fit(curve_function, x_data, y_data, p0=[1, 1, 25])
+        self.a_opt, self.b_opt, self.c_opt = popt
+        print(f"Optimal parameters: a={self.a_opt}, b={self.b_opt}, c={self.c_opt}")
+        print('a * sin(x * (2*pi/(c*24)) - b)')
+        x_fit = np.linspace(1200, 3500, 100)
+        y_fit = curve_function(x_fit, *popt)
+        plt.plot(train_df.index[:100], train_df[feature][:100], color='black')
+        plt.plot(x_fit, y_fit, label='Fitted Curve', color='orange')
+        plt.title('Sampled dataframe with raw hours with fitted sin curve')
+        plt.ylabel('Time in hours')
+        plt.show()
+
+    def call(self, inputs):
+        inputs = tf.reshape(inputs, (self.input_length,))
+        result = tf.py_function(self.numpy_curve_fit, [inputs], tf.float32)
+        result = tf.reshape(result, (1, self.out_steps, self.num_features))
+        return result
+
+    def numpy_curve_fit(self, inputs):
+        y_data = np.array(inputs)  # Convert TensorFlow tensor to NumPy array
+        x_data = np.arange(self.input_length) * 24  # Create x_data array
+        popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[self.b_opt])
+        x_fit = np.arange(len(inputs), len(inputs) + self.out_steps) * 24
+        y_fit = curve_function(x_fit, self.a_opt, popt[0], self.c_opt)
+        print(popt)
+        return np.array(y_fit, dtype=np.float32)
+
+    def move_curve_function(self, x_data, b):
+        return curve_function(x_data, self.a_opt, b, self.c_opt)
