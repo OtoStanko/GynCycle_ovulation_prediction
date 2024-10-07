@@ -27,7 +27,7 @@ from collections import Counter
 """
 TRAIN_DATA_SUFFIX = 4
 TEST_DATA_SUFFIX = 1
-LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError()]
+LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
 
 # Set the parameters
 workDir = os.path.join(os.getcwd(), "../outputDir/")
@@ -694,8 +694,8 @@ sum_of_dists_to_nearest_peak = {}
 num_detected_peaks = {}
 tf.config.run_functions_eagerly(True)
 for _ in range(NUM_RUNS):
-    feedback_model = autoregressive_model()
-    feedback_model._name = 'feed_back'
+    #feedback_model = autoregressive_model()
+    #feedback_model._name = 'feed_back'
     peak_start = Distributed_peaks(OUT_STEPS, len(features), 2)
     peak_start._name = 'peak_beginning'
     peak_middle = Distributed_peaks(OUT_STEPS, len(features), 16)
@@ -708,7 +708,7 @@ for _ in range(NUM_RUNS):
     fitted_sin._name = 'sin_curve'
     #mrnn = more_layers_rnn()
     #mrnn._name = 'drnn'
-    within, outside, nearest_dists, num_detected = compare_multiple_models([feedback_model, fitted_sin],
+    within, outside, nearest_dists, num_detected = compare_multiple_models([ fitted_sin],
                                               sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                               plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
     for model_name, num_peaks_within in within.items():
@@ -738,11 +738,11 @@ for idx, key in enumerate(peaks_within_threshold):
     # Plot each key's data with a unique color and label it with the key
     plt.scatter(x_values, y_values, color=colors(idx), label=key)
 
-plt.xlim(0)
-plt.ylim(0)
 all_values = itertools.chain(*peaks_outside_threshold.values(), *peaks_within_threshold.values())
-max_val = max(all_values)
-plt.plot([0, max_val+5], [0, max_val+5], 'r--', label='y=x')
+max_val = max(all_values) + 5
+plt.xlim(0, max_val)
+plt.ylim(0, max_val)
+plt.plot([0, max_val], [0, max_val], 'r--', label='y=x')
 # Adding labels and title
 plt.xlabel('Num peaks outside the threshold')
 plt.ylabel('Num peaks inside threshold')
