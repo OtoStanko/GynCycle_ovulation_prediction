@@ -82,11 +82,13 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         fshimp = fshAll**Par[31] / (fshAll**Par[31] + Par[32]**Par[31])
         #print(paraPoi[0], paraPoi[0], fshimp)
         #print([t, te])
-        timevec = poissonproc(paraPoi[0] + 6 * paraPoi[0] * fshimp, [t, te])
+        #timevec = poissonproc(paraPoi[0] + 6 * paraPoi[0] * fshimp, [t, te])
+        m_lambda = paraPoi[0] + 6 * paraPoi[0] * fshimp
+        NextStart = t + np.random.exponential(1/m_lambda, 1)#exprnd(1/m_lamda)
 
         # Set integration period for the current follicle
-        if timevec.size != 0:
-            NextStart = timevec[0]
+        if NextStart <= te:
+            #NextStart = timevec[0]
             tspan = [t, NextStart] 
         else:
             tspan = [t, te]
@@ -238,7 +240,7 @@ def Simulation(para, paraPoi, parafoll, Par, tb, te,
         # reset vector of active FSH sensitivities
         Follicles.ActiveFSHS = []
 
-        # loop over all active follicles to set new destiny   
+        # loop over all active follicles to set new destiny
         for i in range(Follicles.NumActive):
             # Save y-values of i-th (current) follicle
             yCurFoll = LastYValues[i]
