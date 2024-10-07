@@ -36,9 +36,9 @@ test_days_end = 300
 features = ['LH']
 MAX_EPOCHS = 25
 
-NUM_RUNS = 1
+NUM_RUNS = 10
 PEAK_COMPARISON_DISTANCE = 2
-PLOT_TESTING = True
+PLOT_TESTING = False
 
 
 def compile_and_fit(model, window, patience=2):
@@ -460,7 +460,7 @@ def linear_model():
     plt.show()
 
 
-def dense_model():
+def multi_layer_model():
     """
     # Dense model
     Two hidden layers with relu activation functions
@@ -621,9 +621,9 @@ def show_performance():
 
 #baseline_model()
 #linear_model()
-#dense_model()
+#multi_layer_model()
 #cnn_model()
-#wide_cnn()
+#lstm_model()
 #residual_connections_model()
 #show_performance()
 

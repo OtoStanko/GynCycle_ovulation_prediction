@@ -52,13 +52,7 @@ class Peak_loss(Loss):
     def call(self, y_true, y_pred):
         MIN_PEAK_DISTANCE = 20
         MIN_PEAK_HEIGHT = 0.3
-        ALPHA = 0.1
-        """peaks, properties = scipy.signal.find_peaks(y_true, distance=MIN_PEAK_DISTANCE / 2,
-                                                    height=MIN_PEAK_HEIGHT)
-        pred_peaks, properties = scipy.signal.find_peaks(y_pred, distance=MIN_PEAK_DISTANCE)
-        mse = tf.keras.losses.MeanSquaredError()
-        loss = mse(peaks, pred_peaks)
-        return loss"""
+        ALPHA = 0.5
 
         true_peaks = self.find_peaks(y_true, MIN_PEAK_HEIGHT)
         pred_peaks = self.find_peaks(y_pred, MIN_PEAK_HEIGHT)
