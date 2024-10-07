@@ -1,8 +1,10 @@
+import itertools
 from cProfile import label
 
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import scipy.signal
 import seaborn as sns
 import numpy as np
@@ -11,7 +13,7 @@ import tensorflow as tf
 #from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.arima.model import ARIMA
 from windowGenerator import WindowGenerator
-from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN, My_rnn, Fit_sinCurve
+from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN, My_rnn, Fit_sinCurve, Distributed_peaks
 import IPython
 import IPython.display
 from scipy.optimize import curve_fit
@@ -25,7 +27,7 @@ from collections import Counter
 """
 TRAIN_DATA_SUFFIX = 4
 TEST_DATA_SUFFIX = 1
-LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
+LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError()]
 
 # Set the parameters
 workDir = os.path.join(os.getcwd(), "../outputDir/")
@@ -113,7 +115,8 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
                             duration=250, step=5, plot=True, peak_comparison_distance=2):
     MIN_PEAK_DISTANCE = 20
     MIN_PEAK_HEIGHT = 0.3
-    peaks, properties = scipy.signal.find_peaks(test_df[hormone], distance=MIN_PEAK_DISTANCE/2, height=MIN_PEAK_HEIGHT)
+    # Identify peaks in the ground-truth data and plot them
+    peaks, _ = scipy.signal.find_peaks(test_df[hormone], distance=MIN_PEAK_DISTANCE/2, height=MIN_PEAK_HEIGHT)
     if plot:
         plt.plot(test_df.index, test_df[hormone])
         plt.scatter(test_df.index[peaks], test_df[hormone].iloc[peaks],
@@ -121,59 +124,67 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
         plt.xlabel('Time [hours]')
         plt.title('Test {} data'.format(hormone))
         plt.show()
-    model_peaks_mae = {}
-    model_peaks_rmse = {}
+    # Statistics about the model forecast and peaks' predictions
     peaks_within_threshold = {}
     peaks_outside_threshold = {}
     sum_of_dists_to_nearest_peak = {}
+    num_detected_peaks = {}
+    """
+    Move along the testing TS. For every window of input_length + pred_length:
+        extract the input data
+        make prediction
+        extract peaks in the current window (input and output)
+        shift peaks by the offset of the current window
+    """
     for offset in range(0, duration-pred_length-input_length+1, step):
-        # Get the input data based on the offset and make a prediction
+        # Extract input data from the testing df
         inputs = []
         for feature in features:
             input = np.array(test_df[feature][offset:input_length + offset], dtype=np.float32)
-            tensor = tf.convert_to_tensor(input, dtype=tf.float32)  # Ensure dtype is compatible
+            tensor = tf.convert_to_tensor(input, dtype=tf.float32)
             inputs.append(tensor)
         tensor_inputs = tf.squeeze(inputs)
         reshaped_tensor = tf.reshape(tensor_inputs, (1, input_length, len(features)))
+        # For every model make a prediction for this time window
         list_of_model_predictions = []
         for model in list_of_models:
             predictions = model.predict(reshaped_tensor)
             predictions = predictions[0][:,0]
             list_of_model_predictions.append(predictions)
-        # ground-truth time in days shifted to start with 0
+        # Ground-truth time in days shifted to start with 0
         gt_time = test_df.index[offset:input_length + pred_length + offset]
         gt_time = gt_time / 24
         first_elem = gt_time[0]
         gt_time = gt_time - first_elem
-        # prediction time in days shifted so that is starts with input_length th day
+        # Prediction time in days shifted to start with input_length-th day
         pred_time = test_df.index[input_length + offset:input_length + pred_length + offset]
         pred_time = pred_time / 24
         pred_time = pred_time - first_elem
-        #
+        # Ground truth values for the whole window
         ground_truth = test_df[hormone][offset:input_length + pred_length + offset]
-        # take only the peaks in the prediction window
+        # Take only the peaks in the prediction window (input and output window)
+        # Shift them so that their time aligns with the offset data
         curr_peaks = np.array([x for x in peaks if offset <= x < input_length + pred_length + offset])
         curr_peaks = curr_peaks - offset
         # Try all the peaks, shift them to match the predicted data
         all_peaks_offset = np.array([x for x in peaks]) - offset
         if plot:
             plt.plot(gt_time, ground_truth, marker='.',)
-        # Plot the tips of the peaks that are in the input-prediction window
+        # Plot the tips of the peaks that are in the input-prediction window (input and output window)
         if len(curr_peaks) > 0 and plot:
             plt.scatter(gt_time[curr_peaks], ground_truth.iloc[curr_peaks],
                         color='red', zorder=5, label='Test data peaks')
         for i in range(len(list_of_model_predictions)):
             model = list_of_models[i]
             model_predictions = list_of_model_predictions[i]
-            pred_peaks, properties = scipy.signal.find_peaks(model_predictions, distance=MIN_PEAK_DISTANCE)
+            # Detect peaks in the prediction part (forecast) and shift them to start from the right time
+            pred_peaks, _ = scipy.signal.find_peaks(model_predictions, distance=MIN_PEAK_DISTANCE)
+            num_detected_peaks[model._name] = num_detected_peaks.get(model._name, 0) + len(pred_peaks)
             offset_pred_peaks = pred_peaks + input_length
             unfiltered_distances = sp.get_distances(all_peaks_offset, offset_pred_peaks)
+            # Proceed only if there are any ground-truth peaks in the output part
             if len(curr_peaks) > 0:
                 filtered_distances = np.array([distance for distance in unfiltered_distances if distance <= peak_comparison_distance])
-                mae = np.mean(filtered_distances) if len(filtered_distances) > 0 else 0
-                rmse = np.sqrt(np.mean(filtered_distances ** 2)) if len(filtered_distances) > 0 else 0
-                model_peaks_mae[model._name] = model_peaks_mae.get(model._name, 0) + mae
-                model_peaks_rmse[model._name] = model_peaks_rmse.get(model._name, 0) + rmse
                 peaks_within_threshold[model._name] = (
                         peaks_within_threshold.get(model._name, 0) + len(filtered_distances))
                 peaks_outside_threshold[model._name] = (
@@ -200,11 +211,9 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
             plt.legend(loc='upper left')
             plt.title('Prediction on {} days with offset {} days'.format(input_length, offset))
             plt.show()
-    print(model_peaks_mae)
-    print(model_peaks_rmse)
     print(peaks_within_threshold)
     print(peaks_outside_threshold)
-    return peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak
+    return peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak, num_detected_peaks
 
 
 def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=170, step=5):
@@ -682,17 +691,24 @@ sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_pro
 peaks_within_threshold = {}
 peaks_outside_threshold = {}
 sum_of_dists_to_nearest_peak = {}
+num_detected_peaks = {}
 tf.config.run_functions_eagerly(True)
 for _ in range(NUM_RUNS):
     feedback_model = autoregressive_model()
     feedback_model._name = 'feed_back'
+    peak_start = Distributed_peaks(OUT_STEPS, len(features), 2)
+    peak_start._name = 'peak_beginning'
+    peak_middle = Distributed_peaks(OUT_STEPS, len(features), 16)
+    peak_middle._name = 'peak_middle'
+    peak_end = Distributed_peaks(OUT_STEPS, len(features), 30)
+    peak_end._name = 'peak_end'
     #multi_cnn_model = multistep_cnn()
     #multi_cnn_model._name = 'wide_cnn'
     fitted_sin = Fit_sinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0])
     fitted_sin._name = 'sin_curve'
     #mrnn = more_layers_rnn()
     #mrnn._name = 'drnn'
-    within, outside, nearest_dists = compare_multiple_models([feedback_model, fitted_sin],
+    within, outside, nearest_dists, num_detected = compare_multiple_models([feedback_model, fitted_sin],
                                               sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                               plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
     for model_name, num_peaks_within in within.items():
@@ -701,8 +717,36 @@ for _ in range(NUM_RUNS):
         peaks_outside_threshold[model_name] = peaks_outside_threshold.get(model_name, list()) + [num_peaks_outside]
     for model_name, nearest_peak_dist in nearest_dists.items():
         sum_of_dists_to_nearest_peak[model_name] = sum_of_dists_to_nearest_peak.get(model_name, list()) + [nearest_peak_dist]
+    for model_name, num_detected_peak in num_detected.items():
+        num_detected_peaks[model_name] = num_detected_peaks.get(model_name, list()) + [num_detected_peak]
 print(peaks_within_threshold)
 print(peaks_outside_threshold)
 sp.print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak,
                          PEAK_COMPARISON_DISTANCE)
 multistep_performance()
+
+colors = mpl.colormaps.get_cmap('tab10')  # Using tab10 colormap with as many colors as there are keys
+
+# Initialize a scatter plot
+plt.figure(figsize=(8, 6))
+
+# Iterate over the dictionaries
+for idx, key in enumerate(peaks_within_threshold):
+    x_values = peaks_outside_threshold[key]
+    y_values = peaks_within_threshold[key]
+
+    # Plot each key's data with a unique color and label it with the key
+    plt.scatter(x_values, y_values, color=colors(idx), label=key)
+
+plt.xlim(0)
+plt.ylim(0)
+all_values = itertools.chain(*peaks_outside_threshold.values(), *peaks_within_threshold.values())
+max_val = max(all_values)
+plt.plot([0, max_val+5], [0, max_val+5], 'r--', label='y=x')
+# Adding labels and title
+plt.xlabel('Num peaks outside the threshold')
+plt.ylabel('Num peaks inside threshold')
+plt.legend(title="Model")
+
+# Display the plot
+plt.show()

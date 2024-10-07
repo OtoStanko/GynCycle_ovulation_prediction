@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
@@ -133,6 +135,7 @@ class Wide_CNN(tf.keras.Model):
         predictions = input_tensor[:, -self.out_steps:, :]
         return predictions
 
+
 class Fit_sinCurve(tf.keras.Model):
     def __init__(self, input_length, out_steps, num_features, train_df, feature):
         super().__init__()
@@ -170,3 +173,26 @@ class Fit_sinCurve(tf.keras.Model):
 
     def move_curve_function(self, x_data, b):
         return curve_function(x_data, self.a_opt, b, self.c_opt)
+
+
+class Distributed_peaks(tf.keras.Model):
+    def __init__(self, out_steps, num_features, position):
+        super().__init__()
+        self.out_steps = out_steps
+        self.num_features = num_features
+        self.position = position  # Position of the first peak. 0 - out_steps-1
+
+    def call(self, inputs):
+        """
+        Idea:
+            Put one peak based on the position. Try to put another peak roughly 10 (11) days later.
+            put som small values as a noise in between
+        """
+        result = np.array([random.random()/10 for _ in range(self.position-2)])
+        result = np.append(result, 0.2)
+        result = np.append(result, 0.5)
+        result = np.append(result, 0.2)
+        result = np.append(result, np.array([random.random()/10 for _ in range(self.out_steps-self.position-1)]))
+        result = tf.reshape(result, (1, self.out_steps, self.num_features))
+        return result
+
