@@ -14,6 +14,7 @@ from models import FeedBack, WideCNN, NoisySinCurve, Distributed_peaks
 import supporting_scripts as sp
 from custom_losses import Peak_loss
 from preprocessing_functions import *
+from model_comparison import ModelComparator
 
 
 """
@@ -53,118 +54,6 @@ def compile_and_fit(model, window, patience=2):
                           validation_data=window.val,
                           callbacks=[early_stopping])
     return history
-
-
-def compare_multiple_models(list_of_models, test_df, input_length, pred_length, features, hormone,
-                            duration=250, step=5, plot=True, peak_comparison_distance=2):
-    MIN_PEAK_DISTANCE = 20
-    MIN_PEAK_HEIGHT = 0.3
-    # Identify peaks in the ground-truth data and plot them
-    peaks, _ = scipy.signal.find_peaks(test_df[hormone], distance=MIN_PEAK_DISTANCE/2, height=MIN_PEAK_HEIGHT)
-    if plot:
-        plt.plot(test_df.index, test_df[hormone])
-        plt.scatter(test_df.index[peaks], test_df[hormone].iloc[peaks],
-                    color='red', zorder=5, label='Highlighted Points')
-        plt.xlabel('Time [hours]')
-        plt.title('Test {} data'.format(hormone))
-        plt.show()
-    # Statistics about the model forecast and peaks' predictions
-    peaks_within_threshold = {}
-    peaks_outside_threshold = {}
-    sum_of_dists_to_nearest_peak = {}
-    num_detected_peaks = {}
-    peak_distances_distribution = {}
-    """
-    Move along the testing TS. For every window of input_length + pred_length:
-        extract the input data
-        make prediction
-        extract peaks in the current window (input and output)
-        shift peaks by the offset of the current window
-    """
-    for offset in range(0, duration-pred_length-input_length+1, step):
-        # Extract input data from the testing df
-        inputs = []
-        for feature in features:
-            input = np.array(test_df[feature][offset:input_length + offset], dtype=np.float32)
-            tensor = tf.convert_to_tensor(input, dtype=tf.float32)
-            inputs.append(tensor)
-        tensor_inputs = tf.squeeze(inputs)
-        reshaped_tensor = tf.reshape(tensor_inputs, (1, input_length, len(features)))
-        # For every model make a prediction for this time window
-        list_of_model_predictions = []
-        for model in list_of_models:
-            predictions = model.predict(reshaped_tensor)
-            predictions = predictions[0][:,0]
-            list_of_model_predictions.append(predictions)
-        # Ground-truth time in days shifted to start with 0
-        gt_time = test_df.index[offset:input_length + pred_length + offset]
-        gt_time = gt_time / 24
-        first_elem = gt_time[0]
-        gt_time = gt_time - first_elem
-        # Prediction time in days shifted to start with input_length-th day
-        pred_time = test_df.index[input_length + offset:input_length + pred_length + offset]
-        pred_time = pred_time / 24
-        pred_time = pred_time - first_elem
-        # Ground truth values for the whole window
-        ground_truth = test_df[hormone][offset:input_length + pred_length + offset]
-        # Take only the peaks in the prediction window (input and output window)
-        # Shift them so that their time aligns with the offset data
-        curr_peaks = np.array([x for x in peaks if offset <= x < input_length + pred_length + offset])
-        curr_peaks = curr_peaks - offset
-        # Try all the peaks, shift them to match the predicted data
-        all_peaks_offset = np.array([x for x in peaks]) - offset
-        if plot:
-            plt.plot(gt_time, ground_truth, marker='.',)
-        # Plot the tips of the peaks that are in the input-prediction window (input and output window)
-        if len(curr_peaks) > 0 and plot:
-            plt.scatter(gt_time[curr_peaks], ground_truth.iloc[curr_peaks],
-                        color='red', zorder=5, label='Test data peaks')
-        for i in range(len(list_of_model_predictions)):
-            model = list_of_models[i]
-            model_name = model._name
-            model_predictions = list_of_model_predictions[i]
-            # Detect peaks in the prediction part (forecast) and shift them to start from the right time
-            pred_peaks, _ = scipy.signal.find_peaks(model_predictions, distance=MIN_PEAK_DISTANCE)
-            num_detected_peaks[model_name] = num_detected_peaks.get(model_name, 0) + len(pred_peaks)
-            offset_pred_peaks = pred_peaks + input_length
-            unfiltered_signed_distances = sp.get_signed_distances(all_peaks_offset, offset_pred_peaks)
-            unfiltered_abs_distances = np.array([abs(dist) for dist in unfiltered_signed_distances])
-            # Proceed only if there are any ground-truth peaks in the output part
-            if len(curr_peaks) > 0:
-                filtered_distances = np.array([distance for distance in unfiltered_abs_distances if distance <= peak_comparison_distance])
-                peaks_within_threshold[model_name] = (
-                        peaks_within_threshold.get(model_name, 0) + len(filtered_distances))
-                peaks_outside_threshold[model_name] = (
-                        peaks_outside_threshold.get(model_name, 0) + len(pred_peaks) - len(filtered_distances))
-                sum_of_dists_to_nearest_peak[model_name] = (
-                        sum_of_dists_to_nearest_peak.get(model_name, 0) + sum(unfiltered_abs_distances))
-                pdd = peak_distances_distribution.get(model_name, dict())
-                for distance in unfiltered_signed_distances:
-                    pdd[distance] = pdd.get(distance, 0) + 1
-                peak_distances_distribution[model_name] = pdd
-            if plot:
-                line, = plt.plot(pred_time, model_predictions, marker='.', label=model_name)
-                line_color = line.get_color()
-                darker_line_color = sp.darken_color(line_color, 0.5)
-                if len(unfiltered_abs_distances) != 0:
-                    for j in range(len(pred_peaks)):
-                        if unfiltered_abs_distances[j] <= peak_comparison_distance:
-                            plt.scatter(pred_time[pred_peaks[j]], model_predictions[pred_peaks[j]],
-                                        color='yellow', zorder=5)
-                        else:
-                            plt.scatter(pred_time[pred_peaks[j]], model_predictions[pred_peaks[j]],
-                                        color=darker_line_color, zorder=5)
-                else:
-                    plt.scatter(pred_time[pred_peaks], model_predictions[pred_peaks],
-                                color=darker_line_color, zorder=5)
-        if plot:
-            plt.axvline(x=input_length, color='r', linestyle='--',)
-            plt.legend(loc='upper left')
-            plt.title('Prediction on {} days with offset {} days'.format(input_length, offset))
-            plt.show()
-    print(peaks_within_threshold)
-    print(peaks_outside_threshold)
-    return peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak, num_detected_peaks, peak_distances_distribution
 
 
 def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=170, step=5):
@@ -414,7 +303,9 @@ peaks_outside_threshold = {}
 sum_of_dists_to_nearest_peak = {}
 num_detected_peaks = {}
 #tf.config.run_functions_eagerly(True)
-for _ in range(NUM_RUNS):
+model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
+                                   plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
+for run_id in range(NUM_RUNS):
     feedback_model = autoregressive_model()
     feedback_model._name = 'feed_back'
     peak_start = Distributed_peaks(OUT_STEPS, len(features), 2)
@@ -427,9 +318,11 @@ for _ in range(NUM_RUNS):
     multi_cnn_model._name = 'wide_cnn'
     fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0], noise=0.1)
     fitted_sin._name = 'sin_curve'
-    within, outside, nearest_dists, num_detected, peak_distances_distribution = compare_multiple_models([feedback_model, fitted_sin, multi_cnn_model],
-                                              sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
-                                              plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
+
+    list_of_models = [feedback_model, fitted_sin, multi_cnn_model]
+    model_comparator.compare_models(list_of_models, run_id)
+    within, outside, nearest_dists, num_detected, peak_distances_distribution = model_comparator.get_run_results_tuple(run_id)
+
     for model_name, num_peaks_within in within.items():
         peaks_within_threshold[model_name] = peaks_within_threshold.get(model_name, list()) + [num_peaks_within]
     for model_name, num_peaks_outside in outside.items():
@@ -438,15 +331,7 @@ for _ in range(NUM_RUNS):
         sum_of_dists_to_nearest_peak[model_name] = sum_of_dists_to_nearest_peak.get(model_name, list()) + [nearest_peak_dist]
     for model_name, num_detected_peak in num_detected.items():
         num_detected_peaks[model_name] = num_detected_peaks.get(model_name, list()) + [num_detected_peak]
-    for model_name, pdd in peak_distances_distribution.items():
-        keys = list(pdd.keys())
-        values = list(pdd.values())
-        plt.bar(keys, values)
-        plt.xlim(-35, 35)
-        plt.xlabel('Signed distance of forecasted pekas to the nearest ground truth peak')
-        plt.ylabel('Number of peaks')
-        plt.title('Model name: ' + model_name)
-        plt.show()
+    model_comparator.plot_peak_distances(run_id)
 print(peaks_within_threshold)
 print(peaks_outside_threshold)
 sp.print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak,
