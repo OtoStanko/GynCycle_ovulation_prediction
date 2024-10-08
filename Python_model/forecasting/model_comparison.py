@@ -164,6 +164,7 @@ class ModelComparator:
         """
         Plots how were forecasted peaks distributed around the position of ground truth peaks.
         :param run_id: if not specified, all the runs will be plotted.
+        :param mode: (plot predicted peaks to gt peaks, plot gt peaks to predicted)
         :return: None
         """
         if len(mode) != 2:
@@ -177,9 +178,12 @@ class ModelComparator:
             results = self.results.get(run_id, None)
             if results is None:
                 print("Wrong id for the results to plot")
-                return
+                return  # ADD COLOURS BASED ON THE DISTANCE
             peak_distances_distribution = results.peak_distances_distribution
             peak_distances_distribution_rev = results.peak_distances_distributionRev
+            max_val = max(max(max(inner_dict.values()) for inner_dict in peak_distances_distribution.values()),
+                          max(max(inner_dict.values()) for inner_dict in peak_distances_distribution_rev.values())) + 1
+
             for model_name in peak_distances_distribution.keys():
                 if mode[0]:
                     pdd = peak_distances_distribution[model_name]
@@ -187,6 +191,7 @@ class ModelComparator:
                     values = list(pdd.values())
                     plt.bar(keys, values)
                     plt.xlim(-35, 35)
+                    plt.ylim(0, max_val)
                     plt.xlabel('Signed distance of forecasted peaks to the nearest ground truth peak')
                     plt.ylabel('Number of peaks')
                     plt.title('Model name: ' + model_name + " (run ID: {})".format(run_id))
@@ -197,6 +202,7 @@ class ModelComparator:
                     values = list(pddr.values())
                     plt.bar(keys, values)
                     plt.xlim(-35, 35)
+                    plt.ylim(0, max_val)
                     plt.xlabel('Signed distance of ground truth peaks to the nearest forecasted peak')
                     plt.ylabel('Number of peaks')
                     plt.title('Model name: ' + model_name + " (run ID: {})".format(run_id))
