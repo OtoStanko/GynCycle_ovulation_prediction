@@ -1,21 +1,17 @@
-import itertools
-
 from collections import Counter
+
+import IPython
+import IPython.display
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import scipy.signal
 import seaborn as sns
 import tensorflow as tf
-import IPython
-import IPython.display
 
-from windowGenerator import WindowGenerator
-from models import FeedBack, WideCNN, NoisySinCurve, Distributed_peaks
-import supporting_scripts as sp
 from custom_losses import Peak_loss
-from preprocessing_functions import *
 from model_comparison import ModelComparator
-
+from models import FeedBack, WideCNN, NoisySinCurve, Distributed_peaks
+from preprocessing_functions import *
+from windowGenerator import WindowGenerator
 
 """
     Parameters
@@ -32,6 +28,10 @@ NUM_INITIAL_DAYS_TO_DISCARD = 50
 test_days_end = 300
 features = ['LH']
 MAX_EPOCHS = 25
+
+# forecast parameters
+OUT_STEPS = 35
+INPUT_WIDTH = 35
 
 NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
@@ -226,8 +226,6 @@ def show_performance(val_performance, performance):
 """
 # Multi-step models
 """
-OUT_STEPS = 35
-INPUT_WIDTH = 35
 multi_window = WindowGenerator(input_width=INPUT_WIDTH, label_width=OUT_STEPS,   shift=OUT_STEPS,
                                train_df=train_df, val_df=val_df, test_df=test_df,
                                label_columns=features)
@@ -298,10 +296,6 @@ plt.bar(numbers, frequencies, color='skyblue')
 plt.show()
 
 sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
-peaks_within_threshold = {}
-peaks_outside_threshold = {}
-sum_of_dists_to_nearest_peak = {}
-num_detected_peaks = {}
 #tf.config.run_functions_eagerly(True)
 model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
@@ -323,37 +317,9 @@ for run_id in range(NUM_RUNS):
     model_comparator.compare_models(list_of_models, run_id)
     within, outside, nearest_dists, num_detected, peak_distances_distribution = model_comparator.get_run_results_tuple(run_id)
 
-    for model_name, num_peaks_within in within.items():
-        peaks_within_threshold[model_name] = peaks_within_threshold.get(model_name, list()) + [num_peaks_within]
-    for model_name, num_peaks_outside in outside.items():
-        peaks_outside_threshold[model_name] = peaks_outside_threshold.get(model_name, list()) + [num_peaks_outside]
-    for model_name, nearest_peak_dist in nearest_dists.items():
-        sum_of_dists_to_nearest_peak[model_name] = sum_of_dists_to_nearest_peak.get(model_name, list()) + [nearest_peak_dist]
-    for model_name, num_detected_peak in num_detected.items():
-        num_detected_peaks[model_name] = num_detected_peaks.get(model_name, list()) + [num_detected_peak]
-    model_comparator.plot_peak_distances(run_id)
-print(peaks_within_threshold)
-print(peaks_outside_threshold)
-sp.print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak,
-                         PEAK_COMPARISON_DISTANCE)
+    model_comparator.plot_pred_peak_distribution(run_id)
+
 multistep_performance()
+model_comparator.print_peak_statistics()
+model_comparator.plot_in_out_peaks()
 
-colors = mpl.colormaps.get_cmap('tab10')  # Using tab10 colormap with as many colors as there are keys
-
-plt.figure(figsize=(8, 6))
-for idx, key in enumerate(peaks_within_threshold):
-    x_values = peaks_outside_threshold[key]
-    y_values = peaks_within_threshold[key]
-
-    # Plot each key's data with a unique color and label it with the key
-    plt.scatter(x_values, y_values, color=colors(idx), label=key)
-
-all_values = itertools.chain(*peaks_outside_threshold.values(), *peaks_within_threshold.values())
-max_val = max(all_values) + 5
-plt.xlim(0, max_val)
-plt.ylim(0, max_val)
-plt.plot([0, max_val], [0, max_val], 'r--', label='y=x')
-plt.xlabel('Num peaks outside the threshold')
-plt.ylabel('Num peaks inside threshold')
-plt.legend(title="Model")
-plt.show()

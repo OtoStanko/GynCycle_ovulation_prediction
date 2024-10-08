@@ -1,10 +1,10 @@
+import matplotlib.colors as mcolors
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
-import matplotlib.colors as mcolors
+
 
 def curve_function(x, a, b, c):
-    #return a * (c + np.sin(b * x))
     return a * np.sin( (x * (2 * np.pi / (c * 24))) - b )
 
 

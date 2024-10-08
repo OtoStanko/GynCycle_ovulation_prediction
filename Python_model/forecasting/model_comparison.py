@@ -1,8 +1,13 @@
-import numpy as np
-import supporting_scripts as sp
-import scipy.signal
+import itertools
+
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
+import scipy.signal
 import tensorflow as tf
+
+import supporting_scripts as sp
+
 
 class ModelComparator:
     def __init__(self, test_df, input_length, pred_length, features, hormone,
@@ -20,6 +25,11 @@ class ModelComparator:
         self.MIN_PEAK_DISTANCE = 20
         self.MIN_PEAK_HEIGHT = 0.3
         self.results = dict()
+
+        self.peaks_within_threshold = None
+        self.peaks_outside_threshold = None
+        self.sum_of_dists_to_nearest_peak = None
+        self.num_detected_peaks = None
 
     def compare_models(self, list_of_models, run_id):
         hormone = self.hormone
@@ -143,7 +153,7 @@ class ModelComparator:
         pdd = results.peak_distances_distribution
         return pwt, pot, sodtnp, ndp, pdd
 
-    def plot_peak_distances(self, run_id=None):
+    def plot_pred_peak_distribution(self, run_id=None):
         """
         Plots how were forecasted peaks distributed around the position of ground truth peaks.
         :param run_id: if not specified, all the runs will be plotted.
@@ -168,6 +178,57 @@ class ModelComparator:
                 plt.ylabel('Number of peaks')
                 plt.title('Model name: ' + model_name + " (run ID: {})".format(run_id))
                 plt.show()
+
+    def simulation_summary(self):
+        if self.peaks_within_threshold is None:
+            self.peaks_within_threshold = {}
+            self.peaks_outside_threshold = {}
+            self.sum_of_dists_to_nearest_peak = {}
+            self.num_detected_peaks = {}
+        for run_id in self.results.keys():
+            within, outside, nearest_dists, num_detected, peak_distances_distribution = (
+                self.get_run_results_tuple(run_id))
+
+            for model_name, num_peaks_within in within.items():
+                self.peaks_within_threshold[model_name] = (
+                        self.peaks_within_threshold.get(model_name, list()) + [num_peaks_within])
+            for model_name, num_peaks_outside in outside.items():
+                self.peaks_outside_threshold[model_name] = (
+                        self.peaks_outside_threshold.get(model_name, list()) + [
+                    num_peaks_outside])
+            for model_name, nearest_peak_dist in nearest_dists.items():
+                self.sum_of_dists_to_nearest_peak[model_name] = (
+                        self.sum_of_dists_to_nearest_peak.get(model_name, list()) + [
+                    nearest_peak_dist])
+            for model_name, num_detected_peak in num_detected.items():
+                self.num_detected_peaks[model_name] = (
+                        self.num_detected_peaks.get(model_name, list()) + [num_detected_peak])
+
+    def plot_in_out_peaks(self):
+        self.simulation_summary()
+        colors = mpl.colormaps.get_cmap('tab10')  # Using tab10 colormap with as many colors as there are keys
+        plt.figure(figsize=(8, 6))
+        for idx, key in enumerate(self.peaks_within_threshold):
+            x_values = self.peaks_outside_threshold[key]
+            y_values = self.peaks_within_threshold[key]
+
+            # Plot each key's data with a unique color and label it with the key
+            plt.scatter(x_values, y_values, color=colors(idx), label=key)
+
+        all_values = itertools.chain(*self.peaks_outside_threshold.values(), *self.peaks_within_threshold.values())
+        max_val = max(all_values) + 5
+        plt.xlim(0, max_val)
+        plt.ylim(0, max_val)
+        plt.plot([0, max_val], [0, max_val], 'r--', label='y=x')
+        plt.xlabel('Num peaks outside the threshold')
+        plt.ylabel('Num peaks inside threshold')
+        plt.legend(title="Model")
+        plt.show()
+
+    def print_peak_statistics(self):
+        self.simulation_summary()
+        sp.print_peak_statistics(self.peaks_within_threshold, self.peaks_outside_threshold, self.sum_of_dists_to_nearest_peak,
+                                 self.peak_comparison_distance)
 
 
 class ComparisonResults:

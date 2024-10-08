@@ -1,8 +1,10 @@
 import random
+
 import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
+
 from supporting_scripts import curve_function
 
 
@@ -61,7 +63,7 @@ class WideCNN(tf.keras.Model):
         self.num_features = num_features
         conv_model_wide = tf.keras.Sequential([
             tf.keras.layers.Conv1D(filters=256,
-                                   kernel_size=input_length-2,
+                                   kernel_size=input_length,
                                    activation='relu',
                                    input_shape=(input_length, num_features),),
             tf.keras.layers.Dense(units=32, activation='relu'),
