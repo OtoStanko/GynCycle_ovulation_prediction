@@ -183,13 +183,13 @@ class ModelComparator:
             peak_distances_distribution_rev = results.peak_distances_distributionRev
             max_val = max(max(max(inner_dict.values()) for inner_dict in peak_distances_distribution.values()),
                           max(max(inner_dict.values()) for inner_dict in peak_distances_distribution_rev.values())) + 1
-
             for model_name in peak_distances_distribution.keys():
                 if mode[0]:
                     pdd = peak_distances_distribution[model_name]
                     keys = list(pdd.keys())
                     values = list(pdd.values())
-                    plt.bar(keys, values)
+                    colors = ['yellow' if abs(key) <= self.peak_comparison_distance else '#1f77b4' for key in keys]
+                    plt.bar(keys, values, color=colors)
                     plt.xlim(-35, 35)
                     plt.ylim(0, max_val)
                     plt.xlabel('Signed distance of forecasted peaks to the nearest ground truth peak')
@@ -200,7 +200,8 @@ class ModelComparator:
                     pddr = peak_distances_distribution_rev[model_name]
                     keys = list(pddr.keys())
                     values = list(pddr.values())
-                    plt.bar(keys, values)
+                    colors = ['yellow' if abs(key) <= self.peak_comparison_distance else '#1f77b4' for key in keys]
+                    plt.bar(keys, values, color=colors)
                     plt.xlim(-35, 35)
                     plt.ylim(0, max_val)
                     plt.xlabel('Signed distance of ground truth peaks to the nearest forecasted peak')
