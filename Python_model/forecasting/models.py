@@ -1,11 +1,10 @@
 import random
-
 import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
-
 from supporting_scripts import curve_function
+
 
 class Baseline(tf.keras.Model):
     def __init__(self, label_index=None):
@@ -31,49 +30,6 @@ class ResidualWrapper(tf.keras.Model):
         # from the previous time step plus the delta
         # calculated by the model.
         return inputs + delta
-
-
-class My_rnn(tf.keras.Model):
-    def __init__(self, units, out_steps, num_features):
-        super().__init__()
-        self.units = units
-        self.out_steps = out_steps
-        self.num_features = num_features
-        self.lstm = tf.keras.layers.LSTM(self.units, return_state=True)
-        self.lstm_cell = tf.keras.layers.LSTMCell(units)
-        self.rnn_cell = tf.keras.layers.LSTMCell(units)
-        self.rnn = tf.keras.layers.RNN(self.rnn_cell, return_state=True)
-        self.dense = tf.keras.Sequential([
-            tf.keras.layers.Dense(32, activation='relu', kernel_initializer=tf.initializers.he_normal()),
-            tf.keras.layers.Dense(num_features),
-        ])
-
-    def call(self, inputs, training=None):
-        predictions = []
-        x, *state_lstm = self.lstm(inputs)
-        #x2, *state_rnn = self.rnn(inputs)
-        state_rnn = state_lstm
-        prediction = self.dense((x))
-        predictions.append(prediction)
-        # Run the rest of the prediction steps.
-        for n in range(1, self.out_steps):
-            # Use the last prediction as input.
-            x = prediction
-            # Execute one lstm step.
-            x, state_lstm = self.lstm_cell(x, states=state_lstm,
-                                           training=training)
-            x, state_rnn = self.rnn_cell(x, states=state_rnn,
-                                         training=training)
-            # Convert the lstm output to a prediction.
-            prediction = self.dense(x)
-            # Add the prediction to the output.
-            predictions.append(prediction)
-
-        # predictions.shape => (time, batch, features)
-        predictions = tf.stack(predictions)
-        # predictions.shape => (batch, time, features)
-        predictions = tf.transpose(predictions, [1, 0, 2])
-        return predictions
 
 
 class FeedBack(tf.keras.Model):
@@ -109,7 +65,7 @@ class FeedBack(tf.keras.Model):
         return predictions
 
 
-class Wide_CNN(tf.keras.Model):
+class WideCNN(tf.keras.Model):
     def __init__(self, input_length, out_steps, num_features):
         super().__init__()
         self.input_length = input_length
@@ -136,15 +92,17 @@ class Wide_CNN(tf.keras.Model):
         return predictions
 
 
-class Fit_sinCurve(tf.keras.Model):
-    def __init__(self, input_length, out_steps, num_features, train_df, feature):
+class NoisySinCurve(tf.keras.Model):
+    def __init__(self, input_length, out_steps, num_features, train_df, feature, noise=0, period=25):
         super().__init__()
         self.input_length = input_length
         self.out_steps = out_steps
         self.num_features = num_features
+        self.noise = noise / 10
+        self.period = period
         x_data = train_df.index.values
         y_data = train_df[feature].values
-        popt, _ = curve_fit(curve_function, x_data, y_data, p0=[1, 1, 25])
+        popt, _ = curve_fit(curve_function, x_data, y_data, p0=[1, 1, self.period])
         self.a_opt, self.b_opt, self.c_opt = popt
         print(f"Optimal parameters: a={self.a_opt}, b={self.b_opt}, c={self.c_opt}")
         print('a * sin(x * (2*pi/(c*24)) - b)')
@@ -168,6 +126,8 @@ class Fit_sinCurve(tf.keras.Model):
         popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[self.b_opt])
         x_fit = np.arange(len(inputs), len(inputs) + self.out_steps) * 24
         y_fit = curve_function(x_fit, self.a_opt, popt[0], self.c_opt)
+        noise = np.random.normal(0, self.noise, y_fit.shape)
+        y_fit = y_fit + noise
         print(popt)
         return np.array(y_fit, dtype=np.float32)
 

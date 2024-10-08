@@ -38,15 +38,15 @@ def darken_color(color, factor=0.7):
     return darkened_color
 
 
-def get_distances(gt_peaks, pred_peaks):
+def get_signed_distances(gt_peaks, pred_peaks):
     if len(gt_peaks) == 0:
         return np.array([])
-    unfiltered_distances = []
+    signed_distances = []
     for p in pred_peaks:
-        # Find the closest ground truth peak
-        closest_gt = np.min(np.abs(gt_peaks - p))
-        unfiltered_distances.append(closest_gt)
-    return np.array(unfiltered_distances)
+        distances = p - gt_peaks
+        closest_gt = distances[np.argmin(np.abs(distances))]
+        signed_distances.append(closest_gt)
+    return np.array(signed_distances)
 
 
 def print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak,

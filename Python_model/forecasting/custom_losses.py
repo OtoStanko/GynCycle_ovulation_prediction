@@ -1,5 +1,4 @@
 import tensorflow as tf
-import scipy.signal
 from keras.losses import Loss
 
 
@@ -18,16 +17,6 @@ class Custom_loss(Loss):
         loss = tf.where(mask2, quadruped_error,
                         tf.where(mask, squared_error, absolute_error))
         return tf.reduce_mean(loss)
-
-
-class MyLoss(Loss):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def call(self, y_true, y_pred):
-        mse = tf.keras.losses.MeanSquaredError()
-        loss = mse(y_true, y_pred)
-        return loss
 
 
 class Peak_loss(Loss):

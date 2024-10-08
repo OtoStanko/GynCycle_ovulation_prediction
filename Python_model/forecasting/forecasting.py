@@ -1,5 +1,4 @@
 import itertools
-from cProfile import label
 
 import pandas as pd
 import os
@@ -9,23 +8,19 @@ import scipy.signal
 import seaborn as sns
 import numpy as np
 import tensorflow as tf
-#from statsmodels.tsa.seasonal import seasonal_decompose
-#from statsmodels.tsa.statespace.sarimax import SARIMAX
-from statsmodels.tsa.arima.model import ARIMA
 from windowGenerator import WindowGenerator
-from models import Baseline, ResidualWrapper, FeedBack, Wide_CNN, My_rnn, Fit_sinCurve, Distributed_peaks
+from models import Baseline, ResidualWrapper, FeedBack, WideCNN, NoisySinCurve, Distributed_peaks
 import IPython
 import IPython.display
-from scipy.optimize import curve_fit
 import supporting_scripts as sp
-from custom_losses import Peak_loss, MyLoss
+from custom_losses import Peak_loss
 from collections import Counter
 
 
 """
     Parameters
 """
-TRAIN_DATA_SUFFIX = 4
+TRAIN_DATA_SUFFIX = 5
 TEST_DATA_SUFFIX = 1
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
 
@@ -129,6 +124,7 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
     peaks_outside_threshold = {}
     sum_of_dists_to_nearest_peak = {}
     num_detected_peaks = {}
+    peak_distances_distribution = {}
     """
     Move along the testing TS. For every window of input_length + pred_length:
         extract the input data
@@ -176,28 +172,34 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
                         color='red', zorder=5, label='Test data peaks')
         for i in range(len(list_of_model_predictions)):
             model = list_of_models[i]
+            model_name = model._name
             model_predictions = list_of_model_predictions[i]
             # Detect peaks in the prediction part (forecast) and shift them to start from the right time
             pred_peaks, _ = scipy.signal.find_peaks(model_predictions, distance=MIN_PEAK_DISTANCE)
-            num_detected_peaks[model._name] = num_detected_peaks.get(model._name, 0) + len(pred_peaks)
+            num_detected_peaks[model_name] = num_detected_peaks.get(model_name, 0) + len(pred_peaks)
             offset_pred_peaks = pred_peaks + input_length
-            unfiltered_distances = sp.get_distances(all_peaks_offset, offset_pred_peaks)
+            unfiltered_signed_distances = sp.get_signed_distances(all_peaks_offset, offset_pred_peaks)
+            unfiltered_abs_distances = np.array([abs(dist) for dist in unfiltered_signed_distances])
             # Proceed only if there are any ground-truth peaks in the output part
             if len(curr_peaks) > 0:
-                filtered_distances = np.array([distance for distance in unfiltered_distances if distance <= peak_comparison_distance])
-                peaks_within_threshold[model._name] = (
-                        peaks_within_threshold.get(model._name, 0) + len(filtered_distances))
-                peaks_outside_threshold[model._name] = (
-                        peaks_outside_threshold.get(model._name, 0) + len(pred_peaks) - len(filtered_distances))
-                sum_of_dists_to_nearest_peak[model._name] = (
-                        sum_of_dists_to_nearest_peak.get(model._name, 0) + sum(unfiltered_distances))
+                filtered_distances = np.array([distance for distance in unfiltered_abs_distances if distance <= peak_comparison_distance])
+                peaks_within_threshold[model_name] = (
+                        peaks_within_threshold.get(model_name, 0) + len(filtered_distances))
+                peaks_outside_threshold[model_name] = (
+                        peaks_outside_threshold.get(model_name, 0) + len(pred_peaks) - len(filtered_distances))
+                sum_of_dists_to_nearest_peak[model_name] = (
+                        sum_of_dists_to_nearest_peak.get(model_name, 0) + sum(unfiltered_abs_distances))
+                pdd = peak_distances_distribution.get(model_name, dict())
+                for distance in unfiltered_signed_distances:
+                    pdd[distance] = pdd.get(distance, 0) + 1
+                peak_distances_distribution[model_name] = pdd
             if plot:
-                line, = plt.plot(pred_time, model_predictions, marker='.', label=model._name)
+                line, = plt.plot(pred_time, model_predictions, marker='.', label=model_name)
                 line_color = line.get_color()
                 darker_line_color = sp.darken_color(line_color, 0.5)
-                if len(unfiltered_distances) != 0:
+                if len(unfiltered_abs_distances) != 0:
                     for j in range(len(pred_peaks)):
-                        if unfiltered_distances[j] <= peak_comparison_distance:
+                        if unfiltered_abs_distances[j] <= peak_comparison_distance:
                             plt.scatter(pred_time[pred_peaks[j]], model_predictions[pred_peaks[j]],
                                         color='yellow', zorder=5)
                         else:
@@ -213,7 +215,7 @@ def compare_multiple_models(list_of_models, test_df, input_length, pred_length, 
             plt.show()
     print(peaks_within_threshold)
     print(peaks_outside_threshold)
-    return peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak, num_detected_peaks
+    return peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak, num_detected_peaks, peak_distances_distribution
 
 
 def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=170, step=5):
@@ -635,7 +637,7 @@ def autoregressive_model():
 
 
 def multistep_cnn():
-    multi_cnn = Wide_CNN(INPUT_WIDTH, OUT_STEPS, len(features))
+    multi_cnn = WideCNN(INPUT_WIDTH, OUT_STEPS, len(features))
     IPython.display.clear_output()
     print('Output shape (batch, time, features): ', multi_cnn(multi_window.example[0]).shape)
     history = compile_and_fit(multi_cnn, multi_window)
@@ -645,19 +647,6 @@ def multistep_cnn():
     for feature in features:
         multi_window.plot(feature, 'CNN model predictions', multi_cnn)
     return multi_cnn
-
-
-def more_layers_rnn():
-    mlr = My_rnn(32, OUT_STEPS, len(features))
-    IPython.display.clear_output()
-    print('Output shape (batch, time, features): ', mlr(multi_window.example[0]).shape)
-    history = compile_and_fit(mlr, multi_window)
-
-    multi_val_performance['drnn'] = mlr.evaluate(multi_window.val, return_dict=True)
-    multi_performance['drnn'] = mlr.evaluate(multi_window.test, verbose=0, return_dict=True)
-    for feature in features:
-        multi_window.plot(feature, 'CNN model predictions', mlr)
-    return mlr
 
 
 def multistep_performance():
@@ -692,23 +681,23 @@ peaks_within_threshold = {}
 peaks_outside_threshold = {}
 sum_of_dists_to_nearest_peak = {}
 num_detected_peaks = {}
-tf.config.run_functions_eagerly(True)
+#tf.config.run_functions_eagerly(True)
 for _ in range(NUM_RUNS):
-    #feedback_model = autoregressive_model()
-    #feedback_model._name = 'feed_back'
+    feedback_model = autoregressive_model()
+    feedback_model._name = 'feed_back'
     peak_start = Distributed_peaks(OUT_STEPS, len(features), 2)
     peak_start._name = 'peak_beginning'
     peak_middle = Distributed_peaks(OUT_STEPS, len(features), 16)
     peak_middle._name = 'peak_middle'
     peak_end = Distributed_peaks(OUT_STEPS, len(features), 30)
     peak_end._name = 'peak_end'
-    #multi_cnn_model = multistep_cnn()
-    #multi_cnn_model._name = 'wide_cnn'
-    fitted_sin = Fit_sinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0])
+    multi_cnn_model = multistep_cnn()
+    multi_cnn_model._name = 'wide_cnn'
+    fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0], noise=0.1)
     fitted_sin._name = 'sin_curve'
     #mrnn = more_layers_rnn()
     #mrnn._name = 'drnn'
-    within, outside, nearest_dists, num_detected = compare_multiple_models([ fitted_sin],
+    within, outside, nearest_dists, num_detected, peak_distances_distribution = compare_multiple_models([feedback_model, fitted_sin, multi_cnn_model],
                                               sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                               plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
     for model_name, num_peaks_within in within.items():
@@ -719,6 +708,15 @@ for _ in range(NUM_RUNS):
         sum_of_dists_to_nearest_peak[model_name] = sum_of_dists_to_nearest_peak.get(model_name, list()) + [nearest_peak_dist]
     for model_name, num_detected_peak in num_detected.items():
         num_detected_peaks[model_name] = num_detected_peaks.get(model_name, list()) + [num_detected_peak]
+    for model_name, pdd in peak_distances_distribution.items():
+        keys = list(pdd.keys())
+        values = list(pdd.values())
+        plt.bar(keys, values)
+        plt.xlim(-35, 35)
+        plt.xlabel('Signed distance of forecasted pekas to the nearest ground truth peak')
+        plt.ylabel('Number of peaks')
+        plt.title('Model name: ' + model_name)
+        plt.show()
 print(peaks_within_threshold)
 print(peaks_outside_threshold)
 sp.print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak,
