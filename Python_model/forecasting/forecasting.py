@@ -1,20 +1,19 @@
 import itertools
 
-import pandas as pd
-import os
+from collections import Counter
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import scipy.signal
 import seaborn as sns
-import numpy as np
 import tensorflow as tf
-from windowGenerator import WindowGenerator
-from models import Baseline, ResidualWrapper, FeedBack, WideCNN, NoisySinCurve, Distributed_peaks
 import IPython
 import IPython.display
+
+from windowGenerator import WindowGenerator
+from models import FeedBack, WideCNN, NoisySinCurve, Distributed_peaks
 import supporting_scripts as sp
 from custom_losses import Peak_loss
-from collections import Counter
+from preprocessing_functions import *
 
 
 """
@@ -54,56 +53,6 @@ def compile_and_fit(model, window, patience=2):
                           validation_data=window.val,
                           callbacks=[early_stopping])
     return history
-
-
-def sample_data(original_df, new_index, columns):
-    # The records are not evenly distributed. We will do sampling with linear interpolation for the models
-    """
-        for every time in the new index, find the largest smaller value and smallest larger value
-        and interpolate them to get the new value
-        Edge case if at least one of the is the same time
-    """
-    hormone_levels = {key: [] for key in columns}
-    i = 0
-    for curr_time in new_index:
-        while original_df.index[i + 1] < curr_time:
-            i += 1
-        for feature in columns:
-            # index_of_largest_smaller_time = i
-            x0 = largest_smaller_time = original_df.index[i]
-            y0 = largest_smaller_value = original_df[feature][original_df.index[i]]
-            x1 = smallest_larger_time = original_df.index[i + 1]
-            y1 = smallest_larger_value = original_df[feature][original_df.index[i + 1]]
-            x = curr_time
-            if type(curr_time) == np.datetime64:
-                diff_x1_x = (x1 - x).total_seconds()
-                diff_x_x0 = (x - x0).total_seconds()
-                diff_x1_x0 = (x1 - x0).total_seconds()
-            else:
-                diff_x1_x = (x1 - x)
-                diff_x_x0 = (x - x0)
-                diff_x1_x0 = (x1 - x0)
-            y = y0 * (diff_x1_x / diff_x1_x0) + y1 * (diff_x_x0 / diff_x1_x0)
-            hormone_levels[feature].append(y)
-
-    sampled_df = pd.DataFrame()
-    for feature in columns:
-        sampled_df[feature] = np.array(hormone_levels[feature])
-    sampled_df.index = new_index
-    sampled_df.index.name = 'DateTime'
-    return sampled_df
-
-
-def create_dataframe(input_files_directory, features, time_file_prefix, run_id=1):
-    time_file = os.path.join(input_files_directory, "{}_{}.csv".format(time_file_prefix, run_id))
-    times = pd.read_csv(time_file, header=None, names=[time_file_prefix])
-    hormone_levels = [times]
-    for feature in features:
-        feature_file = os.path.join(input_files_directory, "{}_{}.csv".format(feature, run_id))
-        feature_values = pd.read_csv(feature_file, header=None, names=[feature])
-        hormone_levels.append(feature_values)
-    combined_df = pd.concat(hormone_levels, axis=1)
-    return combined_df
 
 
 def compare_multiple_models(list_of_models, test_df, input_length, pred_length, features, hormone,
@@ -247,39 +196,6 @@ def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_l
     # first 35 days are the base on which we are predicting one time step
 
 
-def normalize_df(df, method='standard', values=None):
-    """
-    methods: standardization, mean and std may be provided, otherwise are calculated values=(mean, std) is expected
-             minmax, if no values are provided, the scale to [0, 1] is done, otherwise to [a, b]
-    """
-    prop = {}
-    if method == 'standard':
-        for feature in df.columns:
-            if values is None:
-                df_mean = df[feature].mean()
-                df_std = df[feature].std()
-            else:
-                df_mean, df_std = values[feature]
-            df[feature] = (df[feature] - df_mean) / df_std
-            prop[feature] = (df_mean, df_std)
-    elif method == 'minmax':
-        for feature in df.columns:
-            min_val = np.min(df[feature])
-            max_val = np.max(df[feature])
-            if values is None:
-                a = 0
-                b = 1
-            else:
-                a, b = values[feature]
-            df[feature] = a + ((df[feature] - min_val) * (b - a) / (max_val - min_val))
-            prop[feature] = (min_val, max_val)
-    elif method == 'own':
-        for feature in df.columns:
-            df[feature] = (df[feature] - values[feature][0]) / values[feature][1]
-        prop = values
-    return df, prop
-
-
 # test on a small TS
 test_dataframe = create_dataframe(workDir, features, 'Time', TEST_DATA_SUFFIX)
 test_dataframe['Time'] = test_dataframe['Time'] * 24
@@ -387,185 +303,17 @@ wide_window = WindowGenerator(
         label_columns=features)
 
 
-def baseline_model():
-    """
-    # Baseline model
-    Returns the previous value
-    """
-    baseline = Baseline(label_index=column_indices[features[0]])
-
-    baseline.compile(loss=tf.keras.losses.MeanSquaredError(),
-                     metrics=[tf.keras.metrics.MeanAbsoluteError()])
-
-    val_performance['Baseline'] = baseline.evaluate(single_step_window.val, return_dict=True)
-    performance['Baseline'] = baseline.evaluate(single_step_window.test, verbose=0, return_dict=True)
-
-    #print(wide_window)
-    wide_window.plot(features[0], 'Baseline model predictions', baseline)
-
-
-def linear_model():
-    """
-    # Linear model
-    One dense layer. Easily interpretable
-    """
-    linear = tf.keras.Sequential([
-        tf.keras.layers.Dense(units=len(features))
-    ])
-    history = compile_and_fit(linear, single_step_window)
-
-    val_performance['Linear'] = linear.evaluate(single_step_window.val, return_dict=True)
-    performance['Linear'] = linear.evaluate(single_step_window.test, verbose=0, return_dict=True)
+def learn_model(model, window, features, val_performance, performance):
+    history = compile_and_fit(model, window)
+    val_performance[model._name] = model.evaluate(single_step_window.val, return_dict=True)
+    performance[model._name] = model.evaluate(single_step_window.test, verbose=0, return_dict=True)
 
     for feature in features:
-        wide_window.plot(feature, 'Linear model predictions', linear)
-
-    plt.bar(x = range(len(train_df.columns)),
-            height=linear.layers[0].kernel[:,0].numpy())
-    axis = plt.gca()
-    axis.set_xticks(range(len(train_df.columns)))
-    _ = axis.set_xticklabels(train_df.columns, rotation=90)
-    plt.show()
+        window.plot(feature, model._name + 'Model predictions', model)
 
 
-def multi_layer_model():
-    """
-    # Dense model
-    Two hidden layers with relu activation functions
-    """
-    dense = tf.keras.Sequential([
-        tf.keras.layers.Dense(units=64, activation='relu'),
-        tf.keras.layers.Dense(units=64, activation='relu'),
-        tf.keras.layers.Dense(units=len(features))
-    ])
-    history = compile_and_fit(dense, single_step_window)
 
-    val_performance['Dense'] = dense.evaluate(single_step_window.val, return_dict=True)
-    performance['Dense'] = dense.evaluate(single_step_window.test, verbose=0, return_dict=True)
-    for feature in features:
-        wide_window.plot(feature, 'Dense model predictions', dense)
-
-
-"""
-# Multistep dense
-"""
-LABEL_WIDTH = 24
-def cnn_model():
-    """
-    # CNN
-    One convolutional layer with relu and one dense layer with relu activation functions
-    Input width = 3
-    """
-    CONV_WIDTH = 3
-    conv_window = WindowGenerator(input_width=CONV_WIDTH, label_width=1, shift=1,
-                                  train_df=train_df, val_df=val_df, test_df=test_df,
-                                  label_columns=features)
-    print(conv_window)
-    conv_model = tf.keras.Sequential([
-        tf.keras.layers.Conv1D(filters=32,
-                               kernel_size=(CONV_WIDTH,),
-                               activation='relu'),
-        tf.keras.layers.Dense(units=32, activation='relu'),
-        tf.keras.layers.Dense(units=len(features)),
-    ])
-    history = compile_and_fit(conv_model, conv_window)
-
-    IPython.display.clear_output()
-    val_performance['Conv'] = conv_model.evaluate(conv_window.val, return_dict=True)
-    performance['Conv'] = conv_model.evaluate(conv_window.test, verbose=0, return_dict=True)
-    INPUT_WIDTH = LABEL_WIDTH + (CONV_WIDTH - 1)
-    wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH, label_width=LABEL_WIDTH, shift=1,
-                                        train_df=train_df, val_df=val_df, test_df=test_df,
-                                        label_columns=features)
-    for feature in features:
-        wide_conv_window.plot(feature, 'CNN model predictions', conv_model)
-
-
-def wide_cnn(width=35):
-    """
-    # CNN Wide window
-    One convolutional layer with relu and one dense layer with relu activation functions
-    Input width = 35
-    """
-    NUM_DAYS = width
-    CONV_WIDTH_WIDE = NUM_DAYS
-    conv_window_wide = WindowGenerator(input_width=CONV_WIDTH_WIDE, label_width=1, shift=1,
-                                  train_df=train_df, val_df=val_df, test_df=test_df,
-                                  label_columns=features)
-    print(conv_window_wide)
-    conv_model_wide = tf.keras.Sequential([
-        tf.keras.layers.Conv1D(filters=32,
-                               kernel_size=(CONV_WIDTH_WIDE,),
-                               activation='relu'),
-        tf.keras.layers.Dense(units=32, activation='relu'),
-        tf.keras.layers.Dense(units=len(features)),
-    ])
-    history = compile_and_fit(conv_model_wide, conv_window_wide)
-
-    IPython.display.clear_output()
-    val_performance['Conv_wide'] = conv_model_wide.evaluate(conv_window_wide.val, return_dict=True)
-    performance['Conv_wide'] = conv_model_wide.evaluate(conv_window_wide.test, verbose=0, return_dict=True)
-
-    LABEL_WIDTH_WIDE = 24
-    INPUT_WIDTH_WIDE = LABEL_WIDTH + (CONV_WIDTH_WIDE - 1)
-    wide_conv_window = WindowGenerator( input_width=INPUT_WIDTH_WIDE, label_width=LABEL_WIDTH_WIDE, shift=1,
-                                        train_df=train_df, val_df=val_df, test_df=test_df,
-                                        label_columns=features)
-
-    for feature in features:
-        wide_conv_window.plot(feature, 'CNN wide model predictions', conv_model_wide)
-
-    prediction_length = 35
-    #test_model(conv_model_wide, sampled_test_df, train_mean, train_std, NUM_DAYS, prediction_length, hormone)
-
-
-def lstm_model():
-    """
-    # RNN model
-    # LSTM long short-term memory
-    """
-    lstm_model = tf.keras.models.Sequential([
-        # Shape [batch, time, features] => [batch, time, lstm_units]
-        tf.keras.layers.LSTM(32, return_sequences=True),
-        # Shape => [batch, time, features]
-        tf.keras.layers.Dense(units=len(features))
-    ])
-    history = compile_and_fit(lstm_model, wide_window)
-
-    IPython.display.clear_output()
-    val_performance['LSTM'] = lstm_model.evaluate(wide_window.val, return_dict=True)
-    performance['LSTM'] = lstm_model.evaluate(wide_window.test, verbose=0, return_dict=True)
-
-    for feature in features:
-        wide_window.plot(feature, 'RNN LSTM model predictions', lstm_model)
-
-
-def residual_connections_model():
-    """
-    # Residual connections
-    lstm model
-    """
-    residual_lstm = ResidualWrapper(
-        tf.keras.Sequential([
-        tf.keras.layers.LSTM(32, return_sequences=True),
-        tf.keras.layers.Dense(
-            len(features),
-            # The predicted deltas should start small.
-            # Therefore, initialize the output layer with zeros.
-            kernel_initializer=tf.initializers.zeros())
-    ]))
-
-    history = compile_and_fit(residual_lstm, wide_window)
-
-    IPython.display.clear_output()
-    val_performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.val, return_dict=True)
-    performance['Residual LSTM'] = residual_lstm.evaluate(wide_window.test, verbose=0, return_dict=True)
-
-    for feature in features:
-        wide_window.plot(feature, 'Residual LSTM model predictions', residual_lstm)
-
-
-def show_performance():
+def show_performance(val_performance, performance):
     """
     # Performance
     """
@@ -586,15 +334,6 @@ def show_performance():
     for name, value in performance.items():
         print(f'{name:12s}: {value[metric_name]:0.4f}')
 
-
-#baseline_model()
-#linear_model()
-#multi_layer_model()
-#cnn_model()
-#lstm_model()
-#residual_connections_model()
-#show_performance()
-
 """
 # Multi-step models
 """
@@ -605,13 +344,6 @@ multi_window = WindowGenerator(input_width=INPUT_WIDTH, label_width=OUT_STEPS,  
                                label_columns=features)
 for feature in features:
     multi_window.plot(feature, 'Multi window')
-
-# variant with the artificially added samples
-"""OUT_STEPS_a = 24
-multi_window_a = WindowGenerator(input_width=24*24, label_width=OUT_STEPS_a*24,   shift=OUT_STEPS_a*24,
-                               train_df=train_df_a, val_df=val_df_a, test_df=test_df_a,
-                               label_columns=features)
-multi_window_a.plot(hormone)"""
 
 multi_val_performance = dict()
 multi_performance = dict()
@@ -695,8 +427,6 @@ for _ in range(NUM_RUNS):
     multi_cnn_model._name = 'wide_cnn'
     fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0], noise=0.1)
     fitted_sin._name = 'sin_curve'
-    #mrnn = more_layers_rnn()
-    #mrnn._name = 'drnn'
     within, outside, nearest_dists, num_detected, peak_distances_distribution = compare_multiple_models([feedback_model, fitted_sin, multi_cnn_model],
                                               sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                               plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
@@ -725,10 +455,7 @@ multistep_performance()
 
 colors = mpl.colormaps.get_cmap('tab10')  # Using tab10 colormap with as many colors as there are keys
 
-# Initialize a scatter plot
 plt.figure(figsize=(8, 6))
-
-# Iterate over the dictionaries
 for idx, key in enumerate(peaks_within_threshold):
     x_values = peaks_outside_threshold[key]
     y_values = peaks_within_threshold[key]
@@ -741,10 +468,7 @@ max_val = max(all_values) + 5
 plt.xlim(0, max_val)
 plt.ylim(0, max_val)
 plt.plot([0, max_val], [0, max_val], 'r--', label='y=x')
-# Adding labels and title
 plt.xlabel('Num peaks outside the threshold')
 plt.ylabel('Num peaks inside threshold')
 plt.legend(title="Model")
-
-# Display the plot
 plt.show()

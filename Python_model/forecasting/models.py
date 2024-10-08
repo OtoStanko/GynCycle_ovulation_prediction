@@ -6,18 +6,6 @@ from scipy.optimize import curve_fit
 from supporting_scripts import curve_function
 
 
-class Baseline(tf.keras.Model):
-    def __init__(self, label_index=None):
-        super().__init__()
-        self.label_index = label_index
-
-    def call(self, inputs):
-        if self.label_index is None:
-            return inputs
-        result = inputs[:, :, self.label_index]
-        return result[:, :, tf.newaxis]
-
-
 class ResidualWrapper(tf.keras.Model):
     def __init__(self, model):
         super().__init__()
@@ -156,3 +144,62 @@ class Distributed_peaks(tf.keras.Model):
         result = tf.reshape(result, (1, self.out_steps, self.num_features))
         return result
 
+
+"""
+    Single step models
+    input length = _
+    output length = 1
+"""
+
+class LinearModel(tf.keras.Model):
+    def __init__(self, num_features):
+        super().__init__()
+        self.num_features = num_features
+        self.linear = tf.keras.Sequential([
+            tf.keras.layers.Dense(units=num_features),
+        ])
+
+    def call(self, inputs):
+        return self.linear(inputs)
+
+    def interpret(self):
+        plt.bar(x=range(self.num_features),
+                height=self.linear.layers[0].kernel[:, 0].numpy())
+        axis = plt.gca()
+        axis.set_xticks(range(self.num_features))
+        _ = axis.set_xticklabels(self.num_features, rotation=90)
+        plt.show()
+
+
+class MultiLayerModel(tf.keras.Model):
+    """
+        # Dense model
+        Two hidden layers with relu activation functions
+        """
+    def __init__(self, num_features):
+        super().__init__()
+        self.num_features = num_features
+        self.dense = tf.keras.Sequential([
+            tf.keras.layers.Dense(units=64, activation='relu'),
+            tf.keras.layers.Dense(units=64, activation='relu'),
+            tf.keras.layers.Dense(units=num_features)
+        ])
+
+    def call(self, inputs):
+        return self.dense(inputs)
+
+
+class CNNModel(tf.keras.Model):
+    def __init__(self, num_features, input_length):
+        super().__init__()
+        self.num_features = num_features
+        self.conv = tf.keras.Sequential([
+            tf.keras.layers.Conv1D(filters=32,
+                                   kernel_size=(input_length,),
+                                   activation='relu'),
+            tf.keras.layers.Dense(units=32, activation='relu'),
+            tf.keras.layers.Dense(units=num_features),
+        ])
+
+    def call(self, inputs):
+        return self.conv(inputs)
