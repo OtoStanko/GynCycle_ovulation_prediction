@@ -87,6 +87,8 @@ class ModelComparator:
             # Shift them so that their time aligns with the offset data
             curr_peaks = np.array([x for x in peaks if offset <= x < input_length + pred_length + offset])
             curr_peaks = curr_peaks - offset
+            gt_peaks_predWindow = np.array([x for x in peaks if offset + input_length <= x < input_length + pred_length + offset])
+            gt_peaks_predWindow = gt_peaks_predWindow - offset
             # Try all the peaks, shift them to match the predicted data
             all_peaks_offset = np.array([x for x in peaks]) - offset
             if self.plot:
@@ -104,6 +106,7 @@ class ModelComparator:
                 results.num_detected_peaks[model_name] = results.num_detected_peaks.get(model_name, 0) + len(pred_peaks)
                 offset_pred_peaks = pred_peaks + input_length
                 unfiltered_signed_distances = sp.get_signed_distances(all_peaks_offset, offset_pred_peaks)
+                unfiltered_signed_distances_rev = sp.get_signed_distances(offset_pred_peaks, gt_peaks_predWindow)
                 unfiltered_abs_distances = np.array([abs(dist) for dist in unfiltered_signed_distances])
                 # Proceed only if there are any ground-truth peaks in the output part
                 if len(curr_peaks) > 0:
@@ -116,9 +119,13 @@ class ModelComparator:
                     results.sum_of_dists_to_nearest_peak[model_name] = (
                             results.sum_of_dists_to_nearest_peak.get(model_name, 0) + sum(unfiltered_abs_distances))
                     pdd = results.peak_distances_distribution.get(model_name, dict())
+                    pddR = results.peak_distances_distributionRev.get(model_name, dict())
                     for distance in unfiltered_signed_distances:
                         pdd[distance] = pdd.get(distance, 0) + 1
+                    for distance in unfiltered_signed_distances_rev:
+                        pddR[distance] = pddR.get(distance, 0) + 1
                     results.peak_distances_distribution[model_name] = pdd
+                    results.peak_distances_distributionRev[model_name] = pddR
                 if self.plot:
                     line, = plt.plot(pred_time, model_predictions, marker='.', label=model_name)
                     line_color = line.get_color()
@@ -153,12 +160,15 @@ class ModelComparator:
         pdd = results.peak_distances_distribution
         return pwt, pot, sodtnp, ndp, pdd
 
-    def plot_pred_peak_distribution(self, run_id=None):
+    def plot_pred_peak_distribution(self, run_id=None, mode=(True,True)):
         """
         Plots how were forecasted peaks distributed around the position of ground truth peaks.
         :param run_id: if not specified, all the runs will be plotted.
         :return: None
         """
+        if len(mode) != 2:
+            print("Mode required a tuple of two bools")
+            return
         if run_id is None:
             ids_to_plot = [id for id in self.results.keys()]
         else:
@@ -169,15 +179,28 @@ class ModelComparator:
                 print("Wrong id for the results to plot")
                 return
             peak_distances_distribution = results.peak_distances_distribution
-            for model_name, pdd in peak_distances_distribution.items():
-                keys = list(pdd.keys())
-                values = list(pdd.values())
-                plt.bar(keys, values)
-                plt.xlim(-35, 35)
-                plt.xlabel('Signed distance of forecasted peaks to the nearest ground truth peak')
-                plt.ylabel('Number of peaks')
-                plt.title('Model name: ' + model_name + " (run ID: {})".format(run_id))
-                plt.show()
+            peak_distances_distribution_rev = results.peak_distances_distributionRev
+            for model_name in peak_distances_distribution.keys():
+                if mode[0]:
+                    pdd = peak_distances_distribution[model_name]
+                    keys = list(pdd.keys())
+                    values = list(pdd.values())
+                    plt.bar(keys, values)
+                    plt.xlim(-35, 35)
+                    plt.xlabel('Signed distance of forecasted peaks to the nearest ground truth peak')
+                    plt.ylabel('Number of peaks')
+                    plt.title('Model name: ' + model_name + " (run ID: {})".format(run_id))
+                    plt.show()
+                if mode[1]:
+                    pddr = peak_distances_distribution_rev[model_name]
+                    keys = list(pddr.keys())
+                    values = list(pddr.values())
+                    plt.bar(keys, values)
+                    plt.xlim(-35, 35)
+                    plt.xlabel('Signed distance of ground truth peaks to the nearest forecasted peak')
+                    plt.ylabel('Number of peaks')
+                    plt.title('Model name: ' + model_name + " (run ID: {})".format(run_id))
+                    plt.show()
 
     def simulation_summary(self):
         if self.peaks_within_threshold is None:
@@ -238,3 +261,4 @@ class ComparisonResults:
         self.sum_of_dists_to_nearest_peak = {}
         self.num_detected_peaks = {}
         self.peak_distances_distribution = {}
+        self.peak_distances_distributionRev = {}

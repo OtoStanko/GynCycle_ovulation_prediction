@@ -25,7 +25,6 @@ workDir = os.path.join(os.getcwd(), "../outputDir/")
 SAMPLING_FREQUENCY = 24
 SAMPLING_FREQUENCY_UNIT = 'H'
 NUM_INITIAL_DAYS_TO_DISCARD = 50
-test_days_end = 300
 features = ['LH']
 MAX_EPOCHS = 25
 
@@ -33,9 +32,9 @@ MAX_EPOCHS = 25
 OUT_STEPS = 35
 INPUT_WIDTH = 35
 
-NUM_RUNS = 1
+NUM_RUNS = 10
 PEAK_COMPARISON_DISTANCE = 2
-PLOT_TESTING = True
+PLOT_TESTING = False
 
 
 def compile_and_fit(model, window, patience=2):
@@ -54,35 +53,6 @@ def compile_and_fit(model, window, patience=2):
                           validation_data=window.val,
                           callbacks=[early_stopping])
     return history
-
-
-def test_model(model, test_df, train_df_mean, train_df_std, input_length, pred_length, hormone, duration=170, step=5):
-    print(train_df_mean, train_df_std)
-    test_df = (test_df - train_df_mean) / train_df_std
-    plt.plot(test_df.index, test_df[hormone])
-    plt.xlabel('Time [hours]')
-    plt.title('Test {} data'.format(hormone))
-    plt.show()
-    for offset in range(0, duration-pred_length, step):
-        input = np.array(test_df[hormone][offset:input_length + offset], dtype=np.float32)
-        for i in range(pred_length):
-            input_data = input[i:input_length + i]
-            input_data = input_data.reshape(1, input_length, 1)
-            y = model(input_data)[0][0]
-            input = np.append(input, y)
-        gt_time = test_df.index[offset:input_length + pred_length + offset]
-        gt_time = gt_time / 24
-        first_elem = gt_time[0]
-        gt_time = gt_time - first_elem
-        pred_time = test_df.index[input_length + offset:input_length + pred_length + offset]
-        pred_time = pred_time / 24
-        pred_time = pred_time - first_elem
-        plt.plot(gt_time, test_df[hormone][offset:input_length + pred_length + offset])
-        plt.plot(pred_time, input[input_length:input_length + pred_length + offset])
-        plt.axvline(x=input_length, color='r', linestyle='--',)
-        plt.title('Prediction on {} days with offset {} days'.format(input_length, offset))
-        plt.show()
-    # first 35 days are the base on which we are predicting one time step
 
 
 # test on a small TS
@@ -110,15 +80,12 @@ filtered_df.set_index('Time', inplace=True)
 filtered_test_df = test_dataframe[test_dataframe['Time'] > NUM_INITIAL_DAYS_TO_DISCARD * 24]
 filtered_test_df.set_index('Time', inplace=True)
 
-filtered_df_timeH = filtered_df.copy()
 
+print(filtered_df.index[-1])
 
-print(test_days_end * 24 + 1)
-print(filtered_df_timeH.index[-1])
-
-sampled_df_timeH_index = [i for i in range(NUM_INITIAL_DAYS_TO_DISCARD * 24, int(filtered_df_timeH.index[-1]) + 1, SAMPLING_FREQUENCY)]
+sampled_df_timeH_index = [i for i in range(NUM_INITIAL_DAYS_TO_DISCARD * 24, int(filtered_df.index[-1]) + 1, SAMPLING_FREQUENCY)]
 print("Number of days in the training data:", len(sampled_df_timeH_index))
-sampled_df_timeH = sample_data(filtered_df_timeH, sampled_df_timeH_index, features)
+sampled_df_timeH = sample_data(filtered_df, sampled_df_timeH_index, features)
 print('Num records in the sampled dataframe with raw hours: (Should be the same as the above number)', len(sampled_df_timeH.index))
 plt.plot(sampled_df_timeH.index, sampled_df_timeH[features], )
 plt.title('Sampled dataframe with raw hours')
@@ -201,7 +168,6 @@ def learn_model(model, window, features, val_performance, performance):
         window.plot(feature, model._name + 'Model predictions', model)
 
 
-
 def show_performance(val_performance, performance):
     """
     # Performance
@@ -222,6 +188,7 @@ def show_performance(val_performance, performance):
 
     for name, value in performance.items():
         print(f'{name:12s}: {value[metric_name]:0.4f}')
+
 
 """
 # Multi-step models
