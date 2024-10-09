@@ -22,6 +22,32 @@ class ResidualWrapper(tf.keras.Model):
         return inputs + delta
 
 
+class MMML(tf.keras.Model):
+    def __init__(self, model1, model2, out_steps, num_features):
+        super().__init__()
+        self.model1 = model1
+        self.model2 = model2
+        self.out_steps = out_steps
+        self.num_features = num_features
+        self.mmml = tf.keras.Sequential([
+            tf.keras.layers.Dense(256, activation='relu'),
+            tf.keras.layers.Dense(64, activation='relu'),
+            tf.keras.layers.Dense(num_features, activation='relu'),
+        ])
+
+
+    def call(self, inputs, training=None):
+        model1_out = self.model1(inputs, training=training)
+        model2_out = self.model2(inputs, training=training)
+        if model1_out is None or model2_out is None:
+            raise ValueError("One of the model outputs is None.")
+        inputs = model1_out + model2_out
+        inputs = tf.convert_to_tensor(inputs, dtype=tf.float32)
+        result = self.mmml(inputs, training=training)
+        result = tf.convert_to_tensor(result, dtype=tf.float32)
+        return result
+
+
 class FeedBack(tf.keras.Model):
     def __init__(self, units, out_steps, num_features):
         super().__init__()

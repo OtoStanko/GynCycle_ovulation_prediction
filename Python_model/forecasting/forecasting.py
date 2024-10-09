@@ -9,14 +9,14 @@ import tensorflow as tf
 
 from custom_losses import Peak_loss
 from model_comparison import ModelComparator
-from models import FeedBack, WideCNN, NoisySinCurve, Distributed_peaks
+from models import FeedBack, WideCNN, NoisySinCurve, Distributed_peaks, MMML
 from preprocessing_functions import *
 from windowGenerator import WindowGenerator
 
 """
     Parameters
 """
-TRAIN_DATA_SUFFIX = 5
+TRAIN_DATA_SUFFIX = 4
 TEST_DATA_SUFFIX = 1
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
 
@@ -32,9 +32,9 @@ MAX_EPOCHS = 25
 OUT_STEPS = 35
 INPUT_WIDTH = 35
 
-NUM_RUNS = 10
+NUM_RUNS = 3
 PEAK_COMPARISON_DISTANCE = 2
-PLOT_TESTING = False
+PLOT_TESTING = True
 
 
 def compile_and_fit(model, window, patience=2):
@@ -235,6 +235,12 @@ def multistep_cnn():
     return multi_cnn
 
 
+def mmml(model1, model2):
+    combination = MMML(model1, model2,OUT_STEPS, len(features))
+    history = compile_and_fit(combination, multi_window)
+    return combination
+
+
 def multistep_performance():
     # Performance
     x = np.arange(len(multi_performance))
@@ -266,19 +272,16 @@ sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_pro
 #tf.config.run_functions_eagerly(True)
 model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
+
 for run_id in range(NUM_RUNS):
     feedback_model = autoregressive_model()
     feedback_model._name = 'feed_back'
-    peak_start = Distributed_peaks(OUT_STEPS, len(features), 2)
-    peak_start._name = 'peak_beginning'
-    peak_middle = Distributed_peaks(OUT_STEPS, len(features), 16)
-    peak_middle._name = 'peak_middle'
-    peak_end = Distributed_peaks(OUT_STEPS, len(features), 30)
-    peak_end._name = 'peak_end'
     multi_cnn_model = multistep_cnn()
     multi_cnn_model._name = 'wide_cnn'
     fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0], noise=0.1)
     fitted_sin._name = 'sin_curve'
+    #combined = mmml(feedback_model, multi_cnn_model)
+    #combined._name = 'combined_RNN_CNN'
 
     list_of_models = [feedback_model, fitted_sin, multi_cnn_model]
     model_comparator.compare_models(list_of_models, run_id)
