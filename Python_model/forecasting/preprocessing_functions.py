@@ -85,3 +85,50 @@ def normalize_df(df, method='standard', values=None):
             df[feature] = (df[feature] - values[feature][0]) / values[feature][1]
         prop = values
     return df, prop
+
+
+def create_classification_dataset(df, feature, peaks, input_window_length):
+    inputs = []
+    labels = []
+
+    # Create the training dataset
+    for start_time in range(len(df.index)-input_window_length):
+        end_time = start_time + input_window_length
+
+        # Get input features for the 7-day window
+        input_data = df[feature][start_time:end_time].values
+
+        # Find the next peak time after the end of the input window
+        next_peaks = peaks[peaks >= end_time]
+        #next_peaks = next_peaks[next_peaks < end_time + 35]
+
+        if len(next_peaks) != 0:
+            # Calculate the label as the time difference in seconds
+            inputs.append(input_data)
+            label = (next_peaks[0] - end_time)
+            label = min(label, 34)
+            label_vector = [0 for _ in range(35)]
+            label_vector[label] = 1
+            labels.append(label_vector)
+        else:
+            break
+
+    # Convert to NumPy arrays
+    inputs = np.array(inputs)
+    labels = np.array(labels)
+
+    print("Input shape:", inputs.shape)
+    print("Labels shape:", labels.shape)
+    print("Peaks:", peaks)
+    print("DF length:", len(df.index))
+    print("Num records:", len(labels))
+    return inputs, labels
+
+
+def create_KAN_dataset(df, feature):
+    inputs = []
+    labels = []
+    for x in range(len(df.index)):
+        inputs.append([x])
+        labels.append([df[feature][df.index[x]]])
+    return np.array(inputs), np.array(labels)
