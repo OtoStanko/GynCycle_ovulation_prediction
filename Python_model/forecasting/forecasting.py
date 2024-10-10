@@ -312,8 +312,6 @@ for run_id in range(NUM_RUNS):
 
     list_of_models = [feedback_model, fitted_sin, multi_cnn_model, classification_model]
     model_comparator.compare_models(list_of_models, run_id)
-    within, outside, nearest_dists, num_detected, peak_distances_distribution = model_comparator.get_run_results_tuple(run_id)
-
     model_comparator.plot_pred_peak_distribution(run_id)
 
 multistep_performance()

@@ -28,6 +28,8 @@ class ModelComparator:
 
         self.peaks_within_threshold = None
         self.peaks_outside_threshold = None
+        self.peaks_within_threshold_rev = None
+        self.peaks_outside_threshold_rev = None
         self.sum_of_dists_to_nearest_peak = None
         self.num_detected_peaks = None
 
@@ -109,6 +111,7 @@ class ModelComparator:
                 unfiltered_signed_distances = sp.get_signed_distances(all_peaks_offset, offset_pred_peaks)
                 unfiltered_signed_distances_rev = sp.get_signed_distances(offset_pred_peaks, gt_peaks_predWindow)
                 unfiltered_abs_distances = np.array([abs(dist) for dist in unfiltered_signed_distances])
+                unfiltered_abs_distances_rev = np.array([abs(dist) for dist in unfiltered_signed_distances_rev])
                 # Proceed only if there are any ground-truth peaks in the output part
                 if len(curr_peaks) > 0:
                     filtered_distances = np.array(
@@ -119,14 +122,21 @@ class ModelComparator:
                             results.peaks_outside_threshold.get(model_name, 0) + len(pred_peaks) - len(filtered_distances))
                     results.sum_of_dists_to_nearest_peak[model_name] = (
                             results.sum_of_dists_to_nearest_peak.get(model_name, 0) + sum(unfiltered_abs_distances))
+                    filtered_distances_rev = np.array(
+                        [distance for distance in unfiltered_abs_distances_rev if distance <= self.peak_comparison_distance])
+                    results.peaks_within_threshold_rev[model_name] = (
+                        results.peaks_within_threshold_rev.get(model_name, 0) + len(filtered_distances_rev))
+                    results.peaks_outside_threshold_rev[model_name] = (
+                        results.peaks_outside_threshold_rev.get(model_name, 0)
+                        + len(gt_peaks_predWindow) - len(filtered_distances_rev))
                     pdd = results.peak_distances_distribution.get(model_name, dict())
-                    pddR = results.peak_distances_distributionRev.get(model_name, dict())
+                    pddR = results.peak_distances_distribution_rev.get(model_name, dict())
                     for distance in unfiltered_signed_distances:
                         pdd[distance] = pdd.get(distance, 0) + 1
                     for distance in unfiltered_signed_distances_rev:
                         pddR[distance] = pddR.get(distance, 0) + 1
                     results.peak_distances_distribution[model_name] = pdd
-                    results.peak_distances_distributionRev[model_name] = pddR
+                    results.peak_distances_distribution_rev[model_name] = pddR
                 if self.plot:
                     line, = plt.plot(pred_time, model_predictions, marker='.', label=model_name)
                     line_color = line.get_color()
@@ -157,10 +167,12 @@ class ModelComparator:
         results =  self.results[run_id]
         pwt = results.peaks_within_threshold
         pot = results.peaks_outside_threshold
+        pwtr = results.peaks_within_threshold_rev
+        potr = results.peaks_outside_threshold_rev
         sodtnp = results.sum_of_dists_to_nearest_peak
         ndp = results.num_detected_peaks
         pdd = results.peak_distances_distribution
-        return pwt, pot, sodtnp, ndp, pdd
+        return pwt, pot, sodtnp, ndp, pdd, pwtr, potr
 
     def plot_pred_peak_distribution(self, run_id=None, mode=(True,True)):
         """
@@ -182,7 +194,7 @@ class ModelComparator:
                 print("Wrong id for the results to plot")
                 return  # ADD COLOURS BASED ON THE DISTANCE
             peak_distances_distribution = results.peak_distances_distribution
-            peak_distances_distribution_rev = results.peak_distances_distributionRev
+            peak_distances_distribution_rev = results.peak_distances_distribution_rev
             max_val = max(max(max(inner_dict.values()) for inner_dict in peak_distances_distribution.values()),
                           max(max(inner_dict.values()) for inner_dict in peak_distances_distribution_rev.values())) + 1
             for model_name in peak_distances_distribution.keys():
@@ -215,10 +227,12 @@ class ModelComparator:
         if self.peaks_within_threshold is None:
             self.peaks_within_threshold = {}
             self.peaks_outside_threshold = {}
+            self.peaks_within_threshold_rev = {}
+            self.peaks_outside_threshold_rev = {}
             self.sum_of_dists_to_nearest_peak = {}
             self.num_detected_peaks = {}
         for run_id in self.results.keys():
-            within, outside, nearest_dists, num_detected, peak_distances_distribution = (
+            within, outside, nearest_dists, num_detected, peak_distances_distribution, within_rev, outside_rev = (
                 self.get_run_results_tuple(run_id))
 
             for model_name, num_peaks_within in within.items():
@@ -235,27 +249,60 @@ class ModelComparator:
             for model_name, num_detected_peak in num_detected.items():
                 self.num_detected_peaks[model_name] = (
                         self.num_detected_peaks.get(model_name, list()) + [num_detected_peak])
+            for model_name, num_peaks_within_rev in within_rev.items():
+                self.peaks_within_threshold_rev[model_name] = (
+                        self.peaks_within_threshold_rev.get(model_name, list()) + [num_peaks_within_rev])
+            for model_name, num_peaks_outside_rev in outside_rev.items():
+                self.peaks_outside_threshold_rev[model_name] = (
+                        self.peaks_outside_threshold_rev.get(model_name, list()) + [
+                    num_peaks_outside_rev])
 
-    def plot_in_out_peaks(self):
+    def plot_in_out_peaks(self, mode=(True,True)):
+        if len(mode) != 2:
+            print("Mode required a tuple of two bools")
+            return
         self.simulation_summary()
         colors = mpl.colormaps.get_cmap('tab10')  # Using tab10 colormap with as many colors as there are keys
-        plt.figure(figsize=(8, 6))
-        for idx, key in enumerate(self.peaks_within_threshold):
-            x_values = self.peaks_outside_threshold[key]
-            y_values = self.peaks_within_threshold[key]
+        if mode[0]:
+            plt.figure(figsize=(8, 6))
+            for idx, key in enumerate(self.peaks_within_threshold):
+                x_values = self.peaks_outside_threshold[key]
+                y_values = self.peaks_within_threshold[key]
 
-            # Plot each key's data with a unique color and label it with the key
-            plt.scatter(x_values, y_values, color=colors(idx), label=key)
+                # Plot each key's data with a unique color and label it with the key
+                plt.scatter(x_values, y_values, color=colors(idx), label=key)
 
-        all_values = itertools.chain(*self.peaks_outside_threshold.values(), *self.peaks_within_threshold.values())
-        max_val = max(all_values) + 5
-        plt.xlim(0, max_val)
-        plt.ylim(0, max_val)
-        plt.plot([0, max_val], [0, max_val], 'r--', label='y=x')
-        plt.xlabel('Num peaks outside the threshold')
-        plt.ylabel('Num peaks inside threshold')
-        plt.legend(title="Model")
-        plt.show()
+            all_values = itertools.chain(*self.peaks_outside_threshold.values(), *self.peaks_within_threshold.values())
+            max_val = max(all_values) + 5
+            plt.xlim(0, max_val)
+            plt.ylim(0, max_val)
+            plt.plot([0, max_val], [0, max_val], 'r--', label='y=x')
+            plt.xlabel('# predicted peaks that were further than {} days away from the nearest gt peak'.format(self.peak_comparison_distance))
+            plt.ylabel('# predicted peaks that were within {} days of the nearest gt peak'.format(self.peak_comparison_distance))
+            plt.title('How well are the prediction peaks placed near the nearest gt peak '
+                      '\n(how well placed are the peaks from the prediction)')
+            plt.legend(title="Model")
+            plt.show()
+        if mode[1]:
+            plt.figure(figsize=(8, 6))
+            for idx, key in enumerate(self.peaks_within_threshold_rev):
+                x_values = self.peaks_outside_threshold_rev[key]
+                y_values = self.peaks_within_threshold_rev[key]
+
+                # Plot each key's data with a unique color and label it with the key
+                plt.scatter(x_values, y_values, color=colors(idx), label=key)
+
+            all_values = itertools.chain(*self.peaks_outside_threshold_rev.values(), *self.peaks_within_threshold_rev.values())
+            max_val = max(all_values) + 5
+            plt.xlim(0, max_val)
+            plt.ylim(0, max_val)
+            plt.plot([0, max_val], [0, max_val], 'r--', label='y=x')
+            plt.xlabel('# gt peaks that have the nearest predicted peak further than {} days away'.format(self.peak_comparison_distance))
+            plt.ylabel('# gt peaks that have the nearest predicted peak within {} days'.format(self.peak_comparison_distance))
+            plt.title('How well are the gt peaks predicted by the nearest prediction peak '
+                      '\n(how well are the gt peaks identified by the nearest peak from the prediction)')
+            plt.legend(title="Model")
+            plt.show()
 
     def print_peak_statistics(self):
         self.simulation_summary()
@@ -267,7 +314,9 @@ class ComparisonResults:
     def __init__(self):
         self.peaks_within_threshold = {}
         self.peaks_outside_threshold = {}
+        self.peaks_within_threshold_rev = {}
+        self.peaks_outside_threshold_rev = {}
         self.sum_of_dists_to_nearest_peak = {}
         self.num_detected_peaks = {}
         self.peak_distances_distribution = {}
-        self.peak_distances_distributionRev = {}
+        self.peak_distances_distribution_rev = {}
