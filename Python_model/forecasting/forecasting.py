@@ -9,7 +9,7 @@ import tensorflow as tf
 
 from custom_losses import Peak_loss
 from model_comparison import ModelComparator
-from models import FeedBack, WideCNN, NoisySinCurve, Distributed_peaks, MMML
+from models import FeedBack, WideCNN, NoisySinCurve, Distributed_peaks, MMML, ClassificationMLP
 from preprocessing_functions import *
 from windowGenerator import WindowGenerator
 
@@ -34,7 +34,7 @@ INPUT_WIDTH = 35
 
 NUM_RUNS = 10
 PEAK_COMPARISON_DISTANCE = 2
-PLOT_TESTING = True
+PLOT_TESTING = False
 
 
 def compile_and_fit(model, window, patience=2):
@@ -241,6 +241,31 @@ def mmml(model1, model2):
     return combination
 
 
+def classification_mlp():
+    MIN_PEAK_HEIGHT = 0.3
+
+    # Dataset is normalized
+    train_df_peaks, _ = scipy.signal.find_peaks(train_df[features[0]], distance=10, height=MIN_PEAK_HEIGHT)
+    val_df_peaks, _ = scipy.signal.find_peaks(val_df[features[0]], distance=10, height=MIN_PEAK_HEIGHT)
+    test_df_peaks, _ = scipy.signal.find_peaks(test_df[features[0]], distance=10, height=MIN_PEAK_HEIGHT)
+
+    train_inputs, train_labels = create_classification_dataset(train_df, features[0], train_df_peaks, INPUT_WIDTH)
+    val_inputs, val_labels = create_classification_dataset(val_df, features[0], val_df_peaks, INPUT_WIDTH)
+    test_inputs, test_labels = create_classification_dataset(test_df, features[0], test_df_peaks, INPUT_WIDTH)
+
+
+    classification_model = ClassificationMLP(INPUT_WIDTH, OUT_STEPS, len(features))
+    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                                      mode='min')
+    classification_model.compile(loss=tf.keras.losses.CategoricalCrossentropy(),
+                                 optimizer=tf.keras.optimizers.Adam(),
+                                 metrics=[tf.keras.metrics.CategoricalCrossentropy()])
+    history = classification_model.fit(x=train_inputs, y=train_labels, validation_data=(val_inputs, val_labels),
+                             epochs=MAX_EPOCHS, callbacks=[early_stopping], shuffle=True, batch_size=32)
+    return classification_model
+
+
+
 def multistep_performance():
     # Performance
     x = np.arange(len(multi_performance))
@@ -280,10 +305,12 @@ for run_id in range(NUM_RUNS):
     multi_cnn_model._name = 'wide_cnn'
     fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0], noise=0.1)
     fitted_sin._name = 'sin_curve'
+    classification_model = classification_mlp()
+    classification_model._name = 'classification_mlp'
     #combined = mmml(feedback_model, multi_cnn_model)
     #combined._name = 'combined_RNN_CNN'
 
-    list_of_models = [feedback_model, fitted_sin, multi_cnn_model]
+    list_of_models = [feedback_model, fitted_sin, multi_cnn_model, classification_model]
     model_comparator.compare_models(list_of_models, run_id)
     within, outside, nearest_dists, num_detected, peak_distances_distribution = model_comparator.get_run_results_tuple(run_id)
 

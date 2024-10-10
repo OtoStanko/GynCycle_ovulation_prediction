@@ -1,5 +1,6 @@
 import os
 
+import tensorflow as tf
 import numpy as np
 import pandas as pd
 
@@ -96,7 +97,7 @@ def create_classification_dataset(df, feature, peaks, input_window_length):
         end_time = start_time + input_window_length
 
         # Get input features for the 7-day window
-        input_data = df[feature][start_time:end_time].values
+        input_data = tf.convert_to_tensor(df[feature][start_time:end_time].values, dtype=tf.float32)
 
         # Find the next peak time after the end of the input window
         next_peaks = peaks[peaks >= end_time]
@@ -104,18 +105,20 @@ def create_classification_dataset(df, feature, peaks, input_window_length):
 
         if len(next_peaks) != 0:
             # Calculate the label as the time difference in seconds
-            inputs.append(input_data)
+            #inputs.append([input_data])
+            inputs.append(tf.expand_dims(input_data, axis=0))
             label = (next_peaks[0] - end_time)
             label = min(label, 34)
             label_vector = [0 for _ in range(35)]
             label_vector[label] = 1
-            labels.append(label_vector)
+            #labels.append([label_vector])
+            labels.append(tf.convert_to_tensor([label_vector], dtype=tf.int32))
         else:
             break
 
     # Convert to NumPy arrays
-    inputs = np.array(inputs)
-    labels = np.array(labels)
+    inputs = tf.stack(inputs)
+    labels = tf.stack(labels)
 
     print("Input shape:", inputs.shape)
     print("Labels shape:", labels.shape)

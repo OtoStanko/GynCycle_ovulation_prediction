@@ -1,7 +1,7 @@
 import scipy.signal
 import tensorflow as tf
 from matplotlib import pyplot as plt
-from sklearn.metrics import precision_score
+from scipy.signal import savgol_filter
 
 from preprocessing_functions import *
 
@@ -16,8 +16,8 @@ def plot_dataset(dataset_to_plot, labels_to_plot):
             plt.show()
 
 
-TRAIN_DATA_SUFFIX = 4
-TEST_DATA_SUFFIX = 1
+TRAIN_DATA_SUFFIX = 'of_4'
+TEST_DATA_SUFFIX = 'of_1'
 
 # Set the parameters
 workDir = os.path.join(os.getcwd(), "../outputDir/")
@@ -62,10 +62,11 @@ test_inputs, test_labels = create_classification_dataset(test_df, features[0], t
 print(len(train_inputs), len(val_inputs), len(test_inputs))
 
 mean = np.mean(train_inputs, axis=0)
+train_max = np.max(train_inputs, axis=0)
 std = np.std(train_inputs, axis=0)
-train_df_inputs_norm = (train_inputs - mean) / std
-val_df_inputs_norm = (val_inputs - mean) / std
-test_df_inputs_norm = (test_inputs - mean) / std
+train_df_inputs_norm = train_inputs / train_max  # (train_inputs - mean) / std
+val_df_inputs_norm = val_inputs / train_max  # (val_inputs - mean) / std
+test_df_inputs_norm = test_inputs / train_max  # (test_inputs - mean) / std
 
 #plot_dataset(train_df_inputs_norm, train_labels)
 
@@ -88,7 +89,7 @@ simpl_mlp_results = simple_mlp.evaluate(x=test_df_inputs_norm, y=test_labels)
 predictions = []
 for input_val in test_df_inputs_norm:
     inputs = tf.convert_to_tensor(input_val, dtype=tf.float32)
-    inputs = tf.reshape(inputs, (1, imlp))
+    inputs = tf.reshape(inputs, (1, 1, imlp))
     prediction = simple_mlp(inputs)
     predictions.append(prediction[0])
 
@@ -96,20 +97,20 @@ results = []
 print("Num predictions:", len(predictions))
 for i in range(len(predictions)):
     prediction = predictions[i]
+    prediction = tf.reshape(prediction, (imlp))
+    prediction = prediction / 3
+    smoothened_prediction = savgol_filter(prediction, 11, 2)
     max_index = np.unravel_index(np.argmax(prediction, axis=None), prediction.shape)
     result = np.zeros(len(prediction), dtype=int)
     result[max_index] = int(1)
     results.append(result)
     if i+imlp < len(predictions) and i % 5 == 0:
-        plt.plot(np.linspace(0, imlp, imlp), test_df_inputs_norm[i], color='blue')
-        plt.plot(np.linspace(imlp, imlp+35, 35), test_df_inputs_norm[i+imlp], color='blue')
-        plt.plot(np.linspace(imlp, imlp+35, 35), test_labels[i], label='test_label')
+        plt.plot(np.linspace(0, imlp, imlp), test_df_inputs_norm[i][0], color='blue')
+        plt.plot(np.linspace(imlp, imlp+35, 35), test_df_inputs_norm[i+imlp][0], color='blue')
+        plt.plot(np.linspace(imlp, imlp+35, 35), test_labels[i][0], label='test_label')
         plt.plot(np.linspace(imlp, imlp+35, 35), prediction, label='prediction sigmoid', color='green')
+        plt.plot(np.linspace(imlp, imlp+35, 35), smoothened_prediction, label='smoothened prediction', color='red')
         plt.plot(np.linspace(imlp, imlp + 35, 35), result, label='prediction peak', color='red')
         plt.axvline(x=imlp, color='r', linestyle='--', )
         plt.legend(loc='upper left')
         plt.show()
-
-results = np.array(results)
-precision = precision_score(test_labels, results, average='micro')
-print("Precision:", precision)

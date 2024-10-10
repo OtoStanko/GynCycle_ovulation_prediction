@@ -69,7 +69,8 @@ class ModelComparator:
             # For every model make a prediction for this time window
             list_of_model_predictions = []
             for model in list_of_models:
-                predictions = model.predict(reshaped_tensor)
+                predictions = model(reshaped_tensor, smoothen=True)
+                predictions = tf.reshape(predictions, (1, self.pred_length, len(self.features)))
                 predictions = predictions[0][:, 0]
                 list_of_model_predictions.append(predictions)
             # Ground-truth time in days shifted to start with 0
@@ -139,8 +140,9 @@ class ModelComparator:
                                 plt.scatter(pred_time[pred_peaks[j]], model_predictions[pred_peaks[j]],
                                             color=darker_line_color, zorder=5)
                     else:
-                        plt.scatter(pred_time[pred_peaks], model_predictions[pred_peaks],
-                                    color=darker_line_color, zorder=5)
+                        if len(pred_peaks) != 0:
+                            plt.scatter(pred_time[pred_peaks], model_predictions[pred_peaks],
+                                        color=darker_line_color, zorder=5)
             if self.plot:
                 plt.axvline(x=input_length, color='r', linestyle='--', )
                 plt.legend(loc='upper left')

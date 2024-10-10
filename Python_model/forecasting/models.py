@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
+from scipy.signal import savgol_filter
 
 from supporting_scripts import curve_function
 
@@ -62,7 +63,7 @@ class FeedBack(tf.keras.Model):
         prediction = self.dense(x)
         return prediction, state
 
-    def call(self, inputs, training=None):
+    def call(self, inputs, training=None, smoothen=False):
         predictions = []
         prediction, state = self.warmup(inputs)
         predictions.append(prediction)
@@ -97,7 +98,7 @@ class WideCNN(tf.keras.Model):
         ])
         self.cnn = conv_model_wide
 
-    def call(self, inputs):
+    def call(self, inputs, smoothen=False):
         inputs = tf.convert_to_tensor(inputs, dtype=tf.float32)
         input_tensor = inputs
         for i in range(self.out_steps):
@@ -130,7 +131,7 @@ class NoisySinCurve(tf.keras.Model):
         plt.ylabel('Time in hours')
         plt.show()
 
-    def call(self, inputs):
+    def call(self, inputs, smoothen=False):
         inputs = tf.reshape(inputs, (self.input_length,))
         result = tf.py_function(self.numpy_curve_fit, [inputs], tf.float32)
         result = tf.reshape(result, (1, self.out_steps, self.num_features))
@@ -144,11 +145,33 @@ class NoisySinCurve(tf.keras.Model):
         y_fit = curve_function(x_fit, self.a_opt, popt[0], self.c_opt)
         noise = np.random.normal(0, self.noise, y_fit.shape)
         y_fit = y_fit + noise
-        print(popt)
+        #print(popt)
         return np.array(y_fit, dtype=np.float32)
 
     def move_curve_function(self, x_data, b):
         return curve_function(x_data, self.a_opt, b, self.c_opt)
+
+
+class ClassificationMLP(tf.keras.Model):
+    def __init__(self, input_length, out_steps, num_features):
+        super().__init__()
+        self.input_length = input_length
+        self.out_steps = out_steps
+        self.num_features = num_features
+        self.mlp = tf.keras.models.Sequential([
+            tf.keras.layers.Dense(units=256, activation='relu'),
+            tf.keras.layers.Dense(units=64, activation='relu'),
+            tf.keras.layers.Dense(units=out_steps, activation='sigmoid')
+        ])
+
+    def call(self, inputs, smoothen=False):
+        inputs = tf.reshape(inputs, (-1, self.num_features, self.input_length))
+        result = self.mlp(inputs)
+        if smoothen:
+            result = tf.reshape(result, (self.out_steps))
+            result = result / 3
+            result = savgol_filter(result, 11, 2)
+        return result
 
 
 class Distributed_peaks(tf.keras.Model):
