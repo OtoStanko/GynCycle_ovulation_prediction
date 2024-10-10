@@ -16,8 +16,8 @@ from windowGenerator import WindowGenerator
 """
     Parameters
 """
-TRAIN_DATA_SUFFIX = 4
-TEST_DATA_SUFFIX = 1
+TRAIN_DATA_SUFFIX = 'of_4'
+TEST_DATA_SUFFIX = 'of_1'
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
 
 # Set the parameters
@@ -32,7 +32,7 @@ MAX_EPOCHS = 25
 OUT_STEPS = 35
 INPUT_WIDTH = 35
 
-NUM_RUNS = 3
+NUM_RUNS = 10
 PEAK_COMPARISON_DISTANCE = 2
 PLOT_TESTING = True
 

@@ -4,12 +4,12 @@ import numpy as np
 import pandas as pd
 
 
-def create_dataframe(input_files_directory, features, time_file_prefix, run_id=1):
-    time_file = os.path.join(input_files_directory, "{}_{}.csv".format(time_file_prefix, run_id))
+def create_dataframe(input_files_directory, features, time_file_prefix, feature_file_suffix='1'):
+    time_file = os.path.join(input_files_directory, "{}_{}.csv".format(time_file_prefix, feature_file_suffix))
     times = pd.read_csv(time_file, header=None, names=[time_file_prefix])
     hormone_levels = [times]
     for feature in features:
-        feature_file = os.path.join(input_files_directory, "{}_{}.csv".format(feature, run_id))
+        feature_file = os.path.join(input_files_directory, "{}_{}.csv".format(feature, feature_file_suffix))
         feature_values = pd.read_csv(feature_file, header=None, names=[feature])
         hormone_levels.append(feature_values)
     combined_df = pd.concat(hormone_levels, axis=1)
