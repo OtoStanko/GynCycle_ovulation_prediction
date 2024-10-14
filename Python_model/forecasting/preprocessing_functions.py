@@ -108,9 +108,9 @@ def create_classification_dataset(df, feature, peaks, input_window_length):
             #inputs.append([input_data])
             inputs.append(tf.expand_dims(input_data, axis=0))
             label = (next_peaks[0] - end_time)
-            label = min(label, 34)
             label_vector = [0 for _ in range(35)]
-            label_vector[label] = 1
+            if label < 35:
+                label_vector[label] = 1
             #labels.append([label_vector])
             labels.append(tf.convert_to_tensor([label_vector], dtype=tf.int32))
         else:

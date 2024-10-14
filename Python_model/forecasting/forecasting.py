@@ -5,18 +5,17 @@ import IPython.display
 import matplotlib.pyplot as plt
 import scipy.signal
 import seaborn as sns
-import tensorflow as tf
 
 from custom_losses import Peak_loss
 from model_comparison import ModelComparator
-from models import FeedBack, WideCNN, NoisySinCurve, Distributed_peaks, MMML, ClassificationMLP
+from models import FeedBack, WideCNN, NoisySinCurve, MMML, ClassificationMLP
 from preprocessing_functions import *
 from windowGenerator import WindowGenerator
 
 """
     Parameters
 """
-TRAIN_DATA_SUFFIX = 'of_4'
+TRAIN_DATA_SUFFIX = '50'
 TEST_DATA_SUFFIX = 'of_1'
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
 
@@ -32,7 +31,7 @@ MAX_EPOCHS = 25
 OUT_STEPS = 35
 INPUT_WIDTH = 35
 
-NUM_RUNS = 10
+NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
 PLOT_TESTING = False
 
@@ -241,7 +240,7 @@ def mmml(model1, model2):
     return combination
 
 
-def classification_mlp():
+def classification_datasets():
     MIN_PEAK_HEIGHT = 0.3
 
     # Dataset is normalized
@@ -252,8 +251,10 @@ def classification_mlp():
     train_inputs, train_labels = create_classification_dataset(train_df, features[0], train_df_peaks, INPUT_WIDTH)
     val_inputs, val_labels = create_classification_dataset(val_df, features[0], val_df_peaks, INPUT_WIDTH)
     test_inputs, test_labels = create_classification_dataset(test_df, features[0], test_df_peaks, INPUT_WIDTH)
+    return train_inputs, train_labels, val_inputs, val_labels
 
 
+def classification_mlp(train_inputs, train_labels, val_inputs, val_labels):
     classification_model = ClassificationMLP(INPUT_WIDTH, OUT_STEPS, len(features))
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                       mode='min')
@@ -297,20 +298,29 @@ sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_pro
 #tf.config.run_functions_eagerly(True)
 model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
-
+train_inputs, train_labels, val_inputs, val_labels = classification_datasets()
 for run_id in range(NUM_RUNS):
     feedback_model = autoregressive_model()
     feedback_model._name = 'feed_back'
     multi_cnn_model = multistep_cnn()
     multi_cnn_model._name = 'wide_cnn'
-    fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0], noise=0.1)
+    fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0], noise=0.0)
     fitted_sin._name = 'sin_curve'
-    classification_model = classification_mlp()
-    classification_model._name = 'classification_mlp'
+    #classification_model = classification_mlp()
+    #classification_model._name = 'classification_mlp_raw'
+    #classification_model_smoothened = classification_mlp(train_inputs, train_labels, val_inputs, val_labels)
+    #classification_model_smoothened._name = 'classification_mlp_smooth'
+    #classification_model_combined = classification_mlp()
+    #classification_model_combined._name = 'classification_mlp_combined'
+    models = [feedback_model, multi_cnn_model, fitted_sin]
+    for i in range(2, 21, 2):
+        model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels)
+        model._name = 'minPeakDist_' + str(i)
+        models.append(model)
     #combined = mmml(feedback_model, multi_cnn_model)
     #combined._name = 'combined_RNN_CNN'
 
-    list_of_models = [feedback_model, fitted_sin, multi_cnn_model, classification_model]
+    list_of_models = models
     model_comparator.compare_models(list_of_models, run_id)
     model_comparator.plot_pred_peak_distribution(run_id)
 

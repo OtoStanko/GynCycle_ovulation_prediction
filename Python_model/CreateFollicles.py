@@ -5,7 +5,7 @@ def CreateFollicles(parafoll, paraPoi, tb, te):
     # Create normal distributed fsh sensitivities for each follicle
     with open('FSH.txt', 'w+') as fileID2:
         fileID2.write('Number    FSH\n')
-        num_FSH_sensitivity_values = 10000
+        num_FSH_sensitivity_values = 50000
         FSHdistri = np.random.normal(loc=parafoll[7],
                                      scale=parafoll[8],
                                      size=num_FSH_sensitivity_values)

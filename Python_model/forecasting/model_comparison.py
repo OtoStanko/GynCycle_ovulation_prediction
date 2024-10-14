@@ -71,7 +71,7 @@ class ModelComparator:
             # For every model make a prediction for this time window
             list_of_model_predictions = []
             for model in list_of_models:
-                predictions = model(reshaped_tensor, smoothen=True)
+                predictions = model(reshaped_tensor)
                 predictions = tf.reshape(predictions, (1, self.pred_length, len(self.features)))
                 predictions = predictions[0][:, 0]
                 list_of_model_predictions.append(predictions)
@@ -92,6 +92,8 @@ class ModelComparator:
             curr_peaks = curr_peaks - offset
             gt_peaks_predWindow = np.array([x for x in peaks if offset + input_length <= x < input_length + pred_length + offset])
             gt_peaks_predWindow = gt_peaks_predWindow - offset
+            #if len(gt_peaks_predWindow) >= 1:
+            #    gt_peaks_predWindow = gt_peaks_predWindow[:1]
             # Try all the peaks, shift them to match the predicted data
             all_peaks_offset = np.array([x for x in peaks]) - offset
             if self.plot:
@@ -100,12 +102,17 @@ class ModelComparator:
             if len(curr_peaks) > 0 and self.plot:
                 plt.scatter(gt_time[curr_peaks], ground_truth.iloc[curr_peaks],
                             color='red', zorder=5, label='Test data peaks')
+            #methods = ['dense', 'combined', 'raw', 'smooth']
+            methods = ['dense' for _ in range(len(list_of_models))]
+            min_distances = [self.MIN_PEAK_DISTANCE] * 3
+            min_distances = min_distances + [i for i in range(2, 21, 2)]
             for i in range(len(list_of_model_predictions)):
                 model = list_of_models[i]
                 model_name = model._name
                 model_predictions = list_of_model_predictions[i]
                 # Detect peaks in the prediction part (forecast) and shift them to start from the right time
-                pred_peaks, _ = scipy.signal.find_peaks(model_predictions, distance=self.MIN_PEAK_DISTANCE)
+                pred_peaks = model.get_peaks(model_predictions, min_distances[i], methods[i])
+                #pred_peaks, _ = scipy.signal.find_peaks(model_predictions, distance=self.MIN_PEAK_DISTANCE)
                 results.num_detected_peaks[model_name] = results.num_detected_peaks.get(model_name, 0) + len(pred_peaks)
                 offset_pred_peaks = pred_peaks + input_length
                 unfiltered_signed_distances = sp.get_signed_distances(all_peaks_offset, offset_pred_peaks)
@@ -224,13 +231,12 @@ class ModelComparator:
                     plt.show()
 
     def simulation_summary(self):
-        if self.peaks_within_threshold is None:
-            self.peaks_within_threshold = {}
-            self.peaks_outside_threshold = {}
-            self.peaks_within_threshold_rev = {}
-            self.peaks_outside_threshold_rev = {}
-            self.sum_of_dists_to_nearest_peak = {}
-            self.num_detected_peaks = {}
+        self.peaks_within_threshold = {}
+        self.peaks_outside_threshold = {}
+        self.peaks_within_threshold_rev = {}
+        self.peaks_outside_threshold_rev = {}
+        self.sum_of_dists_to_nearest_peak = {}
+        self.num_detected_peaks = {}
         for run_id in self.results.keys():
             within, outside, nearest_dists, num_detected, peak_distances_distribution, within_rev, outside_rev = (
                 self.get_run_results_tuple(run_id))
@@ -262,13 +268,31 @@ class ModelComparator:
             print("Mode required a tuple of two bools")
             return
         self.simulation_summary()
-        colors = mpl.colormaps.get_cmap('tab10')  # Using tab10 colormap with as many colors as there are keys
+        #colors = mpl.colormaps.get_cmap('tab10')  # Using tab10 colormap with as many colors as there are keys
+        colors = mpl.cm.get_cmap('Set3', 13)
+        if mode[0] and mode[1]:
+            plt.figure(figsize=(8, 6))
+            for idx, key in enumerate(self.peaks_within_threshold):
+                tp = np.array(self.peaks_within_threshold[key])
+                fp = np.array(self.peaks_outside_threshold[key])
+                fn = np.array(self.peaks_within_threshold_rev[key])
+                tn = np.array(self.peaks_outside_threshold_rev[key])
+                fpt = fp / (fp + tn)
+                tpr = tp / (tp + fn)
+                plt.scatter(fpt, tpr, color=colors(idx), label=key)
+            plt.xlim(0, 1)
+            plt.ylim(0, 1)
+            plt.plot([0, 1], [0, 1], 'r--', label='y=x')
+            plt.xlabel('FPR')
+            plt.ylabel('TPR')
+            plt.title('FPT vs TPR for peak prediction of models')
+            plt.legend(title="Model")
+            plt.show()
         if mode[0]:
             plt.figure(figsize=(8, 6))
             for idx, key in enumerate(self.peaks_within_threshold):
                 x_values = self.peaks_outside_threshold[key]
                 y_values = self.peaks_within_threshold[key]
-
                 # Plot each key's data with a unique color and label it with the key
                 plt.scatter(x_values, y_values, color=colors(idx), label=key)
 

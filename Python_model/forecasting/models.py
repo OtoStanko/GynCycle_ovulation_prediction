@@ -1,6 +1,7 @@
 import random
 
 import numpy as np
+import scipy.signal
 import tensorflow as tf
 from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
@@ -63,7 +64,7 @@ class FeedBack(tf.keras.Model):
         prediction = self.dense(x)
         return prediction, state
 
-    def call(self, inputs, training=None, smoothen=False):
+    def call(self, inputs, training=None):
         predictions = []
         prediction, state = self.warmup(inputs)
         predictions.append(prediction)
@@ -80,6 +81,10 @@ class FeedBack(tf.keras.Model):
         # predictions.shape => (batch, time, features)
         predictions = tf.transpose(predictions, [1, 0, 2])
         return predictions
+
+    def get_peaks(self, prediction, min_peak_distance, method='raw'):
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=min_peak_distance)
+        return pred_peaks
 
 
 class WideCNN(tf.keras.Model):
@@ -98,7 +103,7 @@ class WideCNN(tf.keras.Model):
         ])
         self.cnn = conv_model_wide
 
-    def call(self, inputs, smoothen=False):
+    def call(self, inputs):
         inputs = tf.convert_to_tensor(inputs, dtype=tf.float32)
         input_tensor = inputs
         for i in range(self.out_steps):
@@ -107,6 +112,10 @@ class WideCNN(tf.keras.Model):
             input_tensor = tf.concat([input_tensor, y], axis=1)
         predictions = input_tensor[:, -self.out_steps:, :]
         return predictions
+
+    def get_peaks(self, prediction, min_peak_distance, method='raw'):
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=min_peak_distance)
+        return pred_peaks
 
 
 class NoisySinCurve(tf.keras.Model):
@@ -131,7 +140,7 @@ class NoisySinCurve(tf.keras.Model):
         plt.ylabel('Time in hours')
         plt.show()
 
-    def call(self, inputs, smoothen=False):
+    def call(self, inputs):
         inputs = tf.reshape(inputs, (self.input_length,))
         result = tf.py_function(self.numpy_curve_fit, [inputs], tf.float32)
         result = tf.reshape(result, (1, self.out_steps, self.num_features))
@@ -151,6 +160,10 @@ class NoisySinCurve(tf.keras.Model):
     def move_curve_function(self, x_data, b):
         return curve_function(x_data, self.a_opt, b, self.c_opt)
 
+    def get_peaks(self, prediction, min_peak_distance, method='raw'):
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=min_peak_distance)
+        return pred_peaks
+
 
 class ClassificationMLP(tf.keras.Model):
     def __init__(self, input_length, out_steps, num_features):
@@ -164,15 +177,63 @@ class ClassificationMLP(tf.keras.Model):
             tf.keras.layers.Dense(units=out_steps, activation='sigmoid')
         ])
 
-    def call(self, inputs, smoothen=False):
+    def call(self, inputs):
         inputs = tf.reshape(inputs, (-1, self.num_features, self.input_length))
+        shape = inputs.shape
+        print(shape)
         result = self.mlp(inputs)
-        if smoothen:
-            result = tf.reshape(result, (self.out_steps))
-            result = result / 3
-            result = savgol_filter(result, 11, 2)
+        #if smoothen:
+        #    result = tf.reshape(result, (self.out_steps))
+        #    result = result / 3
+        #    result = savgol_filter(result, 11, 2)
         return result
 
+    def get_peaks(self, prediction, min_peak_distance, method='raw'):
+        if method == 'raw':
+            return self.peaks_raw(prediction, min_peak_distance)
+        elif method == 'smooth':
+            return self.peaks_smoothened(prediction, min_peak_distance)
+        elif method == 'combined':
+            return self.peaks_combined(prediction, min_peak_distance)
+        elif method == 'dense':
+            return self.peaks_raw(prediction, min_peak_distance)
+
+    def peaks_raw(self, prediction, min_peak_distance):
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=min_peak_distance)
+        return pred_peaks
+
+    def peaks_smoothened(self, prediction, min_peak_distance):
+        result = tf.reshape(prediction, (self.out_steps))
+        result = result / 3
+        result = savgol_filter(result, 11, 2)
+        pred_peaks, _ = scipy.signal.find_peaks(result, distance=min_peak_distance)
+        return pred_peaks
+
+    def is_peak(self, index, values):
+        if index == 0:  # First element
+            return values[index] > values[index + 1]
+        elif index == len(values) - 1:  # Last element
+            return values[index] > values[index - 1]
+        else:  # Middle elements
+            return values[index] > values[index - 1] and values[index] > values[index + 1]
+
+    def peaks_combined(self, prediction, min_peak_distance):
+        offset = 15
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=min_peak_distance)
+        first_peak = pred_peaks[0]
+        result = np.array([first_peak])
+        if first_peak + offset < 35:
+            potential_second_peak = prediction[first_peak+offset:]
+            sorted_indexes = np.argsort(potential_second_peak)[::-1]
+            sorted_indexes += first_peak + offset
+            peak_index = None
+            for index in sorted_indexes:
+                if self.is_peak(index, prediction):
+                    peak_index = index
+                    break
+            if peak_index is not None:
+                result = np.append(result, peak_index)
+        return result
 
 class Distributed_peaks(tf.keras.Model):
     def __init__(self, out_steps, num_features, position):
