@@ -2,10 +2,9 @@ import numpy as np
 
 from HormoneModel import ODE_Model_NormalCycle
 
-def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutStim, FollStim, DoubStim, firstExtraction):
+def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, Stim, settings):
     # determine number of active follicles
     NumFollicles = y.shape[0] - para[1] # does not work when a new follicle is added
-    NumFollicles = len(Follicles.Active)
 
     if NumFollicles > 0:
         x = y[:NumFollicles]
@@ -20,16 +19,27 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
             if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] in [-2, -3]:
                 x[i] = 0
 
+    # E2 production
+    if NumFollicles > 0 and para[0] == 0:
+        for i in range(NumFollicles):
+            if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 4:
+                x[i] = 0
+
+    # calculate E2 concentration
+    SF = np.pi * np.sum((x ** Par[56]) / (x ** Par[56] + Par[57] ** Par[56]) * (x ** 2))
+    E2_lvl = Par[74] + (Par[58] + Par[59] * SF) + Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
+    P4_lvl = Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
+    #print("E2:", E2_lvl, "P4:", P4_lvl)
+    #print("Folls +..., ", y)
+    #print("Num follicles:", NumFollicles, "Current P4 lvl: ", P4_lvl)
+
     # solve differential equations
-    #print("P4: ", Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
-    print(NumFollicles, y[NumFollicles + 1])
-    print(y)
-    dy = ODE_Model_NormalCycle(t, y, Par)
+    dy = ODE_Model_NormalCycle(t, y, Par, E2_lvl, P4_lvl) # E2 and p4 as  params
     f = dy.copy()
 
     r = len(y)
     fshrezcomp = y[r-15]
-    p4all = y[r-16]
+    p4all = P4_lvl
     SumV = np.sum(x ** parafoll[0])
 
     for i in range(NumFollicles):
@@ -47,7 +57,7 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
         ffsh = (fshrezcomp ** 4) / (fshrezcomp ** 4 + (fFSH) ** 4)
 
         # follicles growth equation
-        X = ffsh * (xi - y[i]) * y[i] * (gamma - (kappa * (SumV - (parafoll[3] * (y[i] ** parafoll[0])))))
+        X = ffsh * (xi - fsize) * fsize * (gamma - (kappa * (SumV - (parafoll[3] * (fsize ** parafoll[0])))))
 
         if para[0] == 1:
             if X <= 0:
@@ -56,16 +66,10 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
         if para[0] == 0:
             if (X <= parafoll[11] or
                 Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == -2 or
-                (X <= parafoll[12] and
-                     (t - Follicles.Follicle[Follicles.Active[i]-1]['Time'][0]) >= parafoll[14] and
-                     Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 3) or
-                    (X <= parafoll[12] and
-                     (t - Follicles.Follicle[Follicles.Active[i]-1]['Time'][0]) >= parafoll[13] and
-                     Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == -1) or
-                    (Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 3 and
-                     (t - Follicles.Follicle[Follicles.Active[i]]['TimeDecrease']) >= parafoll[10]) or
-                    (Follicles.Follicle[Follicles.Active[i]-1]['Time'][0] -
-                     Follicles.Follicle[Follicles.Active[i]-1]['Time'][-1] > parafoll[14])):
+                (X <= parafoll[12] and (t - Follicles.Follicle[Follicles.Active[i]-1]['Time'][0]) >= parafoll[14] and Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 3) or
+                (X <= parafoll[12] and (t - Follicles.Follicle[Follicles.Active[i]-1]['Time'][0]) >= parafoll[13] and Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == -1) or
+                (Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 3 and (t - Follicles.Follicle[Follicles.Active[i]-1]['TimeDecrease']) >= parafoll[10]) or
+                (Follicles.Follicle[Follicles.Active[i]-1]['Time'][0] - Follicles.Follicle[Follicles.Active[i]-1]['Time'][-1] > parafoll[14])):
                 # set time the follicle starts to decrease & set destiny to decrease
                 #print(Follicles.Follicle)
                 #print(Follicles.Active)
@@ -82,129 +86,5 @@ def FollicleFunction(t, y, Tovu, Follicles, para, parafoll, Par, dd1, Stim, LutS
         else:
             # if called to test use normal equation
             f[i] = X
-
-    # E2 production
-    if NumFollicles > 0 and para[0] == 0:
-        for i in range(NumFollicles):
-            if Follicles.Follicle[Follicles.Active[i]-1]['Destiny'] == 4:
-                x[i] = 0
-
-    SF = np.pi * np.sum((x ** Par[56]) / (x ** Par[56] + Par[57] ** Par[56]) * (x ** 2))
-
-    # calculate E2 concentration
-    f[NumFollicles] = y[NumFollicles] - Par[74] - (Par[58] + Par[59] * SF) -\
-                      Par[60] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
-
-    # Calculation of P4 values
-    print("P4: ", Par[75] + Par[62] * np.exp(-Par[61] * (t - (Tovu + 7)) ** 2))
-    f[NumFollicles + 1] = y[NumFollicles + 1] - Par[75] - Par[62] *\
-                          np.exp(-Par[61] * (t - (Tovu + 7)) ** 2)
-
-    # Calculation of FSHAnaC
-    if Stim == 0:
-        f[NumFollicles + 16] = y[NumFollicles + 16] - 0
-        f[NumFollicles + 15] = y[NumFollicles + 15] - 0
-
-    if LutStim:
-        if Par[63] > 0 and t > Par[70]:
-            n = dd1
-            H = 0
-            J = 0
-            for i in range(n):
-                dt = Par[70] + i
-                h = ((Par[64] * (Par[65] ** 2)) / ((Par[65] - Par[66]) ** 2)) * \
-                    (np.exp(-Par[65] * (t - dt)) * (Par[66] * (t - dt) - Par[65] * (t - dt) - 1) + np.exp(-Par[66] * (t - dt)))
-                H += h
-
-                j = ((Par[67] * (Par[68] ** 2)) / ((Par[68] - Par[69]) ** 2)) * \
-                    (np.exp(-Par[68] * (t - dt)) * (Par[69] * (t - dt) - Par[68] * (t - dt) - 1) + np.exp(-Par[69] * (t - dt)))
-                J += j
-
-            f[NumFollicles + 16] = y[NumFollicles + 16] - H
-            f[NumFollicles + 15] = y[NumFollicles + 15] - J
-        else:
-            f[NumFollicles + 16] = y[NumFollicles + 16] - 0
-            f[NumFollicles + 15] = y[NumFollicles + 15] - 0
-
-    if FollStim:
-        if Par[63] > 0 and t > Par[70]:
-            n = dd1
-            s = (-1) ** dd1
-            H = 0
-            J = 0
-            if n < 6:
-                if s == 1:
-                    for i in range(n):
-                        dt = Par[70] + i
-                        h = ((Par[64] * (Par[65] ** 2)) / ((Par[65] - Par[66]) ** 2)) * \
-                            (np.exp(-Par[65] * (t - dt)) * (Par[66] * (t - dt) - Par[65] * (t - dt) - 1) + np.exp(-Par[66] * (t - dt)))
-                        H += h
-
-                        j = ((Par[67] * (Par[68] ** 2)) / ((Par[68] - Par[69]) ** 2)) * \
-                            (np.exp(-Par[68] * (t - dt)) * (Par[69] * (t - dt) - Par[68] * (t - dt) - 1) + np.exp(-Par[69] * (t - dt)))
-                        J += j
-                else:
-                    for i in range(n):
-                        dt = Par[70] + i
-                        h = ((Par[64] * (2 / 3) * (Par[65] ** 2)) / ((Par[65] - Par[66]) ** 2)) * \
-                            (np.exp(-Par[65] * (t - dt)) * (Par[66] * (t - dt) - Par[65] * (t - dt) - 1) + np.exp(-Par[66] * (t - dt)))
-                        H += h
-
-                        j = ((Par[67] * (2 / 3) * (Par[68] ** 2)) / ((Par[68] - Par[69]) ** 2)) * \
-                            (np.exp(-Par[68] * (t - dt)) * (Par[69] * (t - dt) - Par[68] * (t - dt) - 1) + np.exp(-Par[69] * (t - dt)))
-                        J += j
-            else:
-                for i in range(n):
-                    dt = Par[70] + i
-                    h = ((Par[64] * (Par[65] ** 2)) / ((Par[65] - Par[66]) ** 2)) * \
-                        (np.exp(-Par[65] * (t - dt)) * (Par[66] * (t - dt) - Par[65] * (t - dt) - 1) + np.exp(-Par[66] * (t - dt)))
-                    H += h
-
-                    j = ((Par[67] * (Par[68] ** 2)) / ((Par[68] - Par[69]) ** 2)) * \
-                        (np.exp(-Par[68] * (t - dt)) * (Par[69] * (t - dt) - Par[68] * (t - dt) - 1) + np.exp(-Par[69] * (t - dt)))
-                    J += j
-
-            f[NumFollicles + 16] = y[NumFollicles + 16] - H
-            f[NumFollicles + 15] = y[NumFollicles + 15] - J
-        else:
-            f[NumFollicles + 16] = y[NumFollicles + 16] - 0
-            f[NumFollicles + 15] = y[NumFollicles + 15] - 0
-
-    if DoubStim:
-        if Par[63] > 0 and t > Par[70]:
-            n = dd1
-            H = 0
-            J = 0
-            if firstExtraction:
-                for i in range(n):
-                    dt = Par[70] + i
-                    h = ((Par[64] * (Par[65] ** 2)) / ((Par[65] - Par[66]) ** 2)) * \
-                        (np.exp(-Par[65] * (t - dt)) * (Par[66] * (t - dt) - Par[65] * (t - dt) - 1) + np.exp(-Par[66] * (t - dt)))
-                    H += h
-
-                    j = ((Par[67] * (Par[68] ** 2)) / ((Par[68] - Par[69]) ** 2)) * \
-                        (np.exp(-Par[68] * (t - dt)) * (Par[69] * (t - dt) - Par[68] * (t - dt) - 1) + np.exp(-Par[69] * (t - dt)))
-                    J += j
-            else:
-                s = (-1) ** dd1
-                if s == -1:
-                    for i in range(n):
-                        dt = Par[70] + i
-                        h = ((Par[64] * (2 / 3) * (Par[65] ** 2)) / ((Par[65] - Par[66]) ** 2)) * \
-                            (np.exp(-Par[65] * (t - dt)) * (Par[66] * (t - dt) - Par[65] * (t - dt) - 1) + np.exp(-Par[66] * (t - dt)))
-                        H += h
-
-                        j = ((Par[67] * (2 / 3) * (Par[68] ** 2)) / ((Par[68] - Par[69]) ** 2)) * \
-                            (np.exp(-Par[68] * (t - dt)) * (Par[69] * (t - dt) - Par[68] * (t - dt) - 1) + np.exp(-Par[69] * (t - dt)))
-                        J += j
-                else:
-                    H = 0
-                    J = 0
-
-            f[NumFollicles + 16] = y[NumFollicles + 16] - H
-            f[NumFollicles + 15] = y[NumFollicles + 15] - J
-        else:
-            f[NumFollicles + 16] = y[NumFollicles + 16] - 0
-            f[NumFollicles + 15] = y[NumFollicles + 15] - 0
 
     return f

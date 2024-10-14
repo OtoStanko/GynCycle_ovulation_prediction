@@ -12,13 +12,11 @@ class FollicleClass:
             'Number': 1,
             'Time': np.array([t]),
             'Y': np.array([y0Follicle]),
-            'Destiny': -1,  # the foll destinys: -1: not clear yet, 0:died, 1:ovulated, -2:decreasing in size but did not yet died
+            'Destiny': -1,  # the foll destinies: -1: not clear yet, 0:died, 1:ovulated, -2:decreasing in size but did not yet died
             'FSHSensitivity': FSHSensitivity,
             'TimeDecrease': 0  # time the size of the foll started to decrease
         }
 
-        #self.Follicle.append(Foll)
-        #self.ActiveFSHS.append(Foll['FSHSensitivity'])
         self.Follicle = np.append(self.Follicle, Foll)
         self.ActiveFSHS = np.append(self.ActiveFSHS, Foll['FSHSensitivity'])
 

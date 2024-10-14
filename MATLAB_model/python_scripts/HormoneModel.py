@@ -1,6 +1,6 @@
 import numpy as np
 
-def ODE_Model_NormalCycle(t, y, Par):
+def ODE_Model_NormalCycle(t, y, Par, E2_lvl, P4_lvl):
     #print("t", t)
     #print("y", y)
     #print("Par", Par)
@@ -24,11 +24,11 @@ def ODE_Model_NormalCycle(t, y, Par):
     i_RFSH     = r - 13
     i_RFSH_des = r - 14
     i_FSHR     = r - 15
-    i_P4       = r - 16
-    i_E2       = r - 17
+    #i_P4       = r - 16
+    #i_E2       = r - 17
 
-    yGfreq = Par[0] / (1 + (y[i_P4] / Par[1]) ** Par[2]) * (1 + y[i_E2] ** Par[3] / (Par[4] ** Par[3] + y[i_E2] ** Par[3]))
-    yGmass = Par[5] * (y[i_E2] ** Par[6] / (Par[7] ** Par[6] + y[i_E2] ** Par[6]) + Par[8] ** Par[9] / (Par[8] ** Par[9] + y[i_E2] ** Par[9]))
+    yGfreq = Par[0] / (1 + (P4_lvl / Par[1]) ** Par[2]) * (1 + E2_lvl ** Par[3] / (Par[4] ** Par[3] + E2_lvl ** Par[3]))
+    yGmass = Par[5] * (E2_lvl ** Par[6] / (Par[7] ** Par[6] + E2_lvl ** Par[6]) + Par[8] ** Par[9] / (Par[8] ** Par[9] + E2_lvl ** Par[9]))
 
     dy[i_GnRH] = yGmass * yGfreq - Par[10] * y[i_GnRH] * y[i_RecGa] + Par[11] * y[i_GReca] - Par[12] * y[i_GnRH]
     dy[i_RecGa] = Par[11] * y[i_GReca] - Par[10] * y[i_GnRH] * y[i_RecGa] - Par[13] * y[i_RecGa] + Par[14] * y[i_RecGi]
@@ -36,10 +36,10 @@ def ODE_Model_NormalCycle(t, y, Par):
     dy[i_GReca] = Par[10] * y[i_GnRH] * y[i_RecGa] - Par[11] * y[i_GReca] - Par[18] * y[i_GReca] + Par[19] * y[i_GReci]
     dy[i_GReci] = Par[18] * y[i_GReca] - Par[19] * y[i_GReci] - Par[16] * y[i_GReci] - Par[20] * y[i_GReci]
 
-    hp_e2 = 1.5 * (y[i_E2] / Par[21]) ** Par[22] / (1 + (y[i_E2] / Par[21]) ** Par[22])
+    hp_e2 = 1.5 * (E2_lvl / Par[21]) ** Par[22] / (1 + (E2_lvl / Par[21]) ** Par[22])
     hp_freq = ((yGfreq / Par[23]) ** Par[24]) / (1 + (yGfreq / Par[23]) ** Par[24])
     f_LH_prod1 = Par[25] + Par[26] * hp_e2
-    hm_p4 = 1 + Par[29] * (y[i_P4] / Par[27]) ** Par[28]
+    hm_p4 = 1 + Par[29] * (P4_lvl / Par[27]) ** Par[28]
     #print(hm_p4, y[i_P4])
 
     f_LH_prod = (f_LH_prod1 / hm_p4) * (1 + hp_freq)
@@ -48,11 +48,11 @@ def ODE_Model_NormalCycle(t, y, Par):
     dy[i_RP_LH] = f_LH_prod - f_LH_rel * y[i_RP_LH]
     dy[i_LH] = (1 / Par[37]) * f_LH_rel * y[i_RP_LH] - Par[38] * y[i_LH]
     f_FSH_prod1 = Par[39]
-    f_FSH_prod2 = 1 + (y[i_P4] / Par[40]) ** Par[41]
+    f_FSH_prod2 = 1 + (P4_lvl / Par[40]) ** Par[41]
     hm_freq = 1 / (1 + (yGfreq / Par[42]) ** Par[43])
 
     f_FSH_prod = (f_FSH_prod1 / f_FSH_prod2) * hm_freq
-    f_FSH_rel = Par[44] + Par[45] * (Par[30] * ((y[i_GReca] / Par[46]) ** Par[47] / (1 + (y[i_GReca] / Par[46]) ** Par[47]))) * 1 / (1 + (y[i_E2] / Par[72]) ** Par[73])
+    f_FSH_rel = Par[44] + Par[45] * (Par[30] * ((y[i_GReca] / Par[46]) ** Par[47] / (1 + (y[i_GReca] / Par[46]) ** Par[47]))) * 1 / (1 + (E2_lvl / Par[72]) ** Par[73])
 
     dy[i_RP_FSH] = f_FSH_prod - f_FSH_rel * y[i_RP_FSH]
     dy[i_FSH] = (1 / Par[37]) * f_FSH_rel * y[i_RP_FSH] - Par[49] * y[i_FSH] - Par[50] * y[i_FSH]
