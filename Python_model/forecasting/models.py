@@ -119,7 +119,7 @@ class WideCNN(tf.keras.Model):
 
 
 class NoisySinCurve(tf.keras.Model):
-    def __init__(self, input_length, out_steps, num_features, train_df, feature, noise=0, period=25):
+    def __init__(self, input_length, out_steps, num_features, train_df, feature, noise=0, period=28):
         super().__init__()
         self.input_length = input_length
         self.out_steps = out_steps

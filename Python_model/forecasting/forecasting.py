@@ -15,7 +15,7 @@ from windowGenerator import WindowGenerator
 """
     Parameters
 """
-TRAIN_DATA_SUFFIX = '50'
+TRAIN_DATA_SUFFIX = '1_n'
 TEST_DATA_SUFFIX = 'of_1'
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
 
@@ -33,7 +33,7 @@ INPUT_WIDTH = 35
 
 NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
-PLOT_TESTING = False
+PLOT_TESTING = True
 
 
 def compile_and_fit(model, window, patience=2):
@@ -294,7 +294,8 @@ frequencies = list(count.values())
 plt.bar(numbers, frequencies, color='skyblue')
 plt.show()
 
-sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
+sampled_test_df = test_df
+#sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
 #tf.config.run_functions_eagerly(True)
 model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
@@ -312,11 +313,13 @@ for run_id in range(NUM_RUNS):
     #classification_model_smoothened._name = 'classification_mlp_smooth'
     #classification_model_combined = classification_mlp()
     #classification_model_combined._name = 'classification_mlp_combined'
-    models = [feedback_model, multi_cnn_model, fitted_sin]
-    for i in range(2, 21, 2):
-        model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels)
-        model._name = 'minPeakDist_' + str(i)
-        models.append(model)
+    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels)
+    model._name = 'minPeakDist_24'
+    models = [feedback_model, multi_cnn_model, fitted_sin, model]
+    #for i in [14, 18, 20, 22, 24, 26, 30]:
+    #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels)
+    #    model._name = 'minPeakDist_' + str(i)
+    #    models.append(model)
     #combined = mmml(feedback_model, multi_cnn_model)
     #combined._name = 'combined_RNN_CNN'
 

@@ -4,6 +4,14 @@ from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
 
 
+def neg_function(x, a, b, c):
+    return - a * (x-b) ** (-1) + c
+
+
+def quadratic(x, a, b, c):
+    return a * (x-b) ** (2) + c
+
+
 def curve_function(x, a, b, c):
     return a * np.sin( (x * (2 * np.pi / (c * 24))) - b )
 
@@ -26,6 +34,12 @@ def fit_sin_curve(train_df, feature, val_df, test_df, original_df):
     plt.title('Sampled dataframe with raw hours with fitted sin curve')
     plt.ylabel('Time in hours')
     plt.show()
+
+
+def fit_curve(x, y, fun, a=1, b=1, c=1):
+    popt, _ = curve_fit(fun, x, y, p0=[a, b, c])
+    a_opt, b_opt, c_opt = popt
+    return a_opt, b_opt, c_opt
 
 
 def darken_color(color, factor=0.7):

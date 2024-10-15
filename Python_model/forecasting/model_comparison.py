@@ -105,7 +105,7 @@ class ModelComparator:
             #methods = ['dense', 'combined', 'raw', 'smooth']
             methods = ['dense' for _ in range(len(list_of_models))]
             min_distances = [self.MIN_PEAK_DISTANCE] * 3
-            min_distances = min_distances + [i for i in range(2, 21, 2)]
+            min_distances = min_distances + [24]
             for i in range(len(list_of_model_predictions)):
                 model = list_of_models[i]
                 model_name = model._name
@@ -269,7 +269,7 @@ class ModelComparator:
             return
         self.simulation_summary()
         #colors = mpl.colormaps.get_cmap('tab10')  # Using tab10 colormap with as many colors as there are keys
-        colors = mpl.cm.get_cmap('Set3', 13)
+        colors = mpl.cm.get_cmap('Set3', len(list(self.results[0].peaks_within_threshold.keys())))
         if mode[0] and mode[1]:
             plt.figure(figsize=(8, 6))
             for idx, key in enumerate(self.peaks_within_threshold):
@@ -277,15 +277,25 @@ class ModelComparator:
                 fp = np.array(self.peaks_outside_threshold[key])
                 fn = np.array(self.peaks_within_threshold_rev[key])
                 tn = np.array(self.peaks_outside_threshold_rev[key])
-                fpt = fp / (fp + tn)
-                tpr = tp / (tp + fn)
-                plt.scatter(fpt, tpr, color=colors(idx), label=key)
+                print('***************')
+                print('Model:', key)
+                print('Within:', tp)
+                print('Outside:', fp)
+                print('Sum:', tp+fp)
+                print('WithinRev:', fn)
+                print('OutsideRev:', tn)
+                print('SumRev:', fn+tn)
+                x = tp / (tp + fp)
+                y = fn / (fn + tn)
+                plt.scatter(x, y, color=colors(idx), label=key)
             plt.xlim(0, 1)
             plt.ylim(0, 1)
-            plt.plot([0, 1], [0, 1], 'r--', label='y=x')
-            plt.xlabel('FPR')
-            plt.ylabel('TPR')
-            plt.title('FPT vs TPR for peak prediction of models')
+            plt.plot([0, 1], [1, 0], 'r--',)
+            #plt.plot([0, 1], [0.5, 0.5], 'r--',)
+            #plt.plot([0.5, 0.5], [0, 1], 'r--',)
+            plt.xlabel('How well are the hits')
+            plt.ylabel('How well are the peaks hit')
+            plt.title('')
             plt.legend(title="Model")
             plt.show()
         if mode[0]:
