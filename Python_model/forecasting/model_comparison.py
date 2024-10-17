@@ -103,15 +103,13 @@ class ModelComparator:
                 plt.scatter(gt_time[curr_peaks], ground_truth.iloc[curr_peaks],
                             color='red', zorder=5, label='Test data peaks')
             #methods = ['dense', 'combined', 'raw', 'smooth']
-            methods = ['dense' for _ in range(len(list_of_models))]
-            min_distances = [self.MIN_PEAK_DISTANCE] * 3
-            min_distances = min_distances + [24]
+            methods = ['raw' for _ in range(len(list_of_models))]
             for i in range(len(list_of_model_predictions)):
                 model = list_of_models[i]
                 model_name = model._name
                 model_predictions = list_of_model_predictions[i]
                 # Detect peaks in the prediction part (forecast) and shift them to start from the right time
-                pred_peaks = model.get_peaks(model_predictions, min_distances[i], methods[i])
+                pred_peaks = model.get_peaks(model_predictions, methods[i])
                 #pred_peaks, _ = scipy.signal.find_peaks(model_predictions, distance=self.MIN_PEAK_DISTANCE)
                 results.num_detected_peaks[model_name] = results.num_detected_peaks.get(model_name, 0) + len(pred_peaks)
                 offset_pred_peaks = pred_peaks + input_length

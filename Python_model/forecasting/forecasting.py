@@ -15,7 +15,7 @@ from windowGenerator import WindowGenerator
 """
     Parameters
 """
-TRAIN_DATA_SUFFIX = '1_n'
+TRAIN_DATA_SUFFIX = '30'
 TEST_DATA_SUFFIX = 'of_1'
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
 
@@ -206,7 +206,7 @@ def autoregressive_model():
     """
     # autoregressive RNN
     """
-    feedback_model = FeedBack(32, OUT_STEPS, len(features))
+    feedback_model = FeedBack(32, OUT_STEPS, len(features), 20)
     prediction, state = feedback_model.warmup(multi_window.example[0])
     print(prediction.shape)
     print('Output shape (batch, time, features): ', feedback_model(multi_window.example[0]).shape)
@@ -222,7 +222,7 @@ def autoregressive_model():
 
 
 def multistep_cnn():
-    multi_cnn = WideCNN(INPUT_WIDTH, OUT_STEPS, len(features))
+    multi_cnn = WideCNN(INPUT_WIDTH, OUT_STEPS, len(features), 20)
     IPython.display.clear_output()
     print('Output shape (batch, time, features): ', multi_cnn(multi_window.example[0]).shape)
     history = compile_and_fit(multi_cnn, multi_window)
@@ -254,8 +254,8 @@ def classification_datasets():
     return train_inputs, train_labels, val_inputs, val_labels
 
 
-def classification_mlp(train_inputs, train_labels, val_inputs, val_labels):
-    classification_model = ClassificationMLP(INPUT_WIDTH, OUT_STEPS, len(features))
+def classification_mlp(train_inputs, train_labels, val_inputs, val_labels, min_peak_distance=20):
+    classification_model = ClassificationMLP(INPUT_WIDTH, OUT_STEPS, len(features), min_peak_distance)
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                       mode='min')
     classification_model.compile(loss=tf.keras.losses.CategoricalCrossentropy(),
@@ -294,8 +294,11 @@ frequencies = list(count.values())
 plt.bar(numbers, frequencies, color='skyblue')
 plt.show()
 
-sampled_test_df = test_df
-#sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
+period = sum(distances) / len(distances)
+print("Period:", period)
+
+#sampled_test_df = test_df
+sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
 #tf.config.run_functions_eagerly(True)
 model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
@@ -305,7 +308,8 @@ for run_id in range(NUM_RUNS):
     feedback_model._name = 'feed_back'
     multi_cnn_model = multistep_cnn()
     multi_cnn_model._name = 'wide_cnn'
-    fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0], noise=0.0)
+    fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0],
+                               noise=0.0, period=period)
     fitted_sin._name = 'sin_curve'
     #classification_model = classification_mlp()
     #classification_model._name = 'classification_mlp_raw'
@@ -313,11 +317,11 @@ for run_id in range(NUM_RUNS):
     #classification_model_smoothened._name = 'classification_mlp_smooth'
     #classification_model_combined = classification_mlp()
     #classification_model_combined._name = 'classification_mlp_combined'
-    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels)
-    model._name = 'minPeakDist_24'
-    models = [feedback_model, multi_cnn_model, fitted_sin, model]
-    #for i in [14, 18, 20, 22, 24, 26, 30]:
-    #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels)
+    classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
+    classification_model._name = 'minPeakDist_24'
+    models = [feedback_model, multi_cnn_model, fitted_sin, classification_model]
+    #for i in range(2, 37, 2):
+    #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, i)
     #    model._name = 'minPeakDist_' + str(i)
     #    models.append(model)
     #combined = mmml(feedback_model, multi_cnn_model)

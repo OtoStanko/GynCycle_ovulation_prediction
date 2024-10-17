@@ -12,8 +12,8 @@ def quadratic(x, a, b, c):
     return a * (x-b) ** (2) + c
 
 
-def curve_function(x, a, b, c):
-    return a * np.sin( (x * (2 * np.pi / (c * 24))) - b )
+def sin_function(x, b, c):
+    return 0.05 * np.sin( (x-b) * (2 * np.pi / (c * 24)) ) + 0.05
 
 
 def fit_sin_curve(train_df, feature, val_df, test_df, original_df):
@@ -21,12 +21,12 @@ def fit_sin_curve(train_df, feature, val_df, test_df, original_df):
     y_data = train_df[feature].values
     x_all = original_df.index.values
     y_all = original_df[feature].values
-    popt, pcov = curve_fit(curve_function, x_data, y_data, p0=[1, 1, 25])
-    a_opt, b_opt, c_opt = popt
-    print(f"Optimal parameters: a={a_opt}, b={b_opt}, c={c_opt}")
-    print('a * sin(x * (2*pi/(c*24)) - b)')
+    popt, pcov = curve_fit(sin_function, x_data, y_data, p0=[1, 25])
+    b_opt, c_opt = popt
+    print(f"Optimal parameters: b={b_opt}, c={c_opt}")
+    print('sin(x * (2*pi/(c*24)) - b)')
     x_fit = np.linspace(min(x_all), max(x_all), 1000)
-    y_fit = curve_function(x_fit, *popt)
+    y_fit = sin_function(x_fit, *popt)
     plt.plot(train_df.index, train_df[feature], color='black')
     plt.plot(val_df.index, val_df[feature], color='blue')
     plt.plot(test_df.index, test_df[feature], color='red')

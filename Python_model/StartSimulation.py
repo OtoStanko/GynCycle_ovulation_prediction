@@ -26,7 +26,7 @@ def StartSimulation():
     for runind in range(1, runnum + 1):
         # integration time beginning and end
         tb = 0
-        te = 50 + 365*1
+        te = 300
         # technical params
         # ODE function called to test(0) or not (1)
         # number of non-follicle equations (NO DRUG)
@@ -34,7 +34,7 @@ def StartSimulation():
         # follicle params
         parafoll = np.array([
             2,                  # v - fractal dimension
-            0.04 / 2,           # gamma - growth rate
+            0.02,               # gamma - growth rate
             25,                 # xi - max. diameter of follicles
             1,                  # mu - proportion of self harm
             0.065 / (25 ** 2),  # k - strength of competition

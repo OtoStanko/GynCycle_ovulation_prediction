@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.signal import savgol_filter
 
-from supporting_scripts import curve_function
+from supporting_scripts import sin_function
 
 
 class ResidualWrapper(tf.keras.Model):
@@ -51,10 +51,11 @@ class MMML(tf.keras.Model):
 
 
 class FeedBack(tf.keras.Model):
-    def __init__(self, units, out_steps, num_features):
+    def __init__(self, units, out_steps, num_features, min_peak_distance=20):
         super().__init__()
         self.out_steps = out_steps
         self.units = units
+        self.min_peak_distance = min_peak_distance
         self.lstm_cell = tf.keras.layers.LSTMCell(units)
         self.lstm_rnn = tf.keras.layers.RNN(self.lstm_cell, return_state=True)
         self.dense = tf.keras.layers.Dense(num_features, kernel_initializer=tf.initializers.he_normal())
@@ -82,17 +83,18 @@ class FeedBack(tf.keras.Model):
         predictions = tf.transpose(predictions, [1, 0, 2])
         return predictions
 
-    def get_peaks(self, prediction, min_peak_distance, method='raw'):
-        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=min_peak_distance)
+    def get_peaks(self, prediction, method='raw'):
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
         return pred_peaks
 
 
 class WideCNN(tf.keras.Model):
-    def __init__(self, input_length, out_steps, num_features):
+    def __init__(self, input_length, out_steps, num_features, min_peak_distance=20):
         super().__init__()
         self.input_length = input_length
         self.out_steps = out_steps
         self.num_features = num_features
+        self.min_peak_distance = min_peak_distance
         conv_model_wide = tf.keras.Sequential([
             tf.keras.layers.Conv1D(filters=256,
                                    kernel_size=input_length,
@@ -113,31 +115,35 @@ class WideCNN(tf.keras.Model):
         predictions = input_tensor[:, -self.out_steps:, :]
         return predictions
 
-    def get_peaks(self, prediction, min_peak_distance, method='raw'):
-        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=min_peak_distance)
+    def get_peaks(self, prediction, method='raw'):
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
         return pred_peaks
 
 
 class NoisySinCurve(tf.keras.Model):
-    def __init__(self, input_length, out_steps, num_features, train_df, feature, noise=0, period=28):
+    def __init__(self, input_length, out_steps, num_features, train_df, feature,
+                 noise=0, shift=0, period=28, min_peak_distance=20):
         super().__init__()
         self.input_length = input_length
         self.out_steps = out_steps
         self.num_features = num_features
         self.noise = noise / 10
         self.period = period
+        self.shift = shift
+        self.min_peak_distance = min_peak_distance
         x_data = train_df.index.values
         y_data = train_df[feature].values
-        popt, _ = curve_fit(curve_function, x_data, y_data, p0=[1, 1, self.period])
-        self.a_opt, self.b_opt, self.c_opt = popt
-        print(f"Optimal parameters: a={self.a_opt}, b={self.b_opt}, c={self.c_opt}")
-        print('a * sin(x * (2*pi/(c*24)) - b)')
+        #popt, _ = curve_fit(sin_function, x_data, y_data, p0=[0, self.period])
+        popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[self.shift])
+        self.shift = popt
+        print(f"Optimal parameters: b={self.shift}, c={self.period}")
+        print('0.1 * sin( (x+(c/4)-b) * ((2*pi)/(c*24)) ) + 0.1')
         x_fit = np.linspace(1200, 3500, 100)
-        y_fit = curve_function(x_fit, *popt)
+        y_fit = sin_function(x_fit, self.shift, self.period)
         plt.plot(train_df.index[:100], train_df[feature][:100], color='black')
         plt.plot(x_fit, y_fit, label='Fitted Curve', color='orange')
         plt.title('Sampled dataframe with raw hours with fitted sin curve')
-        plt.ylabel('Time in hours')
+        plt.xlabel('Time in hours')
         plt.show()
 
     def call(self, inputs):
@@ -149,28 +155,29 @@ class NoisySinCurve(tf.keras.Model):
     def numpy_curve_fit(self, inputs):
         y_data = np.array(inputs)  # Convert TensorFlow tensor to NumPy array
         x_data = np.arange(self.input_length) * 24  # Create x_data array
-        popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[self.b_opt])
+        popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[self.shift])
         x_fit = np.arange(len(inputs), len(inputs) + self.out_steps) * 24
-        y_fit = curve_function(x_fit, self.a_opt, popt[0], self.c_opt)
+        y_fit = sin_function(x_fit, popt[0], self.period)
         noise = np.random.normal(0, self.noise, y_fit.shape)
         y_fit = y_fit + noise
         #print(popt)
         return np.array(y_fit, dtype=np.float32)
 
     def move_curve_function(self, x_data, b):
-        return curve_function(x_data, self.a_opt, b, self.c_opt)
+        return sin_function(x_data, b, self.period)
 
-    def get_peaks(self, prediction, min_peak_distance, method='raw'):
-        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=min_peak_distance)
+    def get_peaks(self, prediction, method='raw'):
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
         return pred_peaks
 
 
 class ClassificationMLP(tf.keras.Model):
-    def __init__(self, input_length, out_steps, num_features):
+    def __init__(self, input_length, out_steps, num_features, min_peak_distance):
         super().__init__()
         self.input_length = input_length
         self.out_steps = out_steps
         self.num_features = num_features
+        self.min_peak_distance = min_peak_distance
         self.mlp = tf.keras.models.Sequential([
             tf.keras.layers.Dense(units=256, activation='relu'),
             tf.keras.layers.Dense(units=64, activation='relu'),
@@ -188,15 +195,13 @@ class ClassificationMLP(tf.keras.Model):
         #    result = savgol_filter(result, 11, 2)
         return result
 
-    def get_peaks(self, prediction, min_peak_distance, method='raw'):
+    def get_peaks(self, prediction, method='raw'):
         if method == 'raw':
-            return self.peaks_raw(prediction, min_peak_distance)
+            return self.peaks_raw(prediction, self.min_peak_distance)
         elif method == 'smooth':
-            return self.peaks_smoothened(prediction, min_peak_distance)
+            return self.peaks_smoothened(prediction, self.min_peak_distance)
         elif method == 'combined':
-            return self.peaks_combined(prediction, min_peak_distance)
-        elif method == 'dense':
-            return self.peaks_raw(prediction, min_peak_distance)
+            return self.peaks_combined(prediction, self.min_peak_distance)
 
     def peaks_raw(self, prediction, min_peak_distance):
         pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=min_peak_distance)
