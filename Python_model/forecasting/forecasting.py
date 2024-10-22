@@ -1,3 +1,4 @@
+import os.path
 from collections import Counter
 
 import IPython
@@ -5,6 +6,7 @@ import IPython.display
 import matplotlib.pyplot as plt
 import scipy.signal
 import seaborn as sns
+from sympy.physics.control import Feedback
 
 from custom_losses import Peak_loss
 from model_comparison import ModelComparator
@@ -15,12 +17,13 @@ from windowGenerator import WindowGenerator
 """
     Parameters
 """
-TRAIN_DATA_SUFFIX = '30'
+TRAIN_DATA_SUFFIX = '1_n'
 TEST_DATA_SUFFIX = 'of_1'
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
 
 # Set the parameters
-workDir = os.path.join(os.getcwd(), "../outputDir/")
+inputDir = os.path.join(os.getcwd(), "../outputDir/")
+save_models_dir = os.path.join(os.getcwd(), "../saved_models/")
 SAMPLING_FREQUENCY = 24
 SAMPLING_FREQUENCY_UNIT = 'H'
 NUM_INITIAL_DAYS_TO_DISCARD = 50
@@ -29,11 +32,12 @@ MAX_EPOCHS = 25
 
 # forecast parameters
 OUT_STEPS = 35
-INPUT_WIDTH = 35
+INPUT_WIDTH = 10
 
 NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
 PLOT_TESTING = True
+SAVE_MODELS = True
 
 
 def compile_and_fit(model, window, patience=2):
@@ -55,10 +59,10 @@ def compile_and_fit(model, window, patience=2):
 
 
 # test on a small TS
-test_dataframe = create_dataframe(workDir, features, 'Time', TEST_DATA_SUFFIX)
+test_dataframe = create_dataframe(inputDir, features, 'Time', TEST_DATA_SUFFIX)
 test_dataframe['Time'] = test_dataframe['Time'] * 24
 # train on a long TS
-combined_df = create_dataframe(workDir, features, 'Time', TRAIN_DATA_SUFFIX)
+combined_df = create_dataframe(inputDir, features, 'Time', TRAIN_DATA_SUFFIX)
 combined_df['Time'] = combined_df['Time'] * 24
 
 print('Num records in the loaded data for training:', len(combined_df['Time']))
@@ -297,37 +301,42 @@ plt.show()
 period = sum(distances) / len(distances)
 print("Period:", period)
 
-#sampled_test_df = test_df
-sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
+sampled_test_df = test_df
+#sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
 #tf.config.run_functions_eagerly(True)
 model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
-                                   plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE)
+                                   plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=5)
 train_inputs, train_labels, val_inputs, val_labels = classification_datasets()
 for run_id in range(NUM_RUNS):
     feedback_model = autoregressive_model()
     feedback_model._name = 'feed_back'
     multi_cnn_model = multistep_cnn()
     multi_cnn_model._name = 'wide_cnn'
-    fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0],
-                               noise=0.0, period=period)
-    fitted_sin._name = 'sin_curve'
-    #classification_model = classification_mlp()
-    #classification_model._name = 'classification_mlp_raw'
-    #classification_model_smoothened = classification_mlp(train_inputs, train_labels, val_inputs, val_labels)
-    #classification_model_smoothened._name = 'classification_mlp_smooth'
-    #classification_model_combined = classification_mlp()
-    #classification_model_combined._name = 'classification_mlp_combined'
+    #fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0],
+    #                           noise=0.0, period=period)
+    #fitted_sin._name = 'sin_curve'
     classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
     classification_model._name = 'minPeakDist_24'
-    models = [feedback_model, multi_cnn_model, fitted_sin, classification_model]
-    #for i in range(2, 37, 2):
+    models = [feedback_model, multi_cnn_model, classification_model]
+    #for i in range(2, 37, 3):
     #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, i)
     #    model._name = 'minPeakDist_' + str(i)
     #    models.append(model)
     #combined = mmml(feedback_model, multi_cnn_model)
     #combined._name = 'combined_RNN_CNN'
-
-    list_of_models = models
+    saved_models_paths = []
+    if SAVE_MODELS:
+        for model in models:
+            model_name = model._name + "_RUN" + str(run_id) + "_IN" + str(INPUT_WIDTH)
+            model_save_path_full = os.path.join(save_models_dir, model_name)
+            saved_models_paths.append(model_save_path_full)
+            model.save(model_save_path_full)
+    list_of_models = models  # []
+    """for model_name in saved_models_paths:
+        model = tf.keras.models.load_model(model_name,
+                custom_objects={'FeedBack': FeedBack, 'WideCNN': WideCNN,
+                                'ClassificationMLP': ClassificationMLP, 'Peak_loss': Peak_loss})
+        list_of_models.append(model)"""
     model_comparator.compare_models(list_of_models, run_id)
     model_comparator.plot_pred_peak_distribution(run_id)
 
