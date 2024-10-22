@@ -16,7 +16,7 @@ SAMPLING_FREQUENCY_UNIT = 'H'
 NUM_INITIAL_DAYS_TO_DISCARD = 50
 features = ['LH']
 OUT_STEPS = 35
-INPUT_WIDTH = 10
+INPUT_WIDTH = 35
 hormone = 'LH'
 
 
@@ -36,7 +36,7 @@ val_df, _ = normalize_df(val_df, method='own', values=norm_properties)
 test_df, _ = normalize_df(test_df, method='own', values=norm_properties)
 
 save_models_dir = os.path.join(os.getcwd(), "../saved_models/")
-saved_models_names = ['feed_back_RUN0_IN10', 'minPeakDist_24_RUN0_IN10', 'wide_cnn_RUN0_IN10']
+saved_models_names = ['feed_back_RUN0_IN35', 'minPeakDist_24_RUN0_IN35', 'wide_cnn_RUN0_IN35']
 saved_models_paths = [os.path.join(save_models_dir, model_name) for model_name in saved_models_names]
 list_of_models = []
 for model_name in saved_models_paths:
@@ -83,7 +83,7 @@ fig.add_trace(highlighted_trace)
 
 for model in list_of_models:
     window_data = df.iloc[:window_size]
-    inputs = window_data[hormone].iloc[:10]
+    inputs = window_data[hormone].iloc[:INPUT_WIDTH]
     tensor = tf.convert_to_tensor(inputs, dtype=tf.float32)
     reshaped_tensor = tf.reshape(tensor, (1, INPUT_WIDTH, 1))
     model_predictions = model(reshaped_tensor)
@@ -119,53 +119,62 @@ fig.add_vline(
 
 # Update layout with sliders
 steps = []
-for i in range(len(df) - window_size + 1):
-    window_data = df.iloc[i:i + window_size]
-    #curr_peaks = peaks[i < peaks < i+window_size]
-    curr_peaks = peaks[peaks < i+window_size]
-    curr_peaks = curr_peaks[curr_peaks >= i]
-
-    input_output_division = window_data.index[INPUT_WIDTH]
-
-    x_values = [window_data.index, df.index[curr_peaks]]
-    y_values = [window_data[hormone], df[hormone].iloc[curr_peaks]]
-
+batch_size = 32
+i = 0
+limit = len(df) - window_size + 1
+while i < limit:
+#for i in range(0, len(df) - window_size + 1, batch_size):
+    current_batch_size = min(batch_size, limit-i)
+    batch_data = [df.iloc[i+j:i+j+window_size][hormone].iloc[:INPUT_WIDTH] for j in range(current_batch_size)]
+    tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)
+    reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, INPUT_WIDTH, 1))
+    batch_predictions_dict = {model._name: None for model in list_of_models}
     for model in list_of_models:
-        inputs = window_data[hormone].iloc[:10]
-        tensor = tf.convert_to_tensor(inputs, dtype=tf.float32)
-        reshaped_tensor = tf.reshape(tensor, (1, INPUT_WIDTH, 1))
-        model_predictions = model(reshaped_tensor)
-        predictions = tf.reshape(model_predictions, (1, OUT_STEPS, 1))
-        predictions = predictions[0][:, 0]
-        x_values.append(window_data.index[INPUT_WIDTH:])
-        y = predictions.numpy()
-        y_values.append(y)
-        pred_peaks = model.get_peaks(predictions)
-        offset_pred_peaks = pred_peaks + window_data.index[0] + INPUT_WIDTH
-        y_peaks = y[pred_peaks]
-        x_values.append(offset_pred_peaks)
-        y_values.append(y_peaks)
-    # Each step represents one window
-    step = dict(
-        method="update",
-        args=[{
-            'x': x_values,
-            'y': y_values
-        }, {
-            'shapes': [
-                {
-                    'type': 'line',
-                    'x0': input_output_division-0.5,
-                    'y0': 0,
-                    'x1': input_output_division-0.5,
-                    'y1': 1,
-                    'line': dict(color='red', width=2, dash='dash'),
-                }
-            ]
-        }],
-        label=f'Window {i + 1}'
-    )
-    steps.append(step)
+        batch_predictions = model(reshaped_tensor_batch)
+        batch_predictions = tf.reshape(batch_predictions, (current_batch_size, OUT_STEPS, 1))
+        batch_predictions_dict[model._name] = batch_predictions
+
+    for j in range(current_batch_size):
+        window_data = df.iloc[i+j:i+j+window_size]
+        curr_peaks = peaks[peaks < i+j+window_size]
+        curr_peaks = curr_peaks[curr_peaks >= i+j]
+
+        input_output_division = window_data.index[INPUT_WIDTH]
+
+        x_values = [window_data.index, df.index[curr_peaks]]
+        y_values = [window_data[hormone], df[hormone].iloc[curr_peaks]]
+        for model in list_of_models:
+            predictions = batch_predictions_dict[model._name][j][:, 0]
+            x_values.append(window_data.index[INPUT_WIDTH:])
+            y = predictions.numpy()
+            y_values.append(y)
+            pred_peaks = model.get_peaks(predictions)
+            offset_pred_peaks = pred_peaks + window_data.index[0] + INPUT_WIDTH
+            y_peaks = y[pred_peaks]
+            x_values.append(offset_pred_peaks)
+            y_values.append(y_peaks)
+        # Each step represents one window
+        step = dict(
+            method="update",
+            args=[{
+                'x': x_values,
+                'y': y_values
+            }, {
+                'shapes': [
+                    {
+                        'type': 'line',
+                        'x0': input_output_division-0.5,
+                        'y0': 0,
+                        'x1': input_output_division-0.5,
+                        'y1': 1,
+                        'line': dict(color='red', width=2, dash='dash'),
+                    }
+                ]
+            }],
+            label=f'Window {i + j + 1}'
+        )
+        steps.append(step)
+    i += current_batch_size
 
 # Create slider
 sliders = [dict(
