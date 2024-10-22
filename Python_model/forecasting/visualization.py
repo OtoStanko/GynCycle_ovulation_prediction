@@ -4,6 +4,8 @@ from matplotlib import pyplot as plt
 from plotly.subplots import make_subplots
 import scipy.signal
 
+from Python_model.forecasting.custom_losses import Peak_loss
+from Python_model.forecasting.models import FeedBack, WideCNN, ClassificationMLP
 from preprocessing_functions import *
 
 
@@ -25,7 +27,6 @@ filtered_df.set_index('Time', inplace=True)
 sampled_df_timeH_index = [i for i in range(NUM_INITIAL_DAYS_TO_DISCARD * 24, int(filtered_df.index[-1]) + 1, SAMPLING_FREQUENCY)]
 sampled_df_timeH = sample_data(filtered_df, sampled_df_timeH_index, features)
 
-
 n = len(sampled_df_timeH)
 train_df = sampled_df_timeH[0:int(n*0.7)]
 val_df = sampled_df_timeH[int(n*0.7):int(n*0.9)]
@@ -34,10 +35,19 @@ train_df, norm_properties = normalize_df(train_df, method='minmax', values={feat
 val_df, _ = normalize_df(val_df, method='own', values=norm_properties)
 test_df, _ = normalize_df(test_df, method='own', values=norm_properties)
 
+save_models_dir = os.path.join(os.getcwd(), "../saved_models/")
+saved_models_names = ['feed_back_RUN0_IN10', 'minPeakDist_24_RUN0_IN10', 'wide_cnn_RUN0_IN10']
+saved_models_paths = [os.path.join(save_models_dir, model_name) for model_name in saved_models_names]
+list_of_models = []
+for model_name in saved_models_paths:
+    model = tf.keras.models.load_model(model_name,
+            custom_objects={'FeedBack': FeedBack, 'WideCNN': WideCNN,
+                            'ClassificationMLP': ClassificationMLP, 'Peak_loss': Peak_loss})
+    list_of_models.append(model)
+
 
 df = test_df
 df.index = (df.index - df.index[0]) / 24
-
 
 peaks, _ = scipy.signal.find_peaks(df[hormone], distance=10, height=0.3)
 plt.plot(df.index, df[hormone])
@@ -47,16 +57,11 @@ plt.xlabel('Time [hours]')
 plt.title('Test {} data'.format(hormone))
 plt.show()
 
-# Define window size (n days)
-window_size = INPUT_WIDTH + OUT_STEPS
 
-# Create figure
+window_size = INPUT_WIDTH + OUT_STEPS
 fig = make_subplots(rows=1, cols=1)
 
-# Initial plot for the first window
 initial_window = df.iloc[:window_size]
-
-# Define the initial trace
 trace = go.Scatter(
     x=initial_window.index,
     y=initial_window[hormone],
@@ -65,10 +70,8 @@ trace = go.Scatter(
 )
 fig.add_trace(trace)
 
-
 curr_peaks = peaks[peaks < window_size]
 highlighted_values = df.loc[df.index.isin(peaks)]
-print(highlighted_values)
 highlighted_trace = go.Scatter(
     x=df.index[curr_peaks],
     y=df[hormone].iloc[curr_peaks],
@@ -77,6 +80,24 @@ highlighted_trace = go.Scatter(
     name='gt LH peaks'
 )
 fig.add_trace(highlighted_trace)
+
+for model in list_of_models:
+    window_data = df.iloc[:window_size]
+    inputs = window_data[hormone].iloc[:10]
+    tensor = tf.convert_to_tensor(inputs, dtype=tf.float32)
+    reshaped_tensor = tf.reshape(tensor, (1, INPUT_WIDTH, 1))
+    model_predictions = model(reshaped_tensor)
+    predictions = tf.reshape(model_predictions, (1, OUT_STEPS, 1))
+    predictions = predictions[0][:, 0]
+    x = window_data.index[INPUT_WIDTH:]
+    y = predictions.numpy()
+    trace = go.Scatter(
+        x=x,
+        y=y,
+        mode='lines+markers',
+        name=model._name
+    )
+    fig.add_trace(trace)
 
 fig.add_vline(
     x=initial_window.index[INPUT_WIDTH]-0.5,
@@ -94,12 +115,25 @@ for i in range(len(df) - window_size + 1):
     curr_peaks = curr_peaks[curr_peaks >= i]
 
     input_output_division = window_data.index[INPUT_WIDTH]
+
+    x_values = [window_data.index, df.index[curr_peaks]]
+    y_values = [window_data[hormone], df[hormone].iloc[curr_peaks]]
+
+    for model in list_of_models:
+        inputs = window_data[hormone].iloc[:10]
+        tensor = tf.convert_to_tensor(inputs, dtype=tf.float32)
+        reshaped_tensor = tf.reshape(tensor, (1, INPUT_WIDTH, 1))
+        model_predictions = model(reshaped_tensor)
+        predictions = tf.reshape(model_predictions, (1, OUT_STEPS, 1))
+        predictions = predictions[0][:, 0]
+        x_values.append(window_data.index[INPUT_WIDTH:])
+        y_values.append(predictions.numpy())
     # Each step represents one window
     step = dict(
         method="update",
         args=[{
-            'x': [window_data.index, df.index[curr_peaks]],
-            'y': [window_data[hormone], df[hormone].iloc[curr_peaks]]
+            'x': x_values,
+            'y': y_values
         }, {
             'shapes': [
                 {
