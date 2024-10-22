@@ -64,6 +64,14 @@ class ModelComparator:
             inputs = []
             for feature in self.features:
                 input = np.array(test_df[feature][offset:input_length + offset], dtype=np.float32)
+                print("Original")
+                print(input)
+                for i in range(1, len(input), 2):
+                    if i+1 == len(input):
+                        break
+                    input[i] = (input[i-1] + input[i+1]) / 2
+                print("Imputated")
+                print(input)
                 tensor = tf.convert_to_tensor(input, dtype=tf.float32)
                 inputs.append(tensor)
             tensor_inputs = tf.squeeze(inputs)
