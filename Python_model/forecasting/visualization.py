@@ -66,7 +66,7 @@ trace = go.Scatter(
     x=initial_window.index,
     y=initial_window[hormone],
     mode='lines+markers',
-    name='Sliding Window'
+    name='Sliding Window',
 )
 fig.add_trace(trace)
 
@@ -77,7 +77,7 @@ highlighted_trace = go.Scatter(
     y=df[hormone].iloc[curr_peaks],
     mode='markers',
     marker=dict(color='red', size=10),
-    name='gt LH peaks'
+    name='gt LH peaks',
 )
 fig.add_trace(highlighted_trace)
 
@@ -95,7 +95,18 @@ for model in list_of_models:
         x=x,
         y=y,
         mode='lines+markers',
-        name=model._name
+        name=model._name,
+    )
+    fig.add_trace(trace)
+    pred_peaks = model.get_peaks(predictions)
+    offset_pred_peaks = pred_peaks + window_data.index[0] + INPUT_WIDTH
+    y_peaks = y[pred_peaks]
+    trace = go.Scatter(
+        x=offset_pred_peaks,
+        y=y_peaks,
+        mode='markers',
+        marker=dict(color='darkred'),
+        showlegend=False,
     )
     fig.add_trace(trace)
 
@@ -127,7 +138,13 @@ for i in range(len(df) - window_size + 1):
         predictions = tf.reshape(model_predictions, (1, OUT_STEPS, 1))
         predictions = predictions[0][:, 0]
         x_values.append(window_data.index[INPUT_WIDTH:])
-        y_values.append(predictions.numpy())
+        y = predictions.numpy()
+        y_values.append(y)
+        pred_peaks = model.get_peaks(predictions)
+        offset_pred_peaks = pred_peaks + window_data.index[0] + INPUT_WIDTH
+        y_peaks = y[pred_peaks]
+        x_values.append(offset_pred_peaks)
+        y_values.append(y_peaks)
     # Each step represents one window
     step = dict(
         method="update",
@@ -155,7 +172,7 @@ sliders = [dict(
     active=0,
     currentvalue={"prefix": "Window: "},
     pad={"t": 50},
-    steps=steps
+    steps=steps,
 )]
 
 
@@ -167,7 +184,7 @@ fig.update_layout(
     yaxis_title='{} levels'.format(hormone),
     width=800,
     height=400,
-    yaxis=dict(range=[0, 1])
+    yaxis=dict(range=[0, 1]),
 )
 
 # Show the interactive plot
