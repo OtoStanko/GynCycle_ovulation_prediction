@@ -55,6 +55,7 @@ class FeedBack(tf.keras.Model):
         super().__init__()
         self.out_steps = out_steps
         self.units = units
+        self.num_features = num_features
         self.min_peak_distance = min_peak_distance
         self.lstm_cell = tf.keras.layers.LSTMCell(units)
         self.lstm_rnn = tf.keras.layers.RNN(self.lstm_cell, return_state=True)
@@ -86,6 +87,22 @@ class FeedBack(tf.keras.Model):
     def get_peaks(self, prediction, method='raw'):
         pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
         return pred_peaks
+
+    def get_config(self):
+        # Return the configuration of the model (needed for saving and loading)
+        config = super().get_config().copy()
+        config.update({
+            "units": self.units,
+            "out_steps": self.out_steps,
+            "num_features": self.num_features,
+            "min_peak_distance": self.min_peak_distance
+        })
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        # Recreate the model from its configuration
+        return cls(**config)
 
 
 class WideCNN(tf.keras.Model):
@@ -119,6 +136,22 @@ class WideCNN(tf.keras.Model):
         pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
         return pred_peaks
 
+    def get_config(self):
+        # Return the configuration of the model (needed for saving and loading)
+        config = super().get_config().copy()
+        config.update({
+            "input_length": self.input_length,
+            "out_steps": self.out_steps,
+            "num_features": self.num_features,
+            "min_peak_distance": self.min_peak_distance
+        })
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        # Recreate the model from its configuration
+        return cls(**config)
+
 
 class NoisySinCurve(tf.keras.Model):
     def __init__(self, input_length, out_steps, num_features, train_df, feature,
@@ -133,7 +166,6 @@ class NoisySinCurve(tf.keras.Model):
         self.min_peak_distance = min_peak_distance
         x_data = train_df.index.values
         y_data = train_df[feature].values
-        #popt, _ = curve_fit(sin_function, x_data, y_data, p0=[0, self.period])
         popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[self.shift])
         self.shift = popt
         print(f"Optimal parameters: b={self.shift}, c={self.period}")
@@ -169,6 +201,26 @@ class NoisySinCurve(tf.keras.Model):
     def get_peaks(self, prediction, method='raw'):
         pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
         return pred_peaks
+
+
+    def get_config(self):
+        # Return the configuration of the model (needed for saving and loading)
+        config = super().get_config().copy()
+        config.update({
+            "input_length": self.input_length,
+            "out_steps": self.out_steps,
+            "num_features": self.num_features,
+            "min_peak_distance": self.min_peak_distance,
+            "noise": self.noise,
+            "period": self.period,
+            "shift": self.shift
+        })
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        # Recreate the model from its configuration
+        return cls(**config)
 
 
 class ClassificationMLP(tf.keras.Model):
@@ -239,6 +291,23 @@ class ClassificationMLP(tf.keras.Model):
             if peak_index is not None:
                 result = np.append(result, peak_index)
         return result
+
+    def get_config(self):
+        # Return the configuration of the model (needed for saving and loading)
+        config = super().get_config().copy()
+        config.update({
+            "input_length": self.input_length,
+            "out_steps": self.out_steps,
+            "num_features": self.num_features,
+            "min_peak_distance": self.min_peak_distance
+        })
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        # Recreate the model from its configuration
+        return cls(**config)
+
 
 class Distributed_peaks(tf.keras.Model):
     def __init__(self, out_steps, num_features, position):
