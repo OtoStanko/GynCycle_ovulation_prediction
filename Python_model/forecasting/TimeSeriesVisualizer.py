@@ -17,6 +17,7 @@ class TimeSeriesVisualizer:
         self.fig = make_subplots(rows=1, cols=1)
 
         initial_window = df.iloc[:self.window_size]
+        initial_window.index = (initial_window.index - initial_window.index[0]) / 24
         trace = go.Scatter(
             x=initial_window.index,
             y=initial_window[hormone],
@@ -27,8 +28,8 @@ class TimeSeriesVisualizer:
         peaks, _ = scipy.signal.find_peaks(df[hormone], distance=10, height=0.3)
         curr_peaks = peaks[peaks < self.window_size]
         highlighted_trace = go.Scatter(
-            x=df.index[curr_peaks],
-            y=df[hormone].iloc[curr_peaks],
+            x=initial_window.index[curr_peaks],
+            y=initial_window[hormone].iloc[curr_peaks],
             mode='markers',
             marker=dict(color='red', size=10),
             name='gt LH peaks',
@@ -38,11 +39,12 @@ class TimeSeriesVisualizer:
 
     def update_sliders(self, list_of_models=None):
         if list_of_models is not None:
+            window_data = self.df.iloc[:self.window_size]
+            window_data.index = (window_data.index - window_data.index[0]) / 24
+            inputs = window_data[self.hormone].iloc[:self.INPUT_LENGTH]
+            tensor = tf.convert_to_tensor(inputs, dtype=tf.float32)
+            reshaped_tensor = tf.reshape(tensor, (1, self.INPUT_LENGTH, 1))
             for model in list_of_models:
-                window_data = self.df.iloc[:self.window_size]
-                inputs = window_data[self.hormone].iloc[:self.INPUT_LENGTH]
-                tensor = tf.convert_to_tensor(inputs, dtype=tf.float32)
-                reshaped_tensor = tf.reshape(tensor, (1, self.INPUT_LENGTH, 1))
                 model_predictions = model(reshaped_tensor)
                 predictions = tf.reshape(model_predictions, (1, self.OUTPUT_LENGTH, 1))
                 predictions = predictions[0][:, 0]
@@ -56,7 +58,7 @@ class TimeSeriesVisualizer:
                 )
                 self.fig.add_trace(trace)
                 pred_peaks = model.get_peaks(predictions)
-                offset_pred_peaks = pred_peaks*24 + window_data.index[0] + self.INPUT_LENGTH*24
+                offset_pred_peaks = pred_peaks + window_data.index[0] + self.INPUT_LENGTH
                 y_peaks = y[pred_peaks]
                 trace = go.Scatter(
                     x=offset_pred_peaks,
@@ -67,7 +69,7 @@ class TimeSeriesVisualizer:
                 )
                 self.fig.add_trace(trace)
             self.fig.add_vline(
-                x=self.df.index[self.INPUT_LENGTH] - 0.5,
+                x=window_data.index[self.INPUT_LENGTH] - 0.5,
                 line=dict(color='red', width=2, dash='dash'),
             )
         i = 0
@@ -87,11 +89,12 @@ class TimeSeriesVisualizer:
 
             for j in range(current_batch_size):
                 window_data = self.df.iloc[i + j:i + j + self.window_size]
+                window_data.index = (window_data.index - window_data.index[0]) / 24
                 curr_peaks = self.peaks[self.peaks < i + j + self.window_size]
-                curr_peaks = curr_peaks[curr_peaks >= i + j]
+                curr_peaks = curr_peaks[curr_peaks >= i + j] - j - i
                 input_output_division = window_data.index[self.INPUT_LENGTH]
-                x_values = [window_data.index, self.df.index[curr_peaks]]
-                y_values = [window_data[self.hormone], self.df[self.hormone].iloc[curr_peaks]]
+                x_values = [window_data.index, window_data.index[curr_peaks]]
+                y_values = [window_data[self.hormone], window_data[self.hormone].iloc[curr_peaks]]
                 args = [{
                         'x': x_values,
                         'y': y_values
@@ -103,7 +106,7 @@ class TimeSeriesVisualizer:
                         y = predictions.numpy()
                         y_values.append(y)
                         pred_peaks = model.get_peaks(predictions)
-                        offset_pred_peaks = pred_peaks*24 + window_data.index[0] + self.INPUT_LENGTH*24
+                        offset_pred_peaks = pred_peaks + window_data.index[0] + self.INPUT_LENGTH
                         y_peaks = y[pred_peaks]
                         x_values.append(offset_pred_peaks)
                         y_values.append(y_peaks)

@@ -122,7 +122,7 @@ def create_classification_dataset(df, feature, peaks, input_window_length):
 
     print("Input shape:", inputs.shape)
     print("Labels shape:", labels.shape)
-    print("Peaks:", peaks)
+    #print("Peaks:", peaks)
     print("DF length:", len(df.index))
     print("Num records:", len(labels))
     return inputs, labels

@@ -83,14 +83,17 @@ class ModelComparator:
             # Extract input data from the testing df
             for feature in self.features:
                 input = np.array(test_df[feature][offset:input_length + offset], dtype=np.float32)
-                print("Original")
-                print(input)
+                #print("Original")
+                #print(input)
+                """
+                    Imputation to the input data
+                """
                 for i in range(1, len(input), 2):
                     if i+1 == len(input):
                         break
                     input[i] = (input[i-1] + input[i+1]) / 2
-                print("Imputated")
-                print(input)
+                #print("Imputated")
+                #print(input)
             # For every model extract the prediction for this time window
             list_of_model_predictions = []
             for model in list_of_models:

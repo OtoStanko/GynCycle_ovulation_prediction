@@ -33,9 +33,9 @@ MAX_EPOCHS = 25
 INPUT_WIDTH = 35
 OUT_STEPS = 35
 
-NUM_RUNS = 1
+NUM_RUNS = 2
 PEAK_COMPARISON_DISTANCE = 2
-PLOT_TESTING = True
+PLOT_TESTING = False
 SAVE_MODELS = False
 
 
@@ -301,16 +301,16 @@ model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, feat
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=5)
 train_inputs, train_labels, val_inputs, val_labels = classification_datasets()
 for run_id in range(NUM_RUNS):
-    feedback_model = autoregressive_model()
-    feedback_model._name = 'feed_back'
+    #feedback_model = autoregressive_model()
+    #feedback_model._name = 'feed_back'
     multi_cnn_model = multistep_cnn()
     multi_cnn_model._name = 'wide_cnn'
     #fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0],
     #                           noise=0.0, period=period)
     #fitted_sin._name = 'sin_curve'
-    classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
-    classification_model._name = 'minPeakDist_24'
-    models = [feedback_model, multi_cnn_model, classification_model]
+    #classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
+    #classification_model._name = 'minPeakDist_24'
+    models = [multi_cnn_model]
     #for i in range(2, 37, 3):
     #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, i)
     #    model._name = 'minPeakDist_' + str(i)
