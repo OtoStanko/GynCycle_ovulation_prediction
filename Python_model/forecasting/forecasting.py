@@ -1,4 +1,3 @@
-import os.path
 from collections import Counter
 
 import IPython
@@ -6,12 +5,11 @@ import IPython.display
 import matplotlib.pyplot as plt
 import scipy.signal
 import seaborn as sns
-from sympy.physics.control import Feedback
 
+from ModelComparator import ModelComparator
 from TimeSeriesVisualizer import TimeSeriesVisualizer
 from custom_losses import Peak_loss
-from ModelComparator import ModelComparator
-from models import FeedBack, WideCNN, NoisySinCurve, MMML, ClassificationMLP
+from models import FeedBack, WideCNN, MMML, ClassificationMLP
 from preprocessing_functions import *
 from windowGenerator import WindowGenerator
 
@@ -37,7 +35,7 @@ OUT_STEPS = 35
 
 NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
-PLOT_TESTING = False
+PLOT_TESTING = True
 SAVE_MODELS = True
 
 

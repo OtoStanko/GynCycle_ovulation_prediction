@@ -1,13 +1,11 @@
-import pandas as pd
 import plotly.graph_objs as go
+import scipy.signal
 from matplotlib import pyplot as plt
 from plotly.subplots import make_subplots
-import scipy.signal
 
 from Python_model.forecasting.custom_losses import Peak_loss
 from Python_model.forecasting.models import FeedBack, WideCNN, ClassificationMLP
 from preprocessing_functions import *
-
 
 TRAIN_DATA_SUFFIX = '1_n'
 workDir = os.path.join(os.getcwd(), "../outputDir/")

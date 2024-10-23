@@ -7,7 +7,6 @@ import scipy.signal
 import tensorflow as tf
 
 import supporting_scripts as sp
-from Python_model.forecasting.visualization import batch_size
 
 
 class ModelComparator:

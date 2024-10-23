@@ -1,11 +1,8 @@
 import plotly.graph_objs as go
-from matplotlib import pyplot as plt
-from plotly.subplots import make_subplots
 import scipy.signal
+from plotly.subplots import make_subplots
 
 from preprocessing_functions import *
-
-
 
 
 class TimeSeriesVisualizer:
