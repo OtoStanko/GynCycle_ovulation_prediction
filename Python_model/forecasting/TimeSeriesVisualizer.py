@@ -78,7 +78,7 @@ class TimeSeriesVisualizer:
         limit = len(self.df) - self.window_size + 1
         while i < limit:
             current_batch_size = min(self.batch_size, limit - i)
-            batch_data = [self.df.iloc[i + j:i + j + self.window_size][self.hormone].iloc[:self.INPUT_LENGTH] for j in
+            batch_data = [self.df.iloc[i + j:i + j + self.INPUT_LENGTH][self.hormone] for j in
                           range(current_batch_size)]
             if list_of_models is not None:
                 tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)

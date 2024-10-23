@@ -7,6 +7,7 @@ import scipy.signal
 import tensorflow as tf
 
 import supporting_scripts as sp
+from Python_model.forecasting.visualization import batch_size
 
 
 class ModelComparator:
@@ -59,9 +60,28 @@ class ModelComparator:
             extract peaks in the current window (input and output)
             shift peaks by the offset of the current window
         """
+        dict_of_model_predictions = {model._name: [] for model in list_of_models}
+        batch_size = 32
+        i = 0
+        limit = self.duration - pred_length - input_length + 1
+        while i < limit:
+            current_batch_size = min(batch_size, limit - i)
+            batch_data = [test_df.iloc[i + j:i + j + self.input_length][self.hormone] for j in
+                      range(current_batch_size)]
+            tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)
+            reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.input_length, 1))
+            batch_predictions_dict = {model._name: None for model in list_of_models}
+            for model in list_of_models:
+                batch_predictions = model(reshaped_tensor_batch)
+                batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.pred_length, 1))
+                batch_predictions_dict[model._name] = batch_predictions
+                for j in range(current_batch_size):
+                    predictions = batch_predictions_dict[model._name][j][:, 0]
+                    dict_of_model_predictions[model._name].append(predictions)
+            i += current_batch_size
+
         for offset in range(0, self.duration - pred_length - input_length + 1, self.step):
             # Extract input data from the testing df
-            inputs = []
             for feature in self.features:
                 input = np.array(test_df[feature][offset:input_length + offset], dtype=np.float32)
                 print("Original")
@@ -72,17 +92,10 @@ class ModelComparator:
                     input[i] = (input[i-1] + input[i+1]) / 2
                 print("Imputated")
                 print(input)
-                tensor = tf.convert_to_tensor(input, dtype=tf.float32)
-                inputs.append(tensor)
-            tensor_inputs = tf.squeeze(inputs)
-            reshaped_tensor = tf.reshape(tensor_inputs, (1, input_length, len(self.features)))
-            # For every model make a prediction for this time window
+            # For every model extract the prediction for this time window
             list_of_model_predictions = []
             for model in list_of_models:
-                predictions = model(reshaped_tensor)
-                predictions = tf.reshape(predictions, (1, self.pred_length, len(self.features)))
-                predictions = predictions[0][:, 0]
-                list_of_model_predictions.append(predictions)
+                list_of_model_predictions.append(dict_of_model_predictions[model._name][offset])
             # Ground-truth time in days shifted to start with 0
             gt_time = test_df.index[offset:input_length + pred_length + offset]
             gt_time = gt_time / 24
