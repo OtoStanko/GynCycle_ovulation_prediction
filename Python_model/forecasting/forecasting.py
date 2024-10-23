@@ -8,8 +8,9 @@ import scipy.signal
 import seaborn as sns
 from sympy.physics.control import Feedback
 
+from TimeSeriesVisualizer import TimeSeriesVisualizer
 from custom_losses import Peak_loss
-from model_comparison import ModelComparator
+from ModelComparator import ModelComparator
 from models import FeedBack, WideCNN, NoisySinCurve, MMML, ClassificationMLP
 from preprocessing_functions import *
 from windowGenerator import WindowGenerator
@@ -31,12 +32,12 @@ features = ['LH']
 MAX_EPOCHS = 25
 
 # forecast parameters
-OUT_STEPS = 35
 INPUT_WIDTH = 10
+OUT_STEPS = 35
 
 NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
-PLOT_TESTING = True
+PLOT_TESTING = False
 SAVE_MODELS = True
 
 
@@ -339,6 +340,9 @@ for run_id in range(NUM_RUNS):
         list_of_models.append(model)"""
     model_comparator.compare_models(list_of_models, run_id)
     model_comparator.plot_pred_peak_distribution(run_id)
+    tsv = TimeSeriesVisualizer(sampled_test_df, features[0], INPUT_WIDTH, OUT_STEPS)
+    tsv.update_sliders(list_of_models)
+    tsv.show()
 
 multistep_performance()
 model_comparator.print_peak_statistics()

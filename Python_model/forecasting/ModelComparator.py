@@ -274,6 +274,9 @@ class ModelComparator:
             print("Mode required a tuple of two bools")
             return
         self.simulation_summary()
+        if len(self.peaks_within_threshold) == 0:
+            print("Comparator data is empty, run compare_models.")
+            return
         #colors = mpl.colormaps.get_cmap('tab10')  # Using tab10 colormap with as many colors as there are keys
         colors = mpl.cm.get_cmap('Set3', len(list(self.results[0].peaks_within_threshold.keys())))
         if mode[0] and mode[1]:
