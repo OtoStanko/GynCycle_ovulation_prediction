@@ -16,7 +16,6 @@ class TimeSeriesVisualizer:
         self.batch_size = 32
         self.fig = make_subplots(rows=1, cols=1)
 
-        self.df.index = (self.df.index - self.df.index[0]) / 24
         initial_window = df.iloc[:self.window_size]
         trace = go.Scatter(
             x=initial_window.index,
@@ -57,7 +56,7 @@ class TimeSeriesVisualizer:
                 )
                 self.fig.add_trace(trace)
                 pred_peaks = model.get_peaks(predictions)
-                offset_pred_peaks = pred_peaks + window_data.index[0] + self.INPUT_LENGTH
+                offset_pred_peaks = pred_peaks*24 + window_data.index[0] + self.INPUT_LENGTH*24
                 y_peaks = y[pred_peaks]
                 trace = go.Scatter(
                     x=offset_pred_peaks,
@@ -93,7 +92,6 @@ class TimeSeriesVisualizer:
                 input_output_division = window_data.index[self.INPUT_LENGTH]
                 x_values = [window_data.index, self.df.index[curr_peaks]]
                 y_values = [window_data[self.hormone], self.df[self.hormone].iloc[curr_peaks]]
-                # Each step represents one window
                 args = [{
                         'x': x_values,
                         'y': y_values
@@ -105,7 +103,7 @@ class TimeSeriesVisualizer:
                         y = predictions.numpy()
                         y_values.append(y)
                         pred_peaks = model.get_peaks(predictions)
-                        offset_pred_peaks = pred_peaks + window_data.index[0] + self.INPUT_LENGTH
+                        offset_pred_peaks = pred_peaks*24 + window_data.index[0] + self.INPUT_LENGTH*24
                         y_peaks = y[pred_peaks]
                         x_values.append(offset_pred_peaks)
                         y_values.append(y_peaks)

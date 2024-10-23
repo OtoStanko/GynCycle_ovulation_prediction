@@ -16,7 +16,7 @@ from windowGenerator import WindowGenerator
 """
     Parameters
 """
-TRAIN_DATA_SUFFIX = '1_n'
+TRAIN_DATA_SUFFIX = '30'
 TEST_DATA_SUFFIX = 'of_1'
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
 
@@ -30,13 +30,13 @@ features = ['LH']
 MAX_EPOCHS = 25
 
 # forecast parameters
-INPUT_WIDTH = 10
+INPUT_WIDTH = 35
 OUT_STEPS = 35
 
 NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
 PLOT_TESTING = True
-SAVE_MODELS = True
+SAVE_MODELS = False
 
 
 def compile_and_fit(model, window, patience=2):
@@ -198,8 +198,8 @@ def show_performance(val_performance, performance):
 multi_window = WindowGenerator(input_width=INPUT_WIDTH, label_width=OUT_STEPS,   shift=OUT_STEPS,
                                train_df=train_df, val_df=val_df, test_df=test_df,
                                label_columns=features)
-for feature in features:
-    multi_window.plot(feature, 'Multi window')
+"""for feature in features:
+    multi_window.plot(feature, 'Multi window')"""
 
 multi_val_performance = dict()
 multi_performance = dict()
@@ -217,10 +217,10 @@ def autoregressive_model():
 
     IPython.display.clear_output()
 
-    multi_val_performance['AR LSTM'] = feedback_model.evaluate(multi_window.val, return_dict=True)
+    """multi_val_performance['AR LSTM'] = feedback_model.evaluate(multi_window.val, return_dict=True)
     multi_performance['AR LSTM'] = feedback_model.evaluate(multi_window.test, verbose=0, return_dict=True)
     for feature in features:
-        multi_window.plot(feature, 'Autoregressive model predictions', feedback_model)
+        multi_window.plot(feature, 'Autoregressive model predictions', feedback_model)"""
     return feedback_model
 
 
@@ -230,17 +230,11 @@ def multistep_cnn():
     print('Output shape (batch, time, features): ', multi_cnn(multi_window.example[0]).shape)
     history = compile_and_fit(multi_cnn, multi_window)
 
-    multi_val_performance['CNN'] = multi_cnn.evaluate(multi_window.val, return_dict=True)
+    """multi_val_performance['CNN'] = multi_cnn.evaluate(multi_window.val, return_dict=True)
     multi_performance['CNN'] = multi_cnn.evaluate(multi_window.test, verbose=0, return_dict=True)
     for feature in features:
-        multi_window.plot(feature, 'CNN model predictions', multi_cnn)
+        multi_window.plot(feature, 'CNN model predictions', multi_cnn)"""
     return multi_cnn
-
-
-def mmml(model1, model2):
-    combination = MMML(model1, model2,OUT_STEPS, len(features))
-    history = compile_and_fit(combination, multi_window)
-    return combination
 
 
 def classification_datasets():
@@ -267,7 +261,6 @@ def classification_mlp(train_inputs, train_labels, val_inputs, val_labels, min_p
     history = classification_model.fit(x=train_inputs, y=train_labels, validation_data=(val_inputs, val_labels),
                              epochs=MAX_EPOCHS, callbacks=[early_stopping], shuffle=True, batch_size=32)
     return classification_model
-
 
 
 def multistep_performance():
@@ -300,8 +293,9 @@ plt.show()
 period = sum(distances) / len(distances)
 print("Period:", period)
 
-sampled_test_df = test_df
-#sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
+#sampled_test_df = test_df
+sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
+#sampled_test_df.index = (sampled_test_df.index - sampled_test_df.index[0]) / 24
 #tf.config.run_functions_eagerly(True)
 model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=5)
@@ -342,7 +336,7 @@ for run_id in range(NUM_RUNS):
     tsv.update_sliders(list_of_models)
     tsv.show()
 
-multistep_performance()
+#multistep_performance()
 model_comparator.print_peak_statistics()
 model_comparator.plot_in_out_peaks()
 
