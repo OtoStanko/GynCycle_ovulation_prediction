@@ -16,6 +16,8 @@ class ModelComparator:
         self.input_length = input_length
         self.pred_length = pred_length
         self.features = features
+        self.num_features = len(features)
+        self.hoi_index = features.index(hormone)
         self.hormone = hormone
         self.duration = duration
         self.step = step
@@ -46,11 +48,11 @@ class ModelComparator:
         peaks, _ = scipy.signal.find_peaks(
             self.test_df[hormone], distance=self.MIN_PEAK_DISTANCE / 2, height=self.MIN_PEAK_HEIGHT)
         if self.plot:
-            plt.plot(test_df.index, test_df[hormone])
+            plt.plot(test_df.index, test_df[self.features])
             plt.scatter(test_df.index[peaks], test_df[hormone].iloc[peaks],
                         color='red', zorder=5, label='Highlighted Points')
             plt.xlabel('Time [hours]')
-            plt.title('Test {} data'.format(hormone))
+            plt.title('Test {} data'.format(self.features))
             plt.show()
         """
         Move along the testing TS. For every window of input_length + pred_length:
@@ -65,35 +67,21 @@ class ModelComparator:
         limit = self.duration - pred_length - input_length + 1
         while i < limit:
             current_batch_size = min(batch_size, limit - i)
-            batch_data = [test_df.iloc[i + j:i + j + self.input_length][self.hormone] for j in
+            batch_data = [test_df.iloc[i + j:i + j + self.input_length][self.features].values for j in
                       range(current_batch_size)]
             tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)
-            reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.input_length, 1))
+            reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.input_length, self.num_features))
             batch_predictions_dict = {model._name: None for model in list_of_models}
             for model in list_of_models:
                 batch_predictions = model(reshaped_tensor_batch)
-                batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.pred_length, 1))
+                batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.pred_length, self.num_features))
                 batch_predictions_dict[model._name] = batch_predictions
                 for j in range(current_batch_size):
-                    predictions = batch_predictions_dict[model._name][j][:, 0]
+                    predictions = batch_predictions_dict[model._name][j][:, self.hoi_index]
                     dict_of_model_predictions[model._name].append(predictions)
             i += current_batch_size
 
         for offset in range(0, self.duration - pred_length - input_length + 1, self.step):
-            # Extract input data from the testing df
-            for feature in self.features:
-                input = np.array(test_df[feature][offset:input_length + offset], dtype=np.float32)
-                #print("Original")
-                #print(input)
-                """
-                    Imputation to the input data
-                """
-                for i in range(1, len(input), 2):
-                    if i+1 == len(input):
-                        break
-                    input[i] = (input[i-1] + input[i+1]) / 2
-                #print("Imputated")
-                #print(input)
             # For every model extract the prediction for this time window
             list_of_model_predictions = []
             for model in list_of_models:

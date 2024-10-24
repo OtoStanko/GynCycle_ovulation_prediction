@@ -35,7 +35,7 @@ OUT_STEPS = 35
 
 NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
-PLOT_TESTING = False
+PLOT_TESTING = True
 SAVE_MODELS = False
 
 
@@ -306,14 +306,14 @@ model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, feat
 for run_id in range(NUM_RUNS):
     feedback_model = autoregressive_model()
     feedback_model._name = 'feed_back'
-    #multi_cnn_model = multistep_cnn()
-    #multi_cnn_model._name = 'wide_cnn'
+    multi_cnn_model = multistep_cnn()
+    multi_cnn_model._name = 'wide_cnn'
     #fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0],
     #                           noise=0.0, period=period)
     #fitted_sin._name = 'sin_curve'
     #classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
     #classification_model._name = 'minPeakDist_24'
-    models = [feedback_model]
+    models = [feedback_model, multi_cnn_model]
     #for i in range(2, 37, 3):
     #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, i)
     #    model._name = 'minPeakDist_' + str(i)
@@ -333,8 +333,8 @@ for run_id in range(NUM_RUNS):
                 custom_objects={'FeedBack': FeedBack, 'WideCNN': WideCNN,
                                 'ClassificationMLP': ClassificationMLP, 'Peak_loss': Peak_loss})
         list_of_models.append(model)"""
-    #model_comparator.compare_models(list_of_models, run_id)
-    #model_comparator.plot_pred_peak_distribution(run_id)
+    model_comparator.compare_models(list_of_models, run_id)
+    model_comparator.plot_pred_peak_distribution(run_id)
     tsv = TimeSeriesVisualizer(sampled_test_df, features, INPUT_WIDTH, OUT_STEPS)
     tsv.update_sliders(list_of_models)
     tsv.show()

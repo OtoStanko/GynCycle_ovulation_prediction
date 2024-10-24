@@ -16,6 +16,7 @@ class TimeSeriesVisualizer:
         self.steps = []
         self.batch_size = 32
         self.fig = make_subplots(rows=1, cols=1)
+        self.hoi_index = 0
 
         initial_window = df.iloc[:self.window_size]
         initial_window.index = (initial_window.index - initial_window.index[0]) / 24
@@ -31,7 +32,7 @@ class TimeSeriesVisualizer:
                 name=hormone,
             )
             self.fig.add_trace(trace)
-        hormone = hormones[0]
+        hormone = hormones[self.hoi_index]
         peaks, _ = scipy.signal.find_peaks(df[hormone], distance=10, height=0.3)
         curr_peaks = peaks[peaks < self.window_size]
         highlighted_trace = go.Scatter(
@@ -39,7 +40,7 @@ class TimeSeriesVisualizer:
             y=initial_window[hormone].iloc[curr_peaks],
             mode='markers',
             marker=dict(color='red', size=10),
-            name='gt {} peaks'.format(hormones[0]),
+            name='gt {} peaks'.format(hormones[self.hoi_index]),
         )
         self.peaks[hormone] = peaks
         self.fig.add_trace(highlighted_trace)
@@ -60,7 +61,7 @@ class TimeSeriesVisualizer:
             for model in list_of_models:
                 model_predictions = model(reshaped_tensor)
                 predictions = tf.reshape(model_predictions, (1, self.OUTPUT_LENGTH, self.num_features))
-                predictions = predictions[0][:, 0]
+                predictions = predictions[0][:, self.hoi_index]
                 x = window_data.index[self.INPUT_LENGTH:]
                 y = predictions.numpy()
                 trace = go.Scatter(
@@ -109,7 +110,7 @@ class TimeSeriesVisualizer:
                 for hormone in self.hormones:
                     x_values += [window_data.index]
                     y_values += [window_data[hormone]]
-                hormone = self.hormones[0]
+                hormone = self.hormones[self.hoi_index]
                 curr_peaks = self.peaks[hormone][self.peaks[hormone] < i + j + self.window_size]
                 curr_peaks = curr_peaks[curr_peaks >= i + j] - j - i
                 x_values += [window_data.index[curr_peaks]]
@@ -120,7 +121,7 @@ class TimeSeriesVisualizer:
                 }]
                 if list_of_models is not None:
                     for model in list_of_models:
-                        predictions = batch_predictions_dict[model._name][j][:, 0]
+                        predictions = batch_predictions_dict[model._name][j][:, self.hoi_index]
                         x_values.append(window_data.index[self.INPUT_LENGTH:])
                         y = predictions.numpy()
                         y_values.append(y)
