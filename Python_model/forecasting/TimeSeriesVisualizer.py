@@ -28,20 +28,21 @@ class TimeSeriesVisualizer:
                 x=initial_window.index,
                 y=initial_window[hormone],
                 mode='lines+markers',
-                name='Sliding Window',
+                name=hormone,
             )
             self.fig.add_trace(trace)
-            peaks, _ = scipy.signal.find_peaks(df[hormone], distance=10, height=0.3)
-            curr_peaks = peaks[peaks < self.window_size]
-            highlighted_trace = go.Scatter(
-                x=initial_window.index[curr_peaks],
-                y=initial_window[hormone].iloc[curr_peaks],
-                mode='markers',
-                marker=dict(color='red', size=10),
-                name='gt LH peaks',
-            )
-            self.peaks[hormone] = peaks
-            self.fig.add_trace(highlighted_trace)
+        hormone = hormones[0]
+        peaks, _ = scipy.signal.find_peaks(df[hormone], distance=10, height=0.3)
+        curr_peaks = peaks[peaks < self.window_size]
+        highlighted_trace = go.Scatter(
+            x=initial_window.index[curr_peaks],
+            y=initial_window[hormone].iloc[curr_peaks],
+            mode='markers',
+            marker=dict(color='red', size=10),
+            name='gt {} peaks'.format(hormones[0]),
+        )
+        self.peaks[hormone] = peaks
+        self.fig.add_trace(highlighted_trace)
 
     def update_sliders(self, list_of_models=None):
         if len(self.hormones) == 0:
@@ -102,18 +103,21 @@ class TimeSeriesVisualizer:
             for j in range(current_batch_size):
                 x_values = []
                 y_values = []
+                window_data = self.df.iloc[i + j:i + j + self.window_size]
+                window_data.index = (window_data.index - window_data.index[0]) / 24
+                input_output_division = window_data.index[self.INPUT_LENGTH]
                 for hormone in self.hormones:
-                    window_data = self.df.iloc[i + j:i + j + self.window_size]
-                    window_data.index = (window_data.index - window_data.index[0]) / 24
-                    curr_peaks = self.peaks[hormone][self.peaks[hormone] < i + j + self.window_size]
-                    curr_peaks = curr_peaks[curr_peaks >= i + j] - j - i
-                    input_output_division = window_data.index[self.INPUT_LENGTH]
-                    x_values += [window_data.index, window_data.index[curr_peaks]]
-                    y_values += [window_data[hormone], window_data[hormone].iloc[curr_peaks]]
+                    x_values += [window_data.index]
+                    y_values += [window_data[hormone]]
+                hormone = self.hormones[0]
+                curr_peaks = self.peaks[hormone][self.peaks[hormone] < i + j + self.window_size]
+                curr_peaks = curr_peaks[curr_peaks >= i + j] - j - i
+                x_values += [window_data.index[curr_peaks]]
+                y_values += [ window_data[hormone].iloc[curr_peaks]]
                 args = [{
-                        'x': x_values,
-                        'y': y_values
-                    }]
+                    'x': x_values,
+                    'y': y_values
+                }]
                 if list_of_models is not None:
                     for model in list_of_models:
                         predictions = batch_predictions_dict[model._name][j][:, 0]
@@ -126,14 +130,14 @@ class TimeSeriesVisualizer:
                         x_values.append(offset_pred_peaks)
                         y_values.append(y_peaks)
                     args.append({'shapes': [
-                            {
-                                'type': 'line',
-                                'x0': input_output_division-0.5,
-                                'y0': 0,
-                                'x1': input_output_division-0.5,
-                                'y1': 1,
-                                'line': dict(color='red', width=2, dash='dash'),
-                            }]
+                        {
+                            'type': 'line',
+                            'x0': input_output_division-0.5,
+                            'y0': 0,
+                            'x1': input_output_division-0.5,
+                            'y1': 1,
+                            'line': dict(color='red', width=2, dash='dash'),
+                        }]
                     })
                 step = dict(
                     method="update",
