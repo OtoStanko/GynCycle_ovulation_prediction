@@ -9,6 +9,7 @@ class TimeSeriesVisualizer:
     def __init__(self, df, hormones, input_length, output_length):
         self.df = df
         self.hormones = hormones
+        self.num_features = len(hormones)
         self.INPUT_LENGTH = input_length
         self.OUTPUT_LENGTH = output_length
         self.window_size = input_length + output_length
@@ -54,10 +55,10 @@ class TimeSeriesVisualizer:
                 feature_inputs = window_data[hormone].iloc[:self.INPUT_LENGTH]
                 input_data.append(feature_inputs)
             tensor = tf.convert_to_tensor(input_data, dtype=tf.float32)
-            reshaped_tensor = tf.reshape(tensor, (1, self.INPUT_LENGTH, len(self.hormones)))
+            reshaped_tensor = tf.reshape(tensor, (1, self.INPUT_LENGTH, self.num_features))
             for model in list_of_models:
                 model_predictions = model(reshaped_tensor)
-                predictions = tf.reshape(model_predictions, (1, self.OUTPUT_LENGTH, 1))
+                predictions = tf.reshape(model_predictions, (1, self.OUTPUT_LENGTH, self.num_features))
                 predictions = predictions[0][:, 0]
                 x = window_data.index[self.INPUT_LENGTH:]
                 y = predictions.numpy()
@@ -91,11 +92,11 @@ class TimeSeriesVisualizer:
                 batch_data = [self.df.iloc[i + j:i + j + self.INPUT_LENGTH][self.hormones].values for j in
                               range(current_batch_size)]
                 tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)
-                reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.INPUT_LENGTH, len(self.hormones)))
+                reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.INPUT_LENGTH, self.num_features))
                 batch_predictions_dict = {model._name: None for model in list_of_models}
                 for model in list_of_models:
                     batch_predictions = model(reshaped_tensor_batch)
-                    batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.OUTPUT_LENGTH, 1))
+                    batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.OUTPUT_LENGTH, self.num_features))
                     batch_predictions_dict[model._name] = batch_predictions
 
             for j in range(current_batch_size):
