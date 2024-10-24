@@ -6,9 +6,9 @@ from preprocessing_functions import *
 
 
 class TimeSeriesVisualizer:
-    def __init__(self, df, hormone, input_length, output_length):
+    def __init__(self, df, hormones, input_length, output_length):
         self.df = df
-        self.hormone = hormone
+        self.hormones = hormones
         self.INPUT_LENGTH = input_length
         self.OUTPUT_LENGTH = output_length
         self.window_size = input_length + output_length
@@ -18,26 +18,34 @@ class TimeSeriesVisualizer:
 
         initial_window = df.iloc[:self.window_size]
         initial_window.index = (initial_window.index - initial_window.index[0]) / 24
-        trace = go.Scatter(
-            x=initial_window.index,
-            y=initial_window[hormone],
-            mode='lines+markers',
-            name='Sliding Window',
-        )
-        self.fig.add_trace(trace)
-        peaks, _ = scipy.signal.find_peaks(df[hormone], distance=10, height=0.3)
-        curr_peaks = peaks[peaks < self.window_size]
-        highlighted_trace = go.Scatter(
-            x=initial_window.index[curr_peaks],
-            y=initial_window[hormone].iloc[curr_peaks],
-            mode='markers',
-            marker=dict(color='red', size=10),
-            name='gt LH peaks',
-        )
-        self.peaks = peaks
-        self.fig.add_trace(highlighted_trace)
+        if len(hormones) == 0:
+            print("No hormones defined")
+            return
+        self.peaks = {hormone: [] for hormone in hormones}
+        for hormone in hormones:
+            trace = go.Scatter(
+                x=initial_window.index,
+                y=initial_window[hormone],
+                mode='lines+markers',
+                name='Sliding Window',
+            )
+            self.fig.add_trace(trace)
+            peaks, _ = scipy.signal.find_peaks(df[hormone], distance=10, height=0.3)
+            curr_peaks = peaks[peaks < self.window_size]
+            highlighted_trace = go.Scatter(
+                x=initial_window.index[curr_peaks],
+                y=initial_window[hormone].iloc[curr_peaks],
+                mode='markers',
+                marker=dict(color='red', size=10),
+                name='gt LH peaks',
+            )
+            self.peaks[hormone] = peaks
+            self.fig.add_trace(highlighted_trace)
 
     def update_sliders(self, list_of_models=None):
+        if len(self.hormones) == 0:
+            print("No hormones defined")
+            return
         if list_of_models is not None:
             window_data = self.df.iloc[:self.window_size]
             window_data.index = (window_data.index - window_data.index[0]) / 24
@@ -76,9 +84,9 @@ class TimeSeriesVisualizer:
         limit = len(self.df) - self.window_size + 1
         while i < limit:
             current_batch_size = min(self.batch_size, limit - i)
-            batch_data = [self.df.iloc[i + j:i + j + self.INPUT_LENGTH][self.hormone] for j in
-                          range(current_batch_size)]
             if list_of_models is not None:
+                batch_data = [self.df.iloc[i + j:i + j + self.INPUT_LENGTH][self.hormone] for j in
+                              range(current_batch_size)]
                 tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)
                 reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.INPUT_LENGTH, 1))
                 batch_predictions_dict = {model._name: None for model in list_of_models}
@@ -88,13 +96,16 @@ class TimeSeriesVisualizer:
                     batch_predictions_dict[model._name] = batch_predictions
 
             for j in range(current_batch_size):
-                window_data = self.df.iloc[i + j:i + j + self.window_size]
-                window_data.index = (window_data.index - window_data.index[0]) / 24
-                curr_peaks = self.peaks[self.peaks < i + j + self.window_size]
-                curr_peaks = curr_peaks[curr_peaks >= i + j] - j - i
-                input_output_division = window_data.index[self.INPUT_LENGTH]
-                x_values = [window_data.index, window_data.index[curr_peaks]]
-                y_values = [window_data[self.hormone], window_data[self.hormone].iloc[curr_peaks]]
+                x_values = []
+                y_values = []
+                for hormone in self.hormones:
+                    window_data = self.df.iloc[i + j:i + j + self.window_size]
+                    window_data.index = (window_data.index - window_data.index[0]) / 24
+                    curr_peaks = self.peaks[hormone][self.peaks[hormone] < i + j + self.window_size]
+                    curr_peaks = curr_peaks[curr_peaks >= i + j] - j - i
+                    input_output_division = window_data.index[self.INPUT_LENGTH]
+                    x_values += [window_data.index, window_data.index[curr_peaks]]
+                    y_values += [window_data[hormone], window_data[hormone].iloc[curr_peaks]]
                 args = [{
                         'x': x_values,
                         'y': y_values
@@ -139,7 +150,7 @@ class TimeSeriesVisualizer:
             sliders=self.sliders,
             title='Sliding Window Time Series Visualization',
             xaxis_title='Date',
-            yaxis_title='{} levels'.format(self.hormone),
+            yaxis_title='{} levels'.format(self.hormones),
             width=800,
             height=400,
             yaxis=dict(range=[0, 1]),

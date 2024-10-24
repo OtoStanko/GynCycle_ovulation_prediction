@@ -16,7 +16,7 @@ from windowGenerator import WindowGenerator
 """
     Parameters
 """
-TRAIN_DATA_SUFFIX = '30'
+TRAIN_DATA_SUFFIX = '1_n'
 TEST_DATA_SUFFIX = 'of_1'
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError(), Peak_loss()]
 
@@ -26,14 +26,14 @@ save_models_dir = os.path.join(os.getcwd(), "../saved_models/")
 SAMPLING_FREQUENCY = 24
 SAMPLING_FREQUENCY_UNIT = 'H'
 NUM_INITIAL_DAYS_TO_DISCARD = 50
-features = ['LH']
+features = ['LH', 'E2']
 MAX_EPOCHS = 25
 
 # forecast parameters
 INPUT_WIDTH = 35
 OUT_STEPS = 35
 
-NUM_RUNS = 2
+NUM_RUNS = 0
 PEAK_COMPARISON_DISTANCE = 2
 PLOT_TESTING = False
 SAVE_MODELS = False
@@ -132,6 +132,9 @@ for feature in features:
     plt.xlabel('Time in hours')
     plt.show()
 
+tsv_combined = TimeSeriesVisualizer(test_df, features, 35, 35)
+tsv_combined.update_sliders()
+tsv_combined.show()
 #sp.fit_sin_curve(train_df, hormone, val_df, test_df, sampled_df_timeH)
 
 
