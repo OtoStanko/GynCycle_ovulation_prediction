@@ -231,9 +231,10 @@ class ClassificationMLP(tf.keras.Model):
         self.num_features = num_features
         self.min_peak_distance = min_peak_distance
         self.mlp = tf.keras.models.Sequential([
+            tf.keras.layers.Reshape((1, num_features * input_length)),
             tf.keras.layers.Dense(units=256, activation='relu'),
             tf.keras.layers.Dense(units=64, activation='relu'),
-            tf.keras.layers.Dense(units=out_steps, activation='sigmoid')
+            tf.keras.layers.Dense(units=out_steps, activation='sigmoid'),
         ])
 
     def call(self, inputs):
@@ -241,6 +242,7 @@ class ClassificationMLP(tf.keras.Model):
         shape = inputs.shape
         print(shape)
         result = self.mlp(inputs)
+        print(result.shape)
         #if smoothen:
         #    result = tf.reshape(result, (self.out_steps))
         #    result = result / 3

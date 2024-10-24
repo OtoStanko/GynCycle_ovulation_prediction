@@ -33,7 +33,7 @@ MAX_EPOCHS = 25
 INPUT_WIDTH = 35
 OUT_STEPS = 35
 
-NUM_RUNS = 0
+NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
 PLOT_TESTING = False
 SAVE_MODELS = False
@@ -240,17 +240,17 @@ def multistep_cnn():
     return multi_cnn
 
 
-def classification_datasets():
+def classification_datasets(features, feature_for_peaks):
     MIN_PEAK_HEIGHT = 0.3
 
     # Dataset is normalized
-    train_df_peaks, _ = scipy.signal.find_peaks(train_df[features[0]], distance=10, height=MIN_PEAK_HEIGHT)
-    val_df_peaks, _ = scipy.signal.find_peaks(val_df[features[0]], distance=10, height=MIN_PEAK_HEIGHT)
-    test_df_peaks, _ = scipy.signal.find_peaks(test_df[features[0]], distance=10, height=MIN_PEAK_HEIGHT)
+    train_df_peaks, _ = scipy.signal.find_peaks(train_df[feature_for_peaks], distance=10, height=MIN_PEAK_HEIGHT)
+    val_df_peaks, _ = scipy.signal.find_peaks(val_df[feature_for_peaks], distance=10, height=MIN_PEAK_HEIGHT)
+    test_df_peaks, _ = scipy.signal.find_peaks(test_df[feature_for_peaks], distance=10, height=MIN_PEAK_HEIGHT)
 
-    train_inputs, train_labels = create_classification_dataset(train_df, features[0], train_df_peaks, INPUT_WIDTH)
-    val_inputs, val_labels = create_classification_dataset(val_df, features[0], val_df_peaks, INPUT_WIDTH)
-    test_inputs, test_labels = create_classification_dataset(test_df, features[0], test_df_peaks, INPUT_WIDTH)
+    train_inputs, train_labels = create_classification_dataset(train_df, features, train_df_peaks, INPUT_WIDTH)
+    val_inputs, val_labels = create_classification_dataset(val_df, features, val_df_peaks, INPUT_WIDTH)
+    test_inputs, test_labels = create_classification_dataset(test_df, features, test_df_peaks, INPUT_WIDTH)
     return train_inputs, train_labels, val_inputs, val_labels
 
 
@@ -296,24 +296,24 @@ plt.show()
 period = sum(distances) / len(distances)
 print("Period:", period)
 
-#sampled_test_df = test_df
-sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
+sampled_test_df = test_df
+#sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
 #sampled_test_df.index = (sampled_test_df.index - sampled_test_df.index[0]) / 24
 #tf.config.run_functions_eagerly(True)
 model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=5)
-train_inputs, train_labels, val_inputs, val_labels = classification_datasets()
+train_inputs, train_labels, val_inputs, val_labels = classification_datasets(features, features[0])
 for run_id in range(NUM_RUNS):
     #feedback_model = autoregressive_model()
     #feedback_model._name = 'feed_back'
-    multi_cnn_model = multistep_cnn()
-    multi_cnn_model._name = 'wide_cnn'
+    #multi_cnn_model = multistep_cnn()
+    #multi_cnn_model._name = 'wide_cnn'
     #fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, len(features), train_df, features[0],
     #                           noise=0.0, period=period)
     #fitted_sin._name = 'sin_curve'
-    #classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
-    #classification_model._name = 'minPeakDist_24'
-    models = [multi_cnn_model]
+    classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
+    classification_model._name = 'minPeakDist_24'
+    models = [classification_model]
     #for i in range(2, 37, 3):
     #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, i)
     #    model._name = 'minPeakDist_' + str(i)
@@ -333,9 +333,9 @@ for run_id in range(NUM_RUNS):
                 custom_objects={'FeedBack': FeedBack, 'WideCNN': WideCNN,
                                 'ClassificationMLP': ClassificationMLP, 'Peak_loss': Peak_loss})
         list_of_models.append(model)"""
-    model_comparator.compare_models(list_of_models, run_id)
-    model_comparator.plot_pred_peak_distribution(run_id)
-    tsv = TimeSeriesVisualizer(sampled_test_df, features[0], INPUT_WIDTH, OUT_STEPS)
+    #model_comparator.compare_models(list_of_models, run_id)
+    #model_comparator.plot_pred_peak_distribution(run_id)
+    tsv = TimeSeriesVisualizer(sampled_test_df, features, INPUT_WIDTH, OUT_STEPS)
     tsv.update_sliders(list_of_models)
     tsv.show()
 

@@ -364,6 +364,9 @@ class ModelComparator:
 
     def print_peak_statistics(self):
         self.simulation_summary()
+        if len(self.peaks_within_threshold) == 0:
+            print("Comparator data is empty, run compare_models.")
+            return
         sp.print_peak_statistics(self.peaks_within_threshold, self.peaks_outside_threshold, self.sum_of_dists_to_nearest_peak,
                                  self.peak_comparison_distance)
 

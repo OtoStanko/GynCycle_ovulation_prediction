@@ -49,9 +49,12 @@ class TimeSeriesVisualizer:
         if list_of_models is not None:
             window_data = self.df.iloc[:self.window_size]
             window_data.index = (window_data.index - window_data.index[0]) / 24
-            inputs = window_data[self.hormone].iloc[:self.INPUT_LENGTH]
-            tensor = tf.convert_to_tensor(inputs, dtype=tf.float32)
-            reshaped_tensor = tf.reshape(tensor, (1, self.INPUT_LENGTH, 1))
+            input_data = []
+            for hormone in self.hormones:
+                feature_inputs = window_data[hormone].iloc[:self.INPUT_LENGTH]
+                input_data.append(feature_inputs)
+            tensor = tf.convert_to_tensor(input_data, dtype=tf.float32)
+            reshaped_tensor = tf.reshape(tensor, (1, self.INPUT_LENGTH, len(self.hormones)))
             for model in list_of_models:
                 model_predictions = model(reshaped_tensor)
                 predictions = tf.reshape(model_predictions, (1, self.OUTPUT_LENGTH, 1))
@@ -85,10 +88,10 @@ class TimeSeriesVisualizer:
         while i < limit:
             current_batch_size = min(self.batch_size, limit - i)
             if list_of_models is not None:
-                batch_data = [self.df.iloc[i + j:i + j + self.INPUT_LENGTH][self.hormone] for j in
+                batch_data = [self.df.iloc[i + j:i + j + self.INPUT_LENGTH][self.hormones].values for j in
                               range(current_batch_size)]
                 tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)
-                reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.INPUT_LENGTH, 1))
+                reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.INPUT_LENGTH, len(self.hormones)))
                 batch_predictions_dict = {model._name: None for model in list_of_models}
                 for model in list_of_models:
                     batch_predictions = model(reshaped_tensor_batch)

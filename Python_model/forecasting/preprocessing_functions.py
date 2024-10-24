@@ -88,7 +88,7 @@ def normalize_df(df, method='standard', values=None):
     return df, prop
 
 
-def create_classification_dataset(df, feature, peaks, input_window_length):
+def create_classification_dataset(df, features, peaks, input_window_length):
     inputs = []
     labels = []
 
@@ -97,7 +97,16 @@ def create_classification_dataset(df, feature, peaks, input_window_length):
         end_time = start_time + input_window_length
 
         # Get input features for the 7-day window
-        input_data = tf.convert_to_tensor(df[feature][start_time:end_time].values, dtype=tf.float32)
+        input_data = []
+        """for i in range(start_time, end_time):
+            feature_inputs = []
+            for feature in features:
+                feature_inputs.append(df[feature].values[i])
+            input_data.append(feature_inputs)"""
+        for feature in features:
+            feature_inputs = df[feature][start_time:end_time].values
+            input_data.append(feature_inputs)
+        input_data = tf.convert_to_tensor(input_data, dtype=tf.float32)
 
         # Find the next peak time after the end of the input window
         next_peaks = peaks[peaks >= end_time]
@@ -105,8 +114,8 @@ def create_classification_dataset(df, feature, peaks, input_window_length):
 
         if len(next_peaks) != 0:
             # Calculate the label as the time difference in seconds
-            #inputs.append([input_data])
-            inputs.append(tf.expand_dims(input_data, axis=0))
+            inputs.append(input_data)
+            #inputs.append(tf.expand_dims(input_data, axis=0))
             label = (next_peaks[0] - end_time)
             label_vector = [0 for _ in range(35)]
             if label < 35:
