@@ -4,15 +4,14 @@ from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
 
 
-def neg_function(x, a, b, c):
-    return - a * (x-b) ** (-1) + c
-
-
-def quadratic(x, a, b, c):
-    return a * (x-b) ** (2) + c
-
-
 def sin_function(x, b, c):
+    """
+    Sine function in form: 0.05 * sin( (x-b) * (2*pi/(c*24)) ) + 0.05
+    :param x: input vector for the sine function
+    :param b: shift along the x-axis of the sine function
+    :param c: length of the sine function period in days (assumes that the x values are in the hours)
+    :return: value of the sine function
+    """
     return 0.05 * np.sin( (x-b) * (2 * np.pi / (c * 24)) ) + 0.05
 
 
@@ -43,6 +42,9 @@ def fit_curve(x, y, fun, a=1, b=1, c=1):
 
 
 def darken_color(color, factor=0.7):
+    """
+    Darkens the specified colour by the factor.
+    """
     # Convert color to RGB if necessary
     if isinstance(color, str):
         color = mcolors.to_rgb(color)  # Convert named color to RGB
@@ -53,6 +55,13 @@ def darken_color(color, factor=0.7):
 
 
 def get_signed_distances(gt_peaks, pred_peaks):
+    """
+    For each peak in pred_peaks finds distance to the closest peak in gt_peaks. Positive if the closest gt peak is before
+    and negative if the closest gt peak if after the predicted peak.
+    :param gt_peaks: list of positions of predicted peaks.
+    :param pred_peaks: list of positions of predicted peaks.
+    :return: list of signed distances from every predicted peak to the closest gt peak.
+    """
     if len(gt_peaks) == 0:
         return np.array([])
     signed_distances = []
@@ -65,13 +74,24 @@ def get_signed_distances(gt_peaks, pred_peaks):
 
 def print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_of_dists_to_nearest_peak,
                           peak_comparison_distance=2):
+    """
+    Pretty print for basic statistics of models in peak prediction. Code still works fine, but has mostly been replaced
+    by plots and other visualizations.
+    :param peaks_within_threshold: dictionary of models' names and lists of numbers of predicted peaks
+     within the threshold of the closest gt peak
+    :param peaks_outside_threshold: dictionary of model's names and lists of numbers of predicted peaks
+     outside the threshold of the closest gt peak
+    :param sum_of_dists_to_nearest_peak: dictionary of models' names and lists of sums of distances between
+     predicted peaks and the closest gt peak
+    :param peak_comparison_distance: threshold for the peak comparison distance
+    :return: None
+    """
     model_name_length = max([len(key) for key in peaks_within_threshold.keys()] + [10])
     peaks_in_means = dict()
     peaks_in_stds = dict()
     for model_name, peaks_in in peaks_within_threshold.items():
         peaks_in_means[model_name] = round(np.mean(peaks_in), 2)
         peaks_in_stds[model_name] = round(np.std(peaks_in), 2)
-
     peaks_out_means = dict()
     peaks_out_stds = dict()
     for model_name, peaks_out in peaks_outside_threshold.items():
@@ -86,7 +106,6 @@ def print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_o
         distances_means[model_name] = round(np.mean(dists), 2)
         distances_stds[model_name] = round(np.std(dists), 2)
     distances_width = max([len(str(mean))+len(str(std))+4 for mean, std in zip(distances_means.values(), distances_stds.values())] + [7])
-    #distances_width = max([len(str(value)) for value in sum_of_dists_to_nearest_peak.values()] + [7])
     print("+-{}-+-{}-+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length + thr_width + 5) * "-",
                                               peaks_out_length * "-", 10 * "-", distances_width * "-"))
     print('| {:{model_width}} | {:{in_width}} (<={:{thr_width}}) | {:{out_width}} | {:{percent_width}} | {:{distances_width}} |'.format(
