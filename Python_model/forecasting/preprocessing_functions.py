@@ -88,7 +88,7 @@ def normalize_df(df, method='standard', values=None):
     return df, prop
 
 
-def create_classification_dataset(df, features, peaks, input_window_length):
+def create_classification_dataset(df, features, peaks, input_window_length, output_length):
     inputs = []
     labels = []
 
@@ -117,8 +117,8 @@ def create_classification_dataset(df, features, peaks, input_window_length):
             inputs.append(input_data)
             #inputs.append(tf.expand_dims(input_data, axis=0))
             label = (next_peaks[0] - end_time)
-            label_vector = [0 for _ in range(35)]
-            if label < 35:
+            label_vector = [0 for _ in range(output_length)]
+            if label < output_length:
                 label_vector[label] = 1
             #labels.append([label_vector])
             labels.append(tf.convert_to_tensor([label_vector], dtype=tf.int32))

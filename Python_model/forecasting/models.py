@@ -56,6 +56,7 @@ class FeedBack(tf.keras.Model):
         self.out_steps = out_steps
         self.units = units
         self.num_features = num_features
+        self.num_output_features = num_features
         self.min_peak_distance = min_peak_distance
         self.lstm_cell = tf.keras.layers.LSTMCell(units)
         self.lstm_rnn = tf.keras.layers.RNN(self.lstm_cell, return_state=True)
@@ -111,6 +112,7 @@ class WideCNN(tf.keras.Model):
         self.input_length = input_length
         self.out_steps = out_steps
         self.num_features = num_features
+        self.num_output_features = num_features
         self.min_peak_distance = min_peak_distance
         conv_model_wide = tf.keras.Sequential([
             tf.keras.layers.Conv1D(filters=256,
@@ -160,6 +162,7 @@ class NoisySinCurve(tf.keras.Model):
         self.input_length = input_length
         self.out_steps = out_steps
         self.num_features = num_features
+        self.num_output_features = 1
         self.noise = noise / 10
         self.period = period
         self.shift = shift
@@ -179,21 +182,28 @@ class NoisySinCurve(tf.keras.Model):
         plt.show()
 
     def call(self, inputs):
-        inputs = tf.reshape(inputs, (self.input_length,))
+        inputs = tf.reshape(inputs, (-1, self.input_length, self.num_features))
         result = tf.py_function(self.numpy_curve_fit, [inputs], tf.float32)
-        result = tf.reshape(result, (1, self.out_steps, self.num_features))
+        result = tf.reshape(result, (-1, self.out_steps, self.num_output_features))
         return result
 
     def numpy_curve_fit(self, inputs):
-        y_data = np.array(inputs)  # Convert TensorFlow tensor to NumPy array
+        #y_data = np.array(inputs)  # Convert TensorFlow tensor to NumPy array
+        y_batch_data = tf.squeeze(inputs, axis=-1).numpy()
         x_data = np.arange(self.input_length) * 24  # Create x_data array
-        popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[self.shift])
-        x_fit = np.arange(len(inputs), len(inputs) + self.out_steps) * 24
-        y_fit = sin_function(x_fit, popt[0], self.period)
-        noise = np.random.normal(0, self.noise, y_fit.shape)
-        y_fit = y_fit + noise
+        output_data = []
+        for y_data in y_batch_data:
+            popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[self.shift])
+            x_fit = np.arange(len(inputs), len(inputs) + self.out_steps) * 24
+            y_fit = sin_function(x_fit, popt[0], self.period)
+            noise = np.random.normal(0, self.noise, y_fit.shape)
+            y_fit = y_fit + noise
+            output_data.append(y_fit)
+        stacked_array = np.stack(output_data)
+        expanded_array = np.expand_dims(stacked_array, axis=-1)
+        tensor = tf.convert_to_tensor(expanded_array)
         #print(popt)
-        return np.array(y_fit, dtype=np.float32)
+        return np.array(tensor, dtype=np.float32)
 
     def move_curve_function(self, x_data, b):
         return sin_function(x_data, b, self.period)
@@ -229,6 +239,7 @@ class ClassificationMLP(tf.keras.Model):
         self.input_length = input_length
         self.out_steps = out_steps
         self.num_features = num_features
+        self.num_output_features = 1
         self.min_peak_distance = min_peak_distance
         self.mlp = tf.keras.models.Sequential([
             tf.keras.layers.Reshape((1, num_features * input_length)),

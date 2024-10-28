@@ -59,8 +59,9 @@ class TimeSeriesVisualizer:
             tensor = tf.convert_to_tensor(input_data, dtype=tf.float32)
             reshaped_tensor = tf.reshape(tensor, (1, self.INPUT_LENGTH, self.num_features))
             for model in list_of_models:
-                model_predictions = model(reshaped_tensor)
-                predictions = tf.reshape(model_predictions, (1, self.OUTPUT_LENGTH, self.num_features))
+                new_tensor = reshaped_tensor[:, :, :model.num_features]
+                model_predictions = model(new_tensor)
+                predictions = tf.reshape(model_predictions, (1, self.OUTPUT_LENGTH, model.num_output_features))
                 predictions = predictions[0][:, self.hoi_index]
                 x = window_data.index[self.INPUT_LENGTH:]
                 y = predictions.numpy()
@@ -97,8 +98,9 @@ class TimeSeriesVisualizer:
                 reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.INPUT_LENGTH, self.num_features))
                 batch_predictions_dict = {model._name: None for model in list_of_models}
                 for model in list_of_models:
-                    batch_predictions = model(reshaped_tensor_batch)
-                    batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.OUTPUT_LENGTH, self.num_features))
+                    new_tensor = reshaped_tensor_batch[:, :, :model.num_features]
+                    batch_predictions = model(new_tensor)
+                    batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.OUTPUT_LENGTH, model.num_output_features))
                     batch_predictions_dict[model._name] = batch_predictions
 
             for j in range(current_batch_size):

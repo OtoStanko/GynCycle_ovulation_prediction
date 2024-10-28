@@ -73,8 +73,9 @@ class ModelComparator:
             reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.input_length, self.num_features))
             batch_predictions_dict = {model._name: None for model in list_of_models}
             for model in list_of_models:
-                batch_predictions = model(reshaped_tensor_batch)
-                batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.pred_length, self.num_features))
+                new_tensor = reshaped_tensor_batch[:, :, :model.num_features]
+                batch_predictions = model(new_tensor)
+                batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.pred_length, model.num_output_features))
                 batch_predictions_dict[model._name] = batch_predictions
                 for j in range(current_batch_size):
                     predictions = batch_predictions_dict[model._name][j][:, self.hoi_index]
