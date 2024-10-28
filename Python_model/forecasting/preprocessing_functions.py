@@ -6,6 +6,23 @@ import pandas as pd
 
 
 def create_dataframe(input_files_directory, features, time_file_prefix, feature_file_suffix='1'):
+    """
+    Creates a pandas dataframe from csv files containing time series data.
+    The function assumes existence of the directory where the files are stored.
+    The time file name is expected to be in form {time_file_prefix}_{feature_file_suffix}.csv i.e.(Time_1.csv)
+    The feature files' names are expected to be in form {feature}_{feature_file_suffix}.csv,
+    where feature is a value from the features' parameter.
+
+    So far, nothing is checked. If any error rises due to any reason (files not found...) function fails.
+
+    Function doesn't set the time as an index
+
+    :param input_files_directory: path to the directory with time and features files
+    :param features: list of strings where each string in a prefix of the corresponding feature file
+    :param time_file_prefix: prefix of the file containing the timestamps of the time series.
+    :param feature_file_suffix:
+    :return: dataframe with timestamp and the features' tracks
+    """
     time_file = os.path.join(input_files_directory, "{}_{}.csv".format(time_file_prefix, feature_file_suffix))
     times = pd.read_csv(time_file, header=None, names=[time_file_prefix])
     hormone_levels = [times]
@@ -17,19 +34,26 @@ def create_dataframe(input_files_directory, features, time_file_prefix, feature_
     return combined_df
 
 
-def sample_data(original_df, new_index, columns):
-    # The records are not evenly distributed. We will do sampling with linear interpolation for the models
+def sample_data(original_df, new_index, features):
+    """
+    For a given dataframe and an index returns a new dataframe with values at the time points from the new index
+    sampled from the original dataframe using linear interpolation.
+    :param original_df: pandas dataframe with time set as index. Time of type integer is expected, no datetime
+    :param new_index: an iterable with time stamps at which new samples should be made
+    :param features: list of features from the original df that should be sampled
+    :return: new df with sampled values at the time points from the new index. The new index is set as an index
+    """
     """
         for every time in the new index, find the largest smaller value and smallest larger value
         and interpolate them to get the new value
         Edge case if at least one of the is the same time
     """
-    hormone_levels = {key: [] for key in columns}
+    hormone_levels = {key: [] for key in features}
     i = 0
     for curr_time in new_index:
         while original_df.index[i + 1] < curr_time:
             i += 1
-        for feature in columns:
+        for feature in features:
             # index_of_largest_smaller_time = i
             x0 = original_df.index[i]
             y0 = original_df[feature][original_df.index[i]]
@@ -48,7 +72,7 @@ def sample_data(original_df, new_index, columns):
             hormone_levels[feature].append(y)
 
     sampled_df = pd.DataFrame()
-    for feature in columns:
+    for feature in features:
         sampled_df[feature] = np.array(hormone_levels[feature])
     sampled_df.index = new_index
     sampled_df.index.name = 'DateTime'
@@ -56,6 +80,19 @@ def sample_data(original_df, new_index, columns):
 
 
 def normalize_df(df, method='standard', values=None):
+    """
+    :param df: dataframe to normalize
+    :param method:  'standard' for standardization,
+                    'minmax' for minmax normalization,
+                    'own' for 'standardization' with given values
+    :param values: a dict of form {feature, (a, b)}, where feature is a feature from the df and a,b depends on the method.
+    for standardization, if specified, a is mean and b is std to be used. If not specified, both will be calculated
+    for each feature separately. For minmax, a is the lower bound of the interval and b is the upper bound of the interval.
+    If not specified, a=0, b=1. For own method, a and b must be specified. The behaviour is technically the same as in the standardization.
+    a is subtracted and the result is divided by b. But the a and b doesn't have to be mean and std, so to avoid confusion of author and others,
+    we have included it as a separate method of normalization.
+    :return: normalized df
+    """
     """
     methods: standardization, mean and std may be provided, otherwise are calculated values=(mean, std) is expected
              minmax, if no values are provided, the scale to [0, 1] is done, otherwise to [a, b]
@@ -89,6 +126,17 @@ def normalize_df(df, method='standard', values=None):
 
 
 def create_classification_dataset(df, features, peaks, input_window_length, output_length):
+    """
+    Creates dataset of inputs and labels for classification of peaks in the output from multiple input features.
+    :param df: dataframe containing time series data
+    :param features: list of features from the df that should be incorporated in the classification dataset
+    :param peaks: list of indexes at which peaks are present in the df -> df.index(peaks) should return the times
+     at which the peaks are present
+    :param input_window_length: length of the input
+    :param output_length: length of the output (label)
+    :return: tuple (dims=2) containing input data of shape (len(df.index)-input_window_length-output_length+1, input_window_length, len(features))
+    and labels data of shape (len(df.index)-input_window_length-output_length+1, output_length, 1)
+    """
     inputs = []
     labels = []
 

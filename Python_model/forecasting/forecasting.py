@@ -33,7 +33,7 @@ MAX_EPOCHS = 25
 INPUT_WIDTH = 35
 OUT_STEPS = 35
 
-NUM_RUNS = 5
+NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
 PLOT_TESTING = False
 SAVE_MODELS = False
@@ -255,7 +255,7 @@ def classification_datasets(features, feature_for_peaks):
 
 
 def classification_mlp(train_inputs, train_labels, val_inputs, val_labels, min_peak_distance=20):
-    classification_model = ClassificationMLP(INPUT_WIDTH, OUT_STEPS, len(features), min_peak_distance)
+    classification_model = ClassificationMLP(INPUT_WIDTH, OUT_STEPS, 1, min_peak_distance)
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                       mode='min')
     classification_model.compile(loss=tf.keras.losses.CategoricalCrossentropy(),
@@ -302,7 +302,7 @@ sampled_test_df = test_df
 #tf.config.run_functions_eagerly(True)
 model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=1)
-train_inputs, train_labels, val_inputs, val_labels = classification_datasets(features, features[0])
+train_inputs, train_labels, val_inputs, val_labels = classification_datasets([features[0]], features[0])
 for run_id in range(NUM_RUNS):
     feedback_model = autoregressive_model()
     feedback_model._name = 'feed_back'
