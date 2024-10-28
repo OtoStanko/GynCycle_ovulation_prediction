@@ -87,6 +87,10 @@ class FeedBack(tf.keras.Model):
 
     def get_peaks(self, prediction, method='raw'):
         pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
+        position_of_max = np.argmax(prediction)
+        if position_of_max not in pred_peaks:
+            index = np.searchsorted(pred_peaks, position_of_max)
+            pred_peaks = np.insert(pred_peaks, index, position_of_max)
         return pred_peaks
 
     def get_config(self):
@@ -136,6 +140,10 @@ class WideCNN(tf.keras.Model):
 
     def get_peaks(self, prediction, method='raw'):
         pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
+        position_of_max = np.argmax(prediction)
+        if position_of_max not in pred_peaks:
+            index = np.searchsorted(pred_peaks, position_of_max)
+            pred_peaks = np.insert(pred_peaks, index, position_of_max)
         return pred_peaks
 
     def get_config(self):
