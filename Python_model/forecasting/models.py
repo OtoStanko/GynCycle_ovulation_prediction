@@ -52,6 +52,14 @@ class MMML(tf.keras.Model):
 
 class FeedBack(tf.keras.Model):
     def __init__(self, units, out_steps, num_features, min_peak_distance=20):
+        """
+        A feedback model consisting of one RNN layer with LSTM cell and one dense layer.
+
+        :param units: number of units in the LSTM cell
+        :param out_steps: output length
+        :param num_features: number of input and output features
+        :param min_peak_distance: minimum distance for peak detection
+        """
         super().__init__()
         self.out_steps = out_steps
         self.units = units
@@ -86,6 +94,13 @@ class FeedBack(tf.keras.Model):
         return predictions
 
     def get_peaks(self, prediction, method='raw'):
+        """
+        For given model predictions identifies peaks in it.
+
+        :param prediction: ndarray of predictions (one feature)
+        :param method: NA for this model
+        :return: ndarray of indexes where peaks were detected in the input array
+        """
         pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
         position_of_max = np.argmax(prediction)
         if position_of_max not in pred_peaks:
@@ -112,6 +127,16 @@ class FeedBack(tf.keras.Model):
 
 class WideCNN(tf.keras.Model):
     def __init__(self, input_length, out_steps, num_features, min_peak_distance=20):
+        """
+        Model consisting of one convolutional layer with 256 filers and two dense layers (32, num_features).
+        Model makes one-step prediction and based on the desired output length feeds the prediction with the original
+        input back to itself to generate the next output step.
+
+        :param input_length: length of the input
+        :param out_steps: output length
+        :param num_features: number of input and output features
+        :param min_peak_distance: minimum distance for peak detection
+        """
         super().__init__()
         self.input_length = input_length
         self.out_steps = out_steps
@@ -139,6 +164,13 @@ class WideCNN(tf.keras.Model):
         return predictions
 
     def get_peaks(self, prediction, method='raw'):
+        """
+        For given model predictions identifies peaks in it.
+
+        :param prediction: ndarray of predictions (one feature)
+        :param method: NA for this model
+        :return: ndarray of indexes where peaks were detected in the input array
+        """
         pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
         position_of_max = np.argmax(prediction)
         if position_of_max not in pred_peaks:
@@ -166,6 +198,22 @@ class WideCNN(tf.keras.Model):
 class NoisySinCurve(tf.keras.Model):
     def __init__(self, input_length, out_steps, num_features, train_df, feature,
                  noise=0, shift=0, period=28, min_peak_distance=20):
+        """
+        Sine curve meant as a baseline for LH prediction. The model cannot be trained. When instantiated a train_df
+        with one feature must be provided. This feature will be used to set the function period (mean peak distance).
+
+        Allows adding noise into the output from normal distribution
+
+        :param input_length: length of the input
+        :param out_steps: output length
+        :param num_features: number of input and output features (should be 1)
+        :param train_df: dataset used to determining the period length (in days)
+        :param feature: feature from the train_df where peaks should be predicted
+        :param noise: scale (std) of normal distribution with mean=0
+        :param shift: initial shift along the x-axis
+        :param period: initial period (in days)
+        :param min_peak_distance: minimum distance for peak detection
+        """
         super().__init__()
         self.input_length = input_length
         self.out_steps = out_steps
@@ -180,7 +228,7 @@ class NoisySinCurve(tf.keras.Model):
         popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[self.shift])
         self.shift = popt
         print(f"Optimal parameters: b={self.shift}, c={self.period}")
-        print('0.1 * sin( (x+(c/4)-b) * ((2*pi)/(c*24)) ) + 0.1')
+        print('0.05 * sin( (x-b) * ((2*pi)/(c*24)) ) + 0.05')
         x_fit = np.linspace(1200, 3500, 100)
         y_fit = sin_function(x_fit, self.shift, self.period)
         plt.plot(train_df.index[:100], train_df[feature][:100], color='black')
@@ -196,6 +244,14 @@ class NoisySinCurve(tf.keras.Model):
         return result
 
     def numpy_curve_fit(self, inputs):
+        """
+        As this model does not work on tensors, a call to non-tensor function is done in call method. This method
+        takes in tensor with batch_size and for every record in the batch fits and subsequently makes prediction
+        that can be used for peak detection.
+
+        :param inputs: tensor of shape (batch_size, input_length, num_features) First feature is kept, others are discarded
+        :return: a tensor of shape (batch_size, out_steps, num_output_features(should be 1))
+        """
         #y_data = np.array(inputs)  # Convert TensorFlow tensor to NumPy array
         y_batch_data = tf.squeeze(inputs, axis=-1).numpy()
         x_data = np.arange(self.input_length) * 24  # Create x_data array
@@ -217,6 +273,13 @@ class NoisySinCurve(tf.keras.Model):
         return sin_function(x_data, b, self.period)
 
     def get_peaks(self, prediction, method='raw'):
+        """
+        For given model predictions identifies peaks in it.
+
+        :param prediction: ndarray of predictions (one feature)
+        :param method: NA for this model
+        :return: ndarray of indexes where peaks were detected in the input array
+        """
         pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
         return pred_peaks
 
@@ -243,6 +306,16 @@ class NoisySinCurve(tf.keras.Model):
 
 class ClassificationMLP(tf.keras.Model):
     def __init__(self, input_length, out_steps, num_features, min_peak_distance):
+        """
+        Classification model with 3 dense layers (256, 64, out_steps). Only outputs one feature where peaks should
+        be detected. Can take in multiple features inputs. The output layer has sigmoid activation function. The output
+        can thus be interpreted as probability of the peak being at that position.
+
+        :param input_length: length of the input
+        :param out_steps: output length
+        :param num_features: number of input features - num_output_features = 1
+        :param min_peak_distance: minimum distance for peak detection
+        """
         super().__init__()
         self.input_length = input_length
         self.out_steps = out_steps
@@ -269,6 +342,17 @@ class ClassificationMLP(tf.keras.Model):
         return result
 
     def get_peaks(self, prediction, method='raw'):
+        """
+        For given model predictions identifies peaks in it. Allows multiple methods for peak detection in the prediction.
+
+
+        :param prediction: ndarray of predictions (one feature)
+        :param method: 'raw' - treats the prediction as it would be hormone levels. Finds peaks based on the height
+        and distance from other peaks. 'smooth' - applies smoothing to the output and then finds peaks as previously
+        'combined' - finds peaks as in raw method. Keeps only the first one. In the rest of the prediction finds the highest
+        value that can be peak (left and right values are lower) and adds it into the results. Always returns at most two peaks.
+        :return: ndarray of indexes where peaks were detected in the input array
+        """
         if method == 'raw':
             return self.peaks_raw(prediction, self.min_peak_distance)
         elif method == 'smooth':

@@ -10,22 +10,19 @@ import supporting_scripts as sp
 
 
 class ModelComparator:
-    """
-    This class server as a basis for comparison of different models for LH peak prediction.
-    """
     def __init__(self, test_df, input_length, pred_length, features, hormone,
                  step=5, plot=True, peak_comparison_distance=2):
         """
+        This class server as a basis for comparison of different models for LH peak prediction.
+
         :param test_df: dataframe used for testing and subsequently comparing the models
         :param input_length: input length of the data for the models (must be same for all the models)
         :param pred_length: output length for the models (must be same for all the models)
         :param features: list of string, features from the test_df (columns)
         :param hormone: feature from features where peaks should be detected
-        :param step: difference between beginning of every consecutive input for comparison.
-        For the best comparison step=1 is advised
+        :param step: difference between beginning of every consecutive input for comparison. For the best comparison step=1 is advised
         :param plot: if true, plot the individual input-prediction windows. If step is 1 may result in large amount of plots.
-        :param peak_comparison_distance: threshold for comparing the peak prediction accuracy. Maximum distance of every
-        predicted peak from the nearest gt peak to be considered truly predicted
+        :param peak_comparison_distance: threshold for comparing the peak prediction accuracy. Maximum distance of every predicted peak from the nearest gt peak to be considered truly predicted
         """
         self.test_df = test_df
         self.input_length = input_length

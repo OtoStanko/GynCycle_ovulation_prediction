@@ -7,6 +7,14 @@ from preprocessing_functions import *
 
 class TimeSeriesVisualizer:
     def __init__(self, df, hormones, input_length, output_length):
+        """
+        Interactive visualization of peak prediction for trained models.
+
+        :param df: dataframe for prediction
+        :param hormones: list of hormones (df columns) to visualize
+        :param input_length: length of the input of models
+        :param output_length: length of the output of models
+        """
         self.df = df
         self.hormones = hormones
         self.num_features = len(hormones)
@@ -46,6 +54,14 @@ class TimeSeriesVisualizer:
         self.fig.add_trace(highlighted_trace)
 
     def update_sliders(self, list_of_models=None):
+        """
+        Method takes list of trained models with the same input and output length as this object and for every window
+        computes prediction and detects peaks. Then it creates tracks for predictions and peaks and adds them
+        into the visualization.
+
+        :param list_of_models: list of trained models that will be predicting hormone levels and peaks
+        :return: None
+        """
         if len(self.hormones) == 0:
             print("No hormones defined")
             return
@@ -151,6 +167,9 @@ class TimeSeriesVisualizer:
             i += current_batch_size
 
     def show(self):
+        """
+        :return: None
+        """
         self.sliders = [dict(
             active=0,
             currentvalue={"prefix": "Window: "},
