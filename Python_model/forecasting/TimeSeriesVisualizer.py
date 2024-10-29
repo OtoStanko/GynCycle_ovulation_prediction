@@ -5,6 +5,13 @@ from plotly.subplots import make_subplots
 from preprocessing_functions import *
 
 
+DEFAULT_PLOTLY_COLORS=[(31, 119, 180), (255, 127, 14),
+                       (44, 160, 44), (214, 39, 40),
+                       (148, 103, 189), (140, 86, 75),
+                       (227, 119, 194), (127, 127, 127),
+                       (188, 189, 34), (23, 190, 207)]
+
+
 class TimeSeriesVisualizer:
     def __init__(self, df, hormones, input_length, output_length):
         """
@@ -81,21 +88,27 @@ class TimeSeriesVisualizer:
                 predictions = predictions[0][:, self.hoi_index]
                 x = window_data.index[self.INPUT_LENGTH:]
                 y = predictions.numpy()
+                print(list_of_models.index(model))
+                color = DEFAULT_PLOTLY_COLORS[list_of_models.index(model)]
+                str_color = 'rgb' + str(color)
                 trace = go.Scatter(
                     x=x,
                     y=y,
                     mode='lines+markers',
                     name=model._name,
+                    marker=dict(color=str_color),
+                    line=dict(color=str_color),
                 )
                 self.fig.add_trace(trace)
                 pred_peaks = model.get_peaks(predictions)
                 offset_pred_peaks = pred_peaks + window_data.index[0] + self.INPUT_LENGTH
                 y_peaks = y[pred_peaks]
+                color = 'rgb' + str(tuple(int(v*0.5) for v in color))  # darken the colour
                 trace = go.Scatter(
                     x=offset_pred_peaks,
                     y=y_peaks,
                     mode='markers',
-                    marker=dict(color='darkred'),
+                    marker=dict(color=color, size=8),
                     showlegend=False,
                 )
                 self.fig.add_trace(trace)
