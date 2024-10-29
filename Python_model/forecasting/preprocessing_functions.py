@@ -1,8 +1,8 @@
 import os
 
-import tensorflow as tf
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
 
 def create_dataframe(input_files_directory, features, time_file_prefix, feature_file_suffix='1'):
@@ -97,6 +97,7 @@ def normalize_df(df, method='standard', values=None):
     methods: standardization, mean and std may be provided, otherwise are calculated values=(mean, std) is expected
              minmax, if no values are provided, the scale to [0, 1] is done, otherwise to [a, b]
     """
+    df = df.copy()
     prop = {}
     if method == 'standard':
         for feature in df.columns:
@@ -158,28 +159,22 @@ def create_classification_dataset(df, features, peaks, input_window_length, outp
 
         # Find the next peak time after the end of the input window
         next_peaks = peaks[peaks >= end_time]
-        #next_peaks = next_peaks[next_peaks < end_time + 35]
 
         if len(next_peaks) != 0:
             # Calculate the label as the time difference in seconds
             inputs.append(input_data)
-            #inputs.append(tf.expand_dims(input_data, axis=0))
             label = (next_peaks[0] - end_time)
             label_vector = [0 for _ in range(output_length)]
             if label < output_length:
                 label_vector[label] = 1
-            #labels.append([label_vector])
             labels.append(tf.convert_to_tensor([label_vector], dtype=tf.int32))
         else:
             break
-
-    # Convert to NumPy arrays
     inputs = tf.stack(inputs)
     labels = tf.stack(labels)
 
     print("Input shape:", inputs.shape)
     print("Labels shape:", labels.shape)
-    #print("Peaks:", peaks)
     print("DF length:", len(df.index))
     print("Num records:", len(labels))
     return inputs, labels

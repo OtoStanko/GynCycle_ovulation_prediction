@@ -121,7 +121,6 @@ class FeedBack(tf.keras.Model):
 
     @classmethod
     def from_config(cls, config):
-        # Recreate the model from its configuration
         return cls(**config)
 
 
@@ -191,7 +190,6 @@ class WideCNN(tf.keras.Model):
 
     @classmethod
     def from_config(cls, config):
-        # Recreate the model from its configuration
         return cls(**config)
 
 
@@ -252,9 +250,8 @@ class NoisySinCurve(tf.keras.Model):
         :param inputs: tensor of shape (batch_size, input_length, num_features) First feature is kept, others are discarded
         :return: a tensor of shape (batch_size, out_steps, num_output_features(should be 1))
         """
-        #y_data = np.array(inputs)  # Convert TensorFlow tensor to NumPy array
         y_batch_data = tf.squeeze(inputs, axis=-1).numpy()
-        x_data = np.arange(self.input_length) * 24  # Create x_data array
+        x_data = np.arange(self.input_length) * 24
         output_data = []
         for y_data in y_batch_data:
             popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[self.shift])
@@ -266,7 +263,6 @@ class NoisySinCurve(tf.keras.Model):
         stacked_array = np.stack(output_data)
         expanded_array = np.expand_dims(stacked_array, axis=-1)
         tensor = tf.convert_to_tensor(expanded_array)
-        #print(popt)
         return np.array(tensor, dtype=np.float32)
 
     def move_curve_function(self, x_data, b):
@@ -300,7 +296,6 @@ class NoisySinCurve(tf.keras.Model):
 
     @classmethod
     def from_config(cls, config):
-        # Recreate the model from its configuration
         return cls(**config)
 
 
@@ -335,10 +330,6 @@ class ClassificationMLP(tf.keras.Model):
         print(shape)
         result = self.mlp(inputs)
         print(result.shape)
-        #if smoothen:
-        #    result = tf.reshape(result, (self.out_steps))
-        #    result = result / 3
-        #    result = savgol_filter(result, 11, 2)
         return result
 
     def get_peaks(self, prediction, method='raw'):
@@ -410,7 +401,6 @@ class ClassificationMLP(tf.keras.Model):
 
     @classmethod
     def from_config(cls, config):
-        # Recreate the model from its configuration
         return cls(**config)
 
 

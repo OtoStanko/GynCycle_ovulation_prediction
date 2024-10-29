@@ -8,7 +8,6 @@ import seaborn as sns
 
 from ModelComparator import ModelComparator
 from TimeSeriesVisualizer import TimeSeriesVisualizer
-from custom_losses import Peak_loss
 from models import FeedBack, WideCNN, ClassificationMLP, NoisySinCurve
 from preprocessing_functions import *
 from windowGenerator import WindowGenerator
@@ -43,9 +42,6 @@ def compile_and_fit(model, window, patience=2):
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                     patience=patience,
                                                     mode='min')
-    # tf.keras.losses.MeanSquaredError(),
-    # tf.keras.losses.Huber()
-    # Peak_loss()
     history = None
     for loss in LOSS_FUNCTIONS:
         model.compile(loss=loss,
@@ -114,15 +110,9 @@ train_std = train_df.std()
 
 
 train_df, norm_properties = normalize_df(train_df, method='minmax', values={feature: (0, 1) for feature in features})
-# values = {feature: (0, properties[feature][1]) for feature in features}
 val_df, _ = normalize_df(val_df, method='own', values=norm_properties)
 test_df, _ = normalize_df(test_df, method='own', values=norm_properties)
-"""
-train_df, norm_properties = normalize_df(train_df, method='standard')
-# values = {feature: (0, properties[feature][1]) for feature in features}
-val_df, _ = normalize_df(val_df, method='standard', values=norm_properties)
-test_df, _ = normalize_df(test_df, method='standard', values=norm_properties)
-"""
+
 
 for feature in features:
     plt.plot(train_df.index, train_df[feature], color='yellow')
@@ -135,64 +125,6 @@ for feature in features:
 tsv_combined = TimeSeriesVisualizer(test_df, features, 35, 35)
 tsv_combined.update_sliders()
 tsv_combined.show()
-#sp.fit_sin_curve(train_df, hormone, val_df, test_df, sampled_df_timeH)
-
-
-# Window
-w2 = WindowGenerator(input_width=34, label_width=1, shift=1,
-                     train_df=train_df, val_df=val_df, test_df=test_df,
-                     label_columns=features)
-#print(w2)
-
-
-print(w2.train.element_spec)
-for example_inputs, example_labels in w2.train.take(1):
-    print(f'Inputs shape (batch, time, features): {example_inputs.shape}')
-    print(f'Labels shape (batch, time, features): {example_labels.shape}')
-
-single_step_window = WindowGenerator(
-    input_width=1, label_width=1, shift=1,
-    train_df=train_df, val_df=val_df, test_df=test_df,
-    label_columns=features)
-
-
-val_performance = {}
-performance = {}
-wide_window = WindowGenerator(
-        input_width=24, label_width=24, shift=1,
-        train_df=train_df, val_df=val_df, test_df=test_df,
-        label_columns=features)
-
-
-def learn_model(model, window, features, val_performance, performance):
-    history = compile_and_fit(model, window)
-    val_performance[model._name] = model.evaluate(single_step_window.val, return_dict=True)
-    performance[model._name] = model.evaluate(single_step_window.test, verbose=0, return_dict=True)
-
-    for feature in features:
-        window.plot(feature, model._name + 'Model predictions', model)
-
-
-def show_performance(val_performance, performance):
-    """
-    # Performance
-    """
-    x = np.arange(len(performance))
-    width = 0.3
-    metric_name = 'mean_absolute_error'
-    val_mae = [v[metric_name] for v in val_performance.values()]
-    test_mae = [v[metric_name] for v in performance.values()]
-
-    plt.ylabel('mean_absolute_error {}, normalized'.format(features))
-    plt.bar(x - 0.17, val_mae, width, label='Validation')
-    plt.bar(x + 0.17, test_mae, width, label='Test')
-    plt.xticks(ticks=x, labels=performance.keys(),
-               rotation=45)
-    _ = plt.legend()
-    plt.show()
-
-    for name, value in performance.items():
-        print(f'{name:12s}: {value[metric_name]:0.4f}')
 
 
 """
@@ -201,11 +133,6 @@ def show_performance(val_performance, performance):
 multi_window = WindowGenerator(input_width=INPUT_WIDTH, label_width=OUT_STEPS,   shift=OUT_STEPS,
                                train_df=train_df, val_df=val_df, test_df=test_df,
                                label_columns=features)
-"""for feature in features:
-    multi_window.plot(feature, 'Multi window')"""
-
-multi_val_performance = dict()
-multi_performance = dict()
 
 
 def autoregressive_model():
@@ -214,16 +141,10 @@ def autoregressive_model():
     """
     feedback_model = FeedBack(32, OUT_STEPS, len(features), 20)
     prediction, state = feedback_model.warmup(multi_window.example[0])
+    IPython.display.clear_output()
     print(prediction.shape)
     print('Output shape (batch, time, features): ', feedback_model(multi_window.example[0]).shape)
     history = compile_and_fit(feedback_model, multi_window)
-
-    IPython.display.clear_output()
-
-    """multi_val_performance['AR LSTM'] = feedback_model.evaluate(multi_window.val, return_dict=True)
-    multi_performance['AR LSTM'] = feedback_model.evaluate(multi_window.test, verbose=0, return_dict=True)
-    for feature in features:
-        multi_window.plot(feature, 'Autoregressive model predictions', feedback_model)"""
     return feedback_model
 
 
@@ -232,11 +153,6 @@ def multistep_cnn():
     IPython.display.clear_output()
     print('Output shape (batch, time, features): ', multi_cnn(multi_window.example[0]).shape)
     history = compile_and_fit(multi_cnn, multi_window)
-
-    """multi_val_performance['CNN'] = multi_cnn.evaluate(multi_window.val, return_dict=True)
-    multi_performance['CNN'] = multi_cnn.evaluate(multi_window.test, verbose=0, return_dict=True)
-    for feature in features:
-        multi_window.plot(feature, 'CNN model predictions', multi_cnn)"""
     return multi_cnn
 
 
@@ -266,24 +182,6 @@ def classification_mlp(train_inputs, train_labels, val_inputs, val_labels, min_p
     return classification_model
 
 
-def multistep_performance():
-    # Performance
-    x = np.arange(len(multi_performance))
-    width = 0.3
-
-    metric_name = 'mean_absolute_error'
-    val_mae = [v[metric_name] for v in multi_val_performance.values()]
-    test_mae = [v[metric_name] for v in multi_performance.values()]
-
-    plt.bar(x - 0.17, val_mae, width, label='Validation')
-    plt.bar(x + 0.17, test_mae, width, label='Test')
-    plt.xticks(ticks=x, labels=multi_performance.keys(),
-               rotation=45)
-    plt.ylabel(f'MAE (average over all times and outputs)')
-    _ = plt.legend()
-    plt.show()
-
-
 peaks, properties = scipy.signal.find_peaks(train_df[features[0]], distance=10, height=0.3)
 distances = [peaks[i+1] - peaks[i] for i in range(len(peaks)-1)]
 count = Counter(distances)
@@ -304,16 +202,16 @@ model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, feat
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=1)
 train_inputs, train_labels, val_inputs, val_labels = classification_datasets([features[0]], features[0])
 for run_id in range(NUM_RUNS):
-    feedback_model = autoregressive_model()
-    feedback_model._name = 'feed_back'
-    multi_cnn_model = multistep_cnn()
-    multi_cnn_model._name = 'wide_cnn'
+    #feedback_model = autoregressive_model()
+    #feedback_model._name = 'feed_back'
+    #multi_cnn_model = multistep_cnn()
+    #multi_cnn_model._name = 'wide_cnn'
     fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, 1, train_df, features[0],
                                noise=0.0, period=period)
     fitted_sin._name = 'sin_curve'
     classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
     classification_model._name = 'minPeakDist_24'
-    models = [feedback_model, multi_cnn_model, fitted_sin, classification_model]
+    models = [fitted_sin, classification_model]
     #for i in range(2, 37, 3):
     #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, i)
     #    model._name = 'minPeakDist_' + str(i)
@@ -339,7 +237,6 @@ for run_id in range(NUM_RUNS):
     tsv.update_sliders(list_of_models)
     tsv.show()
 
-#multistep_performance()
 model_comparator.print_peak_statistics()
 model_comparator.plot_in_out_peaks()
 

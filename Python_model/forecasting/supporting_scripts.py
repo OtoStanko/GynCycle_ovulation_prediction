@@ -19,7 +19,6 @@ def fit_sin_curve(train_df, feature, val_df, test_df, original_df):
     x_data = train_df.index.values
     y_data = train_df[feature].values
     x_all = original_df.index.values
-    y_all = original_df[feature].values
     popt, pcov = curve_fit(sin_function, x_data, y_data, p0=[1, 25])
     b_opt, c_opt = popt
     print(f"Optimal parameters: b={b_opt}, c={c_opt}")
