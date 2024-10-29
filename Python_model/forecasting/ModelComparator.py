@@ -11,13 +11,27 @@ import supporting_scripts as sp
 
 class ModelComparator:
     def __init__(self, test_df, input_length, pred_length, features, hormone,
-                 duration=250, step=5, plot=True, peak_comparison_distance=2):
+                 step=5, plot=True, peak_comparison_distance=2):
+        """
+        This class server as a basis for comparison of different models for LH peak prediction.
+
+        :param test_df: dataframe used for testing and subsequently comparing the models
+        :param input_length: input length of the data for the models (must be same for all the models)
+        :param pred_length: output length for the models (must be same for all the models)
+        :param features: list of string, features from the test_df (columns)
+        :param hormone: feature from features where peaks should be detected
+        :param step: difference between beginning of every consecutive input for comparison. For the best comparison step=1 is advised
+        :param plot: if true, plot the individual input-prediction windows. If step is 1 may result in large amount of plots.
+        :param peak_comparison_distance: threshold for comparing the peak prediction accuracy. Maximum distance of every predicted peak from the nearest gt peak to be considered truly predicted
+        """
         self.test_df = test_df
         self.input_length = input_length
         self.pred_length = pred_length
         self.features = features
+        self.num_features = len(features)
+        self.hoi_index = features.index(hormone)
         self.hormone = hormone
-        self.duration = duration
+        self.duration = len(test_df.index)
         self.step = step
         self.plot = plot
         self.peak_comparison_distance = peak_comparison_distance
@@ -34,6 +48,20 @@ class ModelComparator:
         self.num_detected_peaks = None
 
     def compare_models(self, list_of_models, run_id):
+        """
+        Compares models based on the data in the ModelComparator.
+        ModelComparator can compare models across multiple runs for the final statistics.
+
+        Comparator takes in list of models. For every model computes predictions and identifies peaks in it.
+        These peaks are then compared to the ground-truth peaks identified in the test_df.
+        ModelComparator tests for every predicted peak if it is within the threshold of the nearest gt peak
+        and for every gt peak in the output window if it is with the same threshold of the nearest predicted peak.
+        If plotting is enabled, the for every window also plots the models' outputs with detected peaks. Yellow predicted
+        peaks are those within the threshold of the nearest gt peak.
+        :param list_of_models: list of models to compare
+        :param run_id: id of a run
+        :return: None
+        """
         hormone = self.hormone
         test_df = self.test_df
         input_length = self.input_length
@@ -46,11 +74,11 @@ class ModelComparator:
         peaks, _ = scipy.signal.find_peaks(
             self.test_df[hormone], distance=self.MIN_PEAK_DISTANCE / 2, height=self.MIN_PEAK_HEIGHT)
         if self.plot:
-            plt.plot(test_df.index, test_df[hormone])
+            plt.plot(test_df.index, test_df[self.features])
             plt.scatter(test_df.index[peaks], test_df[hormone].iloc[peaks],
                         color='red', zorder=5, label='Highlighted Points')
             plt.xlabel('Time [hours]')
-            plt.title('Test {} data'.format(hormone))
+            plt.title('Test {} data'.format(self.features))
             plt.show()
         """
         Move along the testing TS. For every window of input_length + pred_length:
@@ -65,35 +93,22 @@ class ModelComparator:
         limit = self.duration - pred_length - input_length + 1
         while i < limit:
             current_batch_size = min(batch_size, limit - i)
-            batch_data = [test_df.iloc[i + j:i + j + self.input_length][self.hormone] for j in
+            batch_data = [test_df.iloc[i + j:i + j + self.input_length][self.features].values for j in
                       range(current_batch_size)]
             tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)
-            reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.input_length, 1))
+            reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.input_length, self.num_features))
             batch_predictions_dict = {model._name: None for model in list_of_models}
             for model in list_of_models:
-                batch_predictions = model(reshaped_tensor_batch)
-                batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.pred_length, 1))
+                new_tensor = reshaped_tensor_batch[:, :, :model.num_features]
+                batch_predictions = model(new_tensor)
+                batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.pred_length, model.num_output_features))
                 batch_predictions_dict[model._name] = batch_predictions
                 for j in range(current_batch_size):
-                    predictions = batch_predictions_dict[model._name][j][:, 0]
+                    predictions = batch_predictions_dict[model._name][j][:, self.hoi_index]
                     dict_of_model_predictions[model._name].append(predictions)
             i += current_batch_size
 
         for offset in range(0, self.duration - pred_length - input_length + 1, self.step):
-            # Extract input data from the testing df
-            for feature in self.features:
-                input = np.array(test_df[feature][offset:input_length + offset], dtype=np.float32)
-                #print("Original")
-                #print(input)
-                """
-                    Imputation to the input data
-                """
-                for i in range(1, len(input), 2):
-                    if i+1 == len(input):
-                        break
-                    input[i] = (input[i-1] + input[i+1]) / 2
-                #print("Imputated")
-                #print(input)
             # For every model extract the prediction for this time window
             list_of_model_predictions = []
             for model in list_of_models:
@@ -189,9 +204,21 @@ class ModelComparator:
         self.results[run_id] = results
 
     def get_run_results(self, run_id):
+        """
+        Returns ComparisonResults object with results of given run_id. Will throw error if the run_id is invalid.
+        :param run_id: id of a run
+        :return: ComparisonResults object
+        """
         return self.results[run_id]
 
     def get_run_results_tuple(self, run_id):
+        """
+        Returns tuple with unwrapped results from ComparisonResults object for the run specified by run_id.
+        Will throw error if the run_id is invalid.
+        :param run_id: id of a run
+        :return: tuple of results in order: peaks_within_threshold, peaks_outside_threshold, peaks_within_threshold_rev,
+        peaks_outside_threshold_rev, sum_of_dists_to_nearest_peak, num_detected_peaks, peak_distances_distribution
+        """
         results =  self.results[run_id]
         pwt = results.peaks_within_threshold
         pot = results.peaks_outside_threshold
@@ -204,7 +231,8 @@ class ModelComparator:
 
     def plot_pred_peak_distribution(self, run_id=None, mode=(True,True)):
         """
-        Plots how were forecasted peaks distributed around the position of ground truth peaks.
+        Plots how were predicted peaks distributed around the nearest ground-truth peak. Or (and) how were
+        ground-truth peaks distributed around the nearest predicted peak.
         :param run_id: if not specified, all the runs will be plotted.
         :param mode: (plot predicted peaks to gt peaks, plot gt peaks to predicted)
         :return: None
@@ -252,6 +280,13 @@ class ModelComparator:
                     plt.show()
 
     def simulation_summary(self):
+        """
+        This method is called internally by plot_in_out_peaks and print_peak_statistics. The method iterates over the runs
+        and extracts info which it concatenates to the summary results. This method basically sets contents of:
+        (self.) peaks_within_threshold, peaks_outside_threshold, peaks_within_threshold_rev, peaks_outside_threshold_rev,
+        sum_of_dists_to_nearest_peak, num_detected_peaks.
+        :return: None
+        """
         self.peaks_within_threshold = {}
         self.peaks_outside_threshold = {}
         self.peaks_within_threshold_rev = {}
@@ -285,6 +320,16 @@ class ModelComparator:
                     num_peaks_outside_rev])
 
     def plot_in_out_peaks(self, mode=(True,True)):
+        """
+        Can plot number of peaks within the threshold vs number of peaks outside the threshold for predicted compared to gt
+        and gt compared to predicted. Moreover, percentage of predicted peaks within threshold distance
+         of the nearest ground truth peak (PPPWG) vs percentage of ground truth peaks within threshold distance of the nearest
+        predicted peak (PGPWP).
+        :param mode: tuple of booleans. If mode[0] then plot predicted peaks compared to gt peaks.
+        If mode[1] then gt peaks compared to predicted peaks.
+        If both, plot also the PPPWG vs PGPWP.
+        :return: None
+        """
         if len(mode) != 2:
             print("Mode required a tuple of two bools")
             return
@@ -363,7 +408,14 @@ class ModelComparator:
             plt.show()
 
     def print_peak_statistics(self):
+        """
+        Pretty print for statistics of predicted peaks compared to the nearest ground-truth peak.
+        :return: None
+        """
         self.simulation_summary()
+        if len(self.peaks_within_threshold) == 0:
+            print("Comparator data is empty, run compare_models.")
+            return
         sp.print_peak_statistics(self.peaks_within_threshold, self.peaks_outside_threshold, self.sum_of_dists_to_nearest_peak,
                                  self.peak_comparison_distance)
 
