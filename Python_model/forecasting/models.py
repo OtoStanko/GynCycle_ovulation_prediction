@@ -50,6 +50,10 @@ class MMML(tf.keras.Model):
         return result
 
 
+def custom_activation(x, a=1.0):
+    return x + (tf.sin(a * x) ** 2)/a
+
+
 class FeedBack(tf.keras.Model):
     def __init__(self, units, out_steps, num_features, min_peak_distance=20):
         """
@@ -68,7 +72,7 @@ class FeedBack(tf.keras.Model):
         self.min_peak_distance = min_peak_distance
         self.lstm_cell = tf.keras.layers.LSTMCell(units)
         self.lstm_rnn = tf.keras.layers.RNN(self.lstm_cell, return_state=True)
-        self.dense = tf.keras.layers.Dense(num_features, kernel_initializer=tf.initializers.he_normal())
+        self.dense = tf.keras.layers.Dense(num_features)
 
     def warmup(self, inputs):
         x, *state = self.lstm_rnn(inputs)
@@ -148,8 +152,9 @@ class WideCNN(tf.keras.Model):
                                    activation='relu',
                                    input_shape=(input_length, num_features),),
             tf.keras.layers.Dense(units=32, activation='relu'),
-            tf.keras.layers.Dense(units=num_features, kernel_initializer=tf.initializers.he_normal()),
+            tf.keras.layers.Dense(units=num_features),
         ])
+        # lambda x: custom_activation(x, a=20.0)
         self.cnn = conv_model_wide
 
     def call(self, inputs):
@@ -254,8 +259,8 @@ class NoisySinCurve(tf.keras.Model):
         x_data = np.arange(self.input_length) * 24
         output_data = []
         for y_data in y_batch_data:
-            popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[self.shift])
-            x_fit = np.arange(len(inputs), len(inputs) + self.out_steps) * 24
+            popt, _ = curve_fit(self.move_curve_function, x_data, y_data, p0=[0])
+            x_fit = np.arange(self.input_length, self.input_length + self.out_steps) * 24
             y_fit = sin_function(x_fit, popt[0], self.period)
             noise = np.random.normal(0, self.noise, y_fit.shape)
             y_fit = y_fit + noise
