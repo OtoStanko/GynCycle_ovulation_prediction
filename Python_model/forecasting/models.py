@@ -54,6 +54,61 @@ def custom_activation(x, a=1.0):
     return x + (tf.sin(a * x) ** 2)/a
 
 
+class CNN_LSTM(tf.keras.Model):
+    def __init__(self, units, input_length, out_steps, num_features, min_peak_distance=20,
+                 filters=None, ks=None, dilations=None):
+        super().__init__()
+        if dilations is None:
+            dilations = [1, 2, 4]
+        if ks is None:
+            ks = [4, 3, 2]
+        if filters is None:
+            filters = [32, 64, 128]
+        self.units = units
+        self.input_length = input_length
+        self.out_steps = out_steps
+        self.num_features = num_features
+        self.num_output_features = num_features
+        self.min_peak_distance = min_peak_distance
+        self.lstm_cell = tf.keras.layers.LSTMCell(units)
+        self.cnl = tf.keras.Sequential([
+            tf.keras.layers.Conv1D(filters=filters[0], kernel_size=ks[0], activation='relu', padding='same',
+                                   dilation_rate=dilations[0],
+                                   input_shape=(input_length, num_features)),
+            tf.keras.layers.Conv1D(filters=filters[1], kernel_size=ks[1], activation='relu', padding='same',
+                                   dilation_rate=dilations[1]),
+            tf.keras.layers.Conv1D(filters=filters[2], kernel_size=ks[2], activation='relu', padding='same',
+                                   dilation_rate=dilations[2]),
+            tf.keras.layers.LSTM(32),
+            tf.keras.layers.Dense(out_steps * num_features),
+            tf.keras.layers.Reshape((out_steps, num_features))
+        ])
+
+    def warmup(self, inputs):
+        x, *state = self.lstm_rnn(inputs)
+        prediction = self.dense(x)
+        return prediction, state
+
+    def call(self, inputs):
+        return self.cnl(inputs)
+
+    def get_peaks(self, prediction, method='raw'):
+        """
+        For given model predictions identifies peaks in it.
+
+        :param prediction: ndarray of predictions (one feature)
+        :param method: NA for this model
+        :return: ndarray of indexes where peaks were detected in the input array
+        """
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
+        position_of_max = np.argmax(prediction)
+        if position_of_max not in pred_peaks:
+            index = np.searchsorted(pred_peaks, position_of_max)
+            pred_peaks = np.insert(pred_peaks, index, position_of_max)
+        return pred_peaks
+
+
+
 class FeedBack(tf.keras.Model):
     def __init__(self, units, out_steps, num_features, min_peak_distance=20):
         """
@@ -152,20 +207,15 @@ class WideCNN(tf.keras.Model):
                                    activation='relu',
                                    input_shape=(input_length, num_features),),
             tf.keras.layers.Dense(units=32, activation='relu'),
-            tf.keras.layers.Dense(units=num_features),
+            tf.keras.layers.Dense(out_steps * num_features),
+            tf.keras.layers.Reshape((out_steps, num_features))
         ])
         # lambda x: custom_activation(x, a=20.0)
         self.cnn = conv_model_wide
 
     def call(self, inputs):
+        return self.cnn(inputs)
         inputs = tf.convert_to_tensor(inputs, dtype=tf.float32)
-        input_tensor = inputs
-        for i in range(self.out_steps):
-            input_data = input_tensor[:, -self.input_length:, :]
-            y = self.cnn(input_data)
-            input_tensor = tf.concat([input_tensor, y], axis=1)
-        predictions = input_tensor[:, -self.out_steps:, :]
-        return predictions
 
     def get_peaks(self, prediction, method='raw'):
         """

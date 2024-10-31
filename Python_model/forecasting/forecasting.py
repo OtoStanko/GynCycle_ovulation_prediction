@@ -8,7 +8,7 @@ import seaborn as sns
 
 from ModelComparator import ModelComparator
 from TimeSeriesVisualizer import TimeSeriesVisualizer
-from models import FeedBack, WideCNN, ClassificationMLP, NoisySinCurve
+from models import FeedBack, WideCNN, ClassificationMLP, NoisySinCurve, CNN_LSTM
 from preprocessing_functions import *
 from windowGenerator import WindowGenerator
 
@@ -32,7 +32,7 @@ MAX_EPOCHS = 25
 INPUT_WIDTH = 35
 OUT_STEPS = 35
 
-NUM_RUNS = 1
+NUM_RUNS = 5
 PEAK_COMPARISON_DISTANCE = 2
 PLOT_TESTING = False
 SAVE_MODELS = False
@@ -156,6 +156,15 @@ def multistep_cnn():
     return multi_cnn
 
 
+def cnn_lstm(filters=None, ks=None, dilations=None):
+    cnn_lstm_model = CNN_LSTM(16, INPUT_WIDTH, OUT_STEPS, len(features), 20,
+                              filters, ks, dilations)
+    IPython.display.clear_output()
+    #print('Output shape (batch, time, features): ', cnn_lstm_model(multi_window.example[0]).shape)
+    history = compile_and_fit(cnn_lstm_model, multi_window)
+    return cnn_lstm_model
+
+
 def classification_datasets(features, feature_for_peaks):
     MIN_PEAK_HEIGHT = 0.3
 
@@ -196,22 +205,24 @@ print("Period:", period)
 
 sampled_test_df = test_df
 #sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
-#sampled_test_df.index = (sampled_test_df.index - sampled_test_df.index[0]) / 24
+##sampled_test_df.index = (sampled_test_df.index - sampled_test_df.index[0]) / 24
 #tf.config.run_functions_eagerly(True)
 model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=1)
 train_inputs, train_labels, val_inputs, val_labels = classification_datasets([features[0]], features[0])
 for run_id in range(NUM_RUNS):
-    #feedback_model = autoregressive_model()
-    #feedback_model._name = 'feed_back'
-    #multi_cnn_model = multistep_cnn()
-    #multi_cnn_model._name = 'wide_cnn'
+    feedback_model = autoregressive_model()
+    feedback_model._name = 'feed_back'
+    multi_cnn_model = multistep_cnn()
+    multi_cnn_model._name = 'wide_cnn'
     fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, 1, train_df, features[0],
                                noise=0.0, period=period)
     fitted_sin._name = 'sin_curve'
+    cnn_lstm_model = cnn_lstm(filters=[256, 128, 64], ks=[4, 3, 2], dilations=[1, 2, 4])
+    cnn_lstm_model._name = 'cnn_lstm'
     classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
     classification_model._name = 'minPeakDist_24'
-    models = [fitted_sin, classification_model]
+    models = [feedback_model, multi_cnn_model, fitted_sin, cnn_lstm_model, classification_model]
     #for i in range(2, 37, 3):
     #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, i)
     #    model._name = 'minPeakDist_' + str(i)
