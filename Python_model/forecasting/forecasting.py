@@ -5,6 +5,7 @@ import IPython.display
 import matplotlib.pyplot as plt
 import scipy.signal
 import seaborn as sns
+from tensorflow.keras.callbacks import TensorBoard
 
 from ModelComparator import ModelComparator
 from TimeSeriesVisualizer import TimeSeriesVisualizer
@@ -25,7 +26,7 @@ save_models_dir = os.path.join(os.getcwd(), "../saved_models/")
 SAMPLING_FREQUENCY = 24
 SAMPLING_FREQUENCY_UNIT = 'H'
 NUM_INITIAL_DAYS_TO_DISCARD = 50
-features = ['LH', 'E2']
+features = ['LH']
 MAX_EPOCHS = 25
 
 # forecast parameters
@@ -38,7 +39,7 @@ PLOT_TESTING = False
 SAVE_MODELS = False
 
 
-def compile_and_fit(model, window, patience=2):
+def compile_and_fit(model, window, tensor_callback=None, patience=2):
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                     patience=patience,
                                                     mode='min')
@@ -47,9 +48,13 @@ def compile_and_fit(model, window, patience=2):
         model.compile(loss=loss,
                     optimizer=tf.keras.optimizers.Adam(),
                     metrics=[tf.keras.metrics.MeanAbsoluteError()])
+        if tensor_callback is not None:
+            callbacks = [early_stopping, tensor_callback]
+        else:
+            callbacks = [early_stopping]
         history = model.fit(window.train, epochs=MAX_EPOCHS,
                           validation_data=window.val,
-                          callbacks=[early_stopping])
+                          callbacks=callbacks)
     return history
 
 
@@ -142,6 +147,8 @@ def autoregressive_model():
     feedback_model = FeedBack(32, OUT_STEPS, len(features), 20)
     prediction, state = feedback_model.warmup(multi_window.example[0])
     IPython.display.clear_output()
+    #log_dir = "logs/fit/"
+    #tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
     print(prediction.shape)
     print('Output shape (batch, time, features): ', feedback_model(multi_window.example[0]).shape)
     history = compile_and_fit(feedback_model, multi_window)
@@ -181,6 +188,8 @@ def classification_datasets(features, feature_for_peaks):
 
 def classification_mlp(train_inputs, train_labels, val_inputs, val_labels, min_peak_distance=20):
     classification_model = ClassificationMLP(INPUT_WIDTH, OUT_STEPS, 1, min_peak_distance)
+    #log_dir = "logs/fit/"
+    #tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                       mode='min')
     classification_model.compile(loss=tf.keras.losses.CategoricalCrossentropy(),
@@ -212,16 +221,16 @@ model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, feat
 train_inputs, train_labels, val_inputs, val_labels = classification_datasets([features[0]], features[0])
 for run_id in range(NUM_RUNS):
     feedback_model = autoregressive_model()
-    feedback_model._name = 'feed_back'
+    feedback_model._name = 'RNN'
     multi_cnn_model = multistep_cnn()
-    multi_cnn_model._name = 'wide_cnn'
+    multi_cnn_model._name = 'CNN'
     fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, 1, train_df, features[0],
                                noise=0.0, period=period)
-    fitted_sin._name = 'sin_curve'
+    fitted_sin._name = 'Baseline'
     cnn_lstm_model = cnn_lstm(filters=[256, 128, 64], ks=[4, 3, 2], dilations=[1, 2, 4])
-    cnn_lstm_model._name = 'cnn_lstm'
+    cnn_lstm_model._name = 'CNN+LSTM'
     classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
-    classification_model._name = 'minPeakDist_24'
+    classification_model._name = 'Classifier'
     models = [feedback_model, multi_cnn_model, fitted_sin, cnn_lstm_model, classification_model]
     #for i in range(2, 37, 3):
     #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, i)
@@ -244,6 +253,11 @@ for run_id in range(NUM_RUNS):
         list_of_models.append(model)"""
     model_comparator.compare_models(list_of_models, run_id)
     model_comparator.plot_pred_peak_distribution(run_id)
+    #sampled_test_df.to_csv(f"{inputDir}atsv_df.csv")
+    """for column in sampled_test_df.columns:
+        sampled_test_df[[column]].to_csv(f"{inputDir}atsv_{column}.csv", index=False, header=False)
+    df_index_data = np.array(sampled_test_df.index) - sampled_test_df.index[0]
+    np.savetxt("../outputDir/atsv_time.csv", df_index_data, delimiter="\t", fmt='%d')"""
     tsv = TimeSeriesVisualizer(sampled_test_df, features, INPUT_WIDTH, OUT_STEPS)
     tsv.update_sliders(list_of_models)
     tsv.show()

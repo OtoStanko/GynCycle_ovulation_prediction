@@ -37,7 +37,6 @@ class MMML(tf.keras.Model):
             tf.keras.layers.Dense(num_features, activation='relu'),
         ])
 
-
     def call(self, inputs, training=None):
         model1_out = self.model1(inputs, training=training)
         model2_out = self.model2(inputs, training=training)
@@ -70,7 +69,6 @@ class CNN_LSTM(tf.keras.Model):
         self.num_features = num_features
         self.num_output_features = num_features
         self.min_peak_distance = min_peak_distance
-        self.lstm_cell = tf.keras.layers.LSTMCell(units)
         self.cnl = tf.keras.Sequential([
             tf.keras.layers.Conv1D(filters=filters[0], kernel_size=ks[0], activation='relu', padding='same',
                                    dilation_rate=dilations[0],
@@ -84,11 +82,6 @@ class CNN_LSTM(tf.keras.Model):
             tf.keras.layers.Reshape((out_steps, num_features))
         ])
 
-    def warmup(self, inputs):
-        x, *state = self.lstm_rnn(inputs)
-        prediction = self.dense(x)
-        return prediction, state
-
     def call(self, inputs):
         return self.cnl(inputs)
 
@@ -100,7 +93,7 @@ class CNN_LSTM(tf.keras.Model):
         :param method: NA for this model
         :return: ndarray of indexes where peaks were detected in the input array
         """
-        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance, height=0.2)
         position_of_max = np.argmax(prediction)
         if position_of_max not in pred_peaks:
             index = np.searchsorted(pred_peaks, position_of_max)
@@ -160,7 +153,7 @@ class FeedBack(tf.keras.Model):
         :param method: NA for this model
         :return: ndarray of indexes where peaks were detected in the input array
         """
-        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance, height=0.2)
         position_of_max = np.argmax(prediction)
         if position_of_max not in pred_peaks:
             index = np.searchsorted(pred_peaks, position_of_max)
@@ -187,8 +180,10 @@ class WideCNN(tf.keras.Model):
     def __init__(self, input_length, out_steps, num_features, min_peak_distance=20):
         """
         Model consisting of one convolutional layer with 256 filers and two dense layers (32, num_features).
-        Model makes one-step prediction and based on the desired output length feeds the prediction with the original
-        input back to itself to generate the next output step.
+        (Model makes one-step prediction and based on the desired output length feeds the prediction with the original
+        input back to itself to generate the next output step.)
+        Model has been simplified. Feedback loop is no longer present. Instead, a prediction of out_steps is made.
+        Results are comparable to the original version and training is shorter.
 
         :param input_length: length of the input
         :param out_steps: output length
@@ -215,7 +210,6 @@ class WideCNN(tf.keras.Model):
 
     def call(self, inputs):
         return self.cnn(inputs)
-        inputs = tf.convert_to_tensor(inputs, dtype=tf.float32)
 
     def get_peaks(self, prediction, method='raw'):
         """
@@ -225,7 +219,7 @@ class WideCNN(tf.keras.Model):
         :param method: NA for this model
         :return: ndarray of indexes where peaks were detected in the input array
         """
-        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance)
+        pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=self.min_peak_distance, height=0.2)
         position_of_max = np.argmax(prediction)
         if position_of_max not in pred_peaks:
             index = np.searchsorted(pred_peaks, position_of_max)
@@ -408,6 +402,11 @@ class ClassificationMLP(tf.keras.Model):
 
     def peaks_raw(self, prediction, min_peak_distance):
         pred_peaks, _ = scipy.signal.find_peaks(prediction, distance=min_peak_distance)
+        position_of_max = np.argmax(prediction)
+        # The following code sometimes results in 2 peaks too close to each other, but that is somehow acceptable
+        if position_of_max not in pred_peaks:
+            index = np.searchsorted(pred_peaks, position_of_max)
+            pred_peaks = np.insert(pred_peaks, index, position_of_max)
         return pred_peaks
 
     def peaks_smoothened(self, prediction, min_peak_distance):

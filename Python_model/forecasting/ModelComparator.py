@@ -66,6 +66,11 @@ class ModelComparator:
         test_df = self.test_df
         input_length = self.input_length
         pred_length = self.pred_length
+        # reverse_offset serves as a cutoff of the last records from the testing data. The sliding window will not go
+        # over these last days. Peaks from this period are still taken into account for computing the statistics
+        # of models. This is just to ensure that there are no outlying predictions that don't have a corresponding
+        # ground-truth peak due to the end of the testing data. I advise to use value of last 20 days or so
+        reverse_offset = 20
 
         # Statistics about the model forecast and peaks' predictions
         results = ComparisonResults()
@@ -108,7 +113,7 @@ class ModelComparator:
                     dict_of_model_predictions[model._name].append(predictions)
             i += current_batch_size
 
-        for offset in range(0, self.duration - pred_length - input_length + 1, self.step):
+        for offset in range(0, self.duration - pred_length - input_length + 1 - reverse_offset, self.step):
             # For every model extract the prediction for this time window
             list_of_model_predictions = []
             for model in list_of_models:
@@ -128,6 +133,8 @@ class ModelComparator:
             # Shift them so that their time aligns with the offset data
             curr_peaks = np.array([x for x in peaks if offset <= x < input_length + pred_length + offset])
             curr_peaks = curr_peaks - offset
+            peaks_for_first_method = np.array([x for x in peaks if offset <= x < input_length + pred_length + offset + reverse_offset])
+            peaks_for_first_method = peaks_for_first_method - offset
             gt_peaks_predWindow = np.array([x for x in peaks if offset + input_length <= x < input_length + pred_length + offset])
             gt_peaks_predWindow = gt_peaks_predWindow - offset
             #if len(gt_peaks_predWindow) >= 1:
@@ -151,8 +158,8 @@ class ModelComparator:
                 #pred_peaks, _ = scipy.signal.find_peaks(model_predictions, distance=self.MIN_PEAK_DISTANCE)
                 results.num_detected_peaks[model_name] = results.num_detected_peaks.get(model_name, 0) + len(pred_peaks)
                 offset_pred_peaks = pred_peaks + input_length
-                unfiltered_signed_distances = sp.get_signed_distances(all_peaks_offset, offset_pred_peaks)
-                unfiltered_signed_distances_rev = sp.get_signed_distances(offset_pred_peaks, gt_peaks_predWindow)
+                unfiltered_signed_distances = sp.get_signed_distances(peaks_for_first_method, offset_pred_peaks)
+                unfiltered_signed_distances_rev = sp.get_signed_distances(offset_pred_peaks, gt_peaks_predWindow[:1])
                 unfiltered_abs_distances = np.array([abs(dist) for dist in unfiltered_signed_distances])
                 unfiltered_abs_distances_rev = np.array([abs(dist) for dist in unfiltered_signed_distances_rev])
                 # Proceed only if there are any ground-truth peaks in the output part
