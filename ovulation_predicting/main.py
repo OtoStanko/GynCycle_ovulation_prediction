@@ -21,8 +21,8 @@ TEST_DATA_SUFFIX = 'of_1'
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError()]
 
 # Set the parameters
-inputDir = os.path.join(os.getcwd(), "../outputDir/")
-save_models_dir = os.path.join(os.getcwd(), "../saved_models/")
+inputDir = os.path.join(os.getcwd(), "../Python_model/outputDir/")
+save_models_dir = os.path.join(os.getcwd(), "./saved_models/")
 SAMPLING_FREQUENCY = 24
 SAMPLING_FREQUENCY_UNIT = 'H'
 NUM_INITIAL_DAYS_TO_DISCARD = 50
@@ -33,7 +33,7 @@ MAX_EPOCHS = 25
 INPUT_WIDTH = 35
 OUT_STEPS = 35
 
-NUM_RUNS = 5
+NUM_RUNS = 1
 PEAK_COMPARISON_DISTANCE = 2
 PLOT_TESTING = False
 SAVE_MODELS = False
