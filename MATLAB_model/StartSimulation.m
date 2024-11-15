@@ -8,8 +8,8 @@ ShowPlots     = 0;
 SaveSim       = 0;
 SavePlotStuff = 0;
 SavePop       = 0;
-DirStuff      = '/Users/sophie/Documents/GynCycleModel_Pub2021/NonVec_Model/ModelPopulation/HormPopulation'; 
-%select type of simulation 
+DirStuff      = '/Users/sophie/Documents/GynCycleModel_Pub2021/NonVec_Model/ModelPopulation/HormPopulation';
+%select type of simulation
 NormalCycle   = 1;
 LutStim       = 0;
 FollStim      = 0;
@@ -18,7 +18,7 @@ Foll_ModelPop = 0;
 Horm_ModelPop = 0;
 %
 %-----------------------------------------------------------------------
-%     
+%
 global ModelPop_Params
 ModelPop_Params =[];
 global ModelPop_CycleInfo
@@ -26,53 +26,53 @@ ModelPop_CycleInfo = [];
 
 %
 %-----------------------------------------------------------------------
-% 
+%
 for runind = 1:runnum
 %
 %-----------------------------------------------------------------------
-%   
+%
 %integration time beginning and end
 %
     tb = 0;
     te = 300;
 %
 %-----------------------------------------------------------------------
-% 
+%
 % technical parameters
 %
     para    = [];
     para(1) = 0;               %ODE function called to test(0) or not (1)
-    para(2) = 17;              %number of non-follcile equations (NO DRUG) 
+    para(2) = 17;              %number of non-follcile equations (NO DRUG)
     para    = para';
 %
 %-----------------------------------------------------------------------
-%     
+%
 %follicle parameters
 %
     parafoll     = [];
-    parafoll(1)  = 2;                  %v - fractal dimension 
+    parafoll(1)  = 2;                  %v - fractal dimension
     parafoll(2)  = 0.04/2;             %gamma - growth rate
-    parafoll(3)  = 25;                 %xi - max. diameter of follicles 
-    parafoll(4)  = 1;                  %mu - proportion of self harm  
-    parafoll(5)  = 0.065/ ...          %k - strength of competition 
-                  (parafoll(3)^parafoll(1));       
+    parafoll(3)  = 25;                 %xi - max. diameter of follicles
+    parafoll(4)  = 1;                  %mu - proportion of self harm
+    parafoll(5)  = 0.065/ ...          %k - strength of competition
+                  (parafoll(3)^parafoll(1));
     parafoll(6)  = 0.01;               %rho - rate of decline
-    parafoll(7)  = 18;                 %min. ovulation size 
-    parafoll(8)  = (3/10);             %mean for FSH Sensitivity 
+    parafoll(7)  = 18;                 %min. ovulation size
+    parafoll(8)  = (3/10);             %mean for FSH Sensitivity
     parafoll(9)  = 0.1;                %std.deviation for FSH Sensitivity %0.55
-    parafoll(10) = 25;                 %threshold LH concentration for ovulation    
+    parafoll(10) = 25;                 %threshold LH concentration for ovulation
     parafoll(11) = 5;                  %big but not ovulated follicle livetime
     parafoll(12) = 0.01;               %too slow foll growth
     parafoll(13) = 0.1;                %very slow foll growth
     parafoll(14) = 2;                  %max life time for a small slow growing follciles
-    parafoll(15) = 25;                 %max follicle life time for a big follicles that start to rest 
-    parafoll     = parafoll';    
+    parafoll(15) = 25;                 %max follicle life time for a big follicles that start to rest
+    parafoll     = parafoll';
 %
 %-----------------------------------------------------------------------
-%    
+%
 %parameters for poisson distribution
 %
-    paraPoi    = [];    
+    paraPoi    = [];
     paraPoi(1) = 10/14;             %lambda - #Follikels/days
     paraPoi(2) = 0.25;              %intervall per day in which follicles appear
     paraPoi    = paraPoi';
@@ -109,7 +109,7 @@ for runind = 1:runnum
     Par(25) = 5;                     %n GnRH freq on LH
     Par(26) = 1.8275e+03;            %basal LH production
     Par(27) = 7.3099e+03;            %E2 stimulated LH production
-    Par(28) = 2.3708;                %T P4 on LH 
+    Par(28) = 2.3708;                %T P4 on LH
     Par(29) = 1;                     %n P4 on LH
     Par(30) = 0.25;                  %scale hm_p4
     Par(31) = 1.25;                  %scale hp_GnRHa on FSH
@@ -123,7 +123,7 @@ for runind = 1:runnum
     Par(39) = 74.851;                %LH clearance rate
     Par(40) = 1.6e+04; 		   %basal FSH production
     Par(41) = 2;                     %T P4 on FSH
-    Par(42) = 2;                     %n P4 on FSH 
+    Par(42) = 2;                     %n P4 on FSH
     Par(43) = 15;                    %T GnRH freq on FSH
     Par(44) = 5;                     %n GnRH freq on FSH
     Par(45) = 0.02; 	            %basal FSH release
@@ -163,7 +163,7 @@ for runind = 1:runnum
 %
 %initial follicles
 %
-    y0Foll = 4;                                                 
+    y0Foll = 4;
     StartValues = [y0Foll; yInitial]';
 
     if Foll_ModelPop || Horm_ModelPop
@@ -187,14 +187,14 @@ end
 %
 %Luteal Phase Stimulation: FSH/LH administartion (Menopur)
 %
-if (LutStim)  
+if (LutStim)
     Stim = 1;
     Par(64) = 0;                %set 1 if protocol starts
-    Par(65) = 13.387/2.6667;    %D FSH 
+    Par(65) = 13.387/2.6667;    %D FSH
     Par(66) = 9.87;             %beta FSH
     Par(67) = 0.42;             %clearance rate FSH
     Par(68) = 2.14;             %D LH
-    Par(69) = 6.04;             %beta LH 
+    Par(69) = 6.04;             %beta LH
     Par(70) = 3.199;            %clearance rate LH
     Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
     Par(72) = Par(71)+15;       %end time of dosing
@@ -206,14 +206,14 @@ end
 %
 %Follicular Phase Stimulation: FSH/LH administartion (Menopur)
 %
-if (FollStim)  
+if (FollStim)
     Stim = 1;
     Par(64) = 0;                %set 1 if protocol starts
-    Par(65) = 13.387/2.6667;      %D FSH 
+    Par(65) = 13.387/2.6667;      %D FSH
     Par(66) = 9.87;             %beta FSH
     Par(67) = 0.42;             %clearance rate FSH
     Par(68) = 2.14;             %D LH
-    Par(69) = 6.04;             %beta LH 
+    Par(69) = 6.04;             %beta LH
     Par(70) = 3.199;            %clearance rate LH
     Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
     Par(72) = Par(71)+15;       %end time of dosing
@@ -225,20 +225,20 @@ end
 %
 %Double Stimulation: FSH/LH administartion (Menopur)
 %
-if (DoubStim)  
+if (DoubStim)
     Stim = 1;
-    
+
     paraPoi(1) = 5/14;
-    y0Foll = 4;                                                 
+    y0Foll = 4;
     StartValues = [y0Foll; yInitial]';
     [FSHVec, StartVec] = CreateFollicles(parafoll,paraPoi,tb,te);
-    
+
     Par(64) = 0;                %set 1 if protocol starts
-    Par(65) = 13.387/2.6667;      %D FSH 
+    Par(65) = 13.387/2.6667;      %D FSH
     Par(66) = 9.87;             %beta FSH
     Par(67) = 0.42;             %clearance rate FSH
     Par(68) = 2.14;             %D LH
-    Par(69) = 6.04;             %beta LH 
+    Par(69) = 6.04;             %beta LH
     Par(70) = 3.199;            %clearance rate LH
     Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
     Par(72) = Par(71)+15;       %end time of dosing
@@ -248,7 +248,7 @@ end
 %
 %-----------------------------------------------------------------------
 %
-if (Foll_ModelPop) 
+if (Foll_ModelPop)
     Stim = 0;
     parafoll(2) = lognrnd(log(parafoll(2)),0.15);
     parafoll(4) = lognrnd(log(parafoll(4)),0.15);
@@ -259,8 +259,8 @@ end
 %
 %-----------------------------------------------------------------------
 %
-if (Horm_ModelPop)      
-    Stim = 0;  
+if (Horm_ModelPop)
+    Stim = 0;
     Par(1)  = lognrnd(log(Par(1)),0.15);
     Par(2)  = lognrnd(log(Par(2)),0.15);
     Par(5)  = lognrnd(log(Par(5)),0.15);
@@ -300,8 +300,8 @@ if SavePop && mod(runind, 10) == 0
     fullFileName = fullfile(DirStuff, FileName);
     M = load(fullFileName);
     M = [M ModelPop_CycleInfo];
-    csvwrite(fullFileName,M); 
-    ModelPop_CycleInfo = []; 
+    csvwrite(fullFileName,M);
+    ModelPop_CycleInfo = [];
 end
 %
 %-----------------------------------------------------------------------
