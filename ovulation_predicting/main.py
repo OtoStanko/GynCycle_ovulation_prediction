@@ -26,7 +26,7 @@ save_models_dir = os.path.join(os.getcwd(), "./saved_models/")
 SAMPLING_FREQUENCY = 24
 SAMPLING_FREQUENCY_UNIT = 'H'
 NUM_INITIAL_DAYS_TO_DISCARD = 50
-features = ['LH']
+features = ['LH', 'E2']
 MAX_EPOCHS = 25
 
 # forecast parameters
@@ -69,10 +69,9 @@ print('Num records in the loaded data for training:', len(combined_df['Time']))
 # Plot the loaded data
 sns.set()
 plt.ylabel('{} levels'.format('Hormones'))
-plt.xticks(rotation=45)
 plt.xlabel('Time in hours')
 plt.plot(combined_df['Time'], combined_df[features], )
-plt.title('Loaded combined dataframe for training')
+plt.title('Raw dataset {}'.format(features))
 plt.show()
 
 
@@ -120,10 +119,11 @@ test_df, _ = normalize_df(test_df, method='own', values=norm_properties)
 
 
 for feature in features:
-    plt.plot(train_df.index, train_df[feature], color='yellow')
+    plt.plot(train_df.index, train_df[feature], color='#1f77b4')
     plt.plot(val_df.index, val_df[feature], color='blue')
-    plt.plot(test_df.index, test_df[feature], color='red')
-    plt.title('Sampled raw hours split {} levels normalized'.format(feature))
+    plt.plot(test_df.index, test_df[feature], color='chocolate')
+    plt.title("Preprocessed split dataset ['{}']".format(feature))
+    plt.ylabel('Normalized hormone levels')
     plt.xlabel('Time in hours')
     plt.show()
 
@@ -229,9 +229,9 @@ for run_id in range(NUM_RUNS):
     fitted_sin._name = 'Baseline'
     cnn_lstm_model = cnn_lstm(filters=[256, 128, 64], ks=[4, 3, 2], dilations=[1, 2, 4])
     cnn_lstm_model._name = 'CNN+LSTM'
-    classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
-    classification_model._name = 'Classifier'
-    models = [feedback_model, multi_cnn_model, fitted_sin, cnn_lstm_model, classification_model]
+    #classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
+    #classification_model._name = 'Classifier'
+    models = [feedback_model, multi_cnn_model, fitted_sin, cnn_lstm_model]
     #for i in range(2, 37, 3):
     #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, i)
     #    model._name = 'minPeakDist_' + str(i)
