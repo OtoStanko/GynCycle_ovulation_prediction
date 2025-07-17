@@ -1,14 +1,12 @@
 from collections import Counter
 from tensorflow.keras.callbacks import TensorBoard
 
-import IPython
-import IPython.display
 import matplotlib.pyplot as plt
 import scipy.signal
 import seaborn as sns
 
 from ModelComparator import ModelComparator
-from models import FeedBack, WideCNN, ClassificationMLP, NoisySinCurve, CNN_LSTM
+from ovulation_predicting.models import MyModelWrapper, NoisySinCurve
 from preprocessing_functions import *
 from TimeSeriesVisualizer import TimeSeriesVisualizer
 from windowGenerator import WindowGenerator
@@ -40,23 +38,7 @@ PLOT_TESTING = False
 SAVE_MODELS = False
 
 
-def compile_and_fit(model_to_refactor, window, tensor_callback=None, patience=2):
-    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
-                                                    patience=patience,
-                                                    mode='min')
-    history = None
-    for loss in LOSS_FUNCTIONS:
-        model_to_refactor.compile(loss=loss,
-                                  optimizer=tf.keras.optimizers.Adam(),
-                                  metrics=[tf.keras.metrics.MeanAbsoluteError()])
-        if tensor_callback is not None:
-            callbacks = [early_stopping, tensor_callback]
-        else:
-            callbacks = [early_stopping]
-        history = model_to_refactor.fit(window.train, epochs=MAX_EPOCHS,
-                                        validation_data=window.val,
-                                        callbacks=callbacks)
-    return history
+
 
 
 # test on a small TS
@@ -141,65 +123,6 @@ multi_window = WindowGenerator(input_width=INPUT_WIDTH, label_width=OUT_STEPS,  
                                label_columns=features)
 
 
-def autoregressive_model():
-    """
-    # autoregressive RNN
-    """
-    feedback_model = FeedBack(32, OUT_STEPS, len(features), 20)
-    prediction, state = feedback_model.warmup(multi_window.example[0])
-    IPython.display.clear_output()
-    #log_dir = "logs/fit/"
-    #tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
-    print(prediction.shape)
-    print('Output shape (batch, time, features): ', feedback_model(multi_window.example[0]).shape)
-    history = compile_and_fit(feedback_model, multi_window)
-    return feedback_model
-
-
-def multistep_cnn():
-    multi_cnn = WideCNN(INPUT_WIDTH, OUT_STEPS, len(features), 20)
-    IPython.display.clear_output()
-    print('Output shape (batch, time, features): ', multi_cnn(multi_window.example[0]).shape)
-    history = compile_and_fit(multi_cnn, multi_window)
-    return multi_cnn
-
-
-def cnn_lstm(filters=None, ks=None, dilations=None):
-    cnn_lstm_model = CNN_LSTM(16, INPUT_WIDTH, OUT_STEPS, len(features), 20,
-                              filters, ks, dilations)
-    IPython.display.clear_output()
-    #print('Output shape (batch, time, features): ', cnn_lstm_model(multi_window.example[0]).shape)
-    history = compile_and_fit(cnn_lstm_model, multi_window)
-    return cnn_lstm_model
-
-
-def classification_datasets(features, feature_for_peaks):
-    MIN_PEAK_HEIGHT = 0.3
-
-    # Dataset is normalized
-    train_df_peaks, _ = scipy.signal.find_peaks(train_df[feature_for_peaks], distance=10, height=MIN_PEAK_HEIGHT)
-    val_df_peaks, _ = scipy.signal.find_peaks(val_df[feature_for_peaks], distance=10, height=MIN_PEAK_HEIGHT)
-    test_df_peaks, _ = scipy.signal.find_peaks(test_df[feature_for_peaks], distance=10, height=MIN_PEAK_HEIGHT)
-
-    train_inputs, train_labels = create_classification_dataset(train_df, features, train_df_peaks, INPUT_WIDTH, OUT_STEPS)
-    val_inputs, val_labels = create_classification_dataset(val_df, features, val_df_peaks, INPUT_WIDTH, OUT_STEPS)
-    test_inputs, test_labels = create_classification_dataset(test_df, features, test_df_peaks, INPUT_WIDTH, OUT_STEPS)
-    return train_inputs, train_labels, val_inputs, val_labels
-
-
-def classification_mlp(train_inputs, train_labels, val_inputs, val_labels, min_peak_distance=20):
-    classification_model = ClassificationMLP(INPUT_WIDTH, OUT_STEPS, 1, min_peak_distance)
-    #log_dir = "logs/fit/"
-    #tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
-    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
-                                                      mode='min')
-    classification_model.compile(loss=tf.keras.losses.CategoricalCrossentropy(),
-                                 optimizer=tf.keras.optimizers.Adam(),
-                                 metrics=[tf.keras.metrics.CategoricalCrossentropy()])
-    history = classification_model.fit(x=train_inputs, y=train_labels, validation_data=(val_inputs, val_labels),
-                             epochs=MAX_EPOCHS, callbacks=[early_stopping], shuffle=True, batch_size=32)
-    return classification_model
-
 
 peaks, properties = scipy.signal.find_peaks(train_df[features[0]], distance=10, height=0.3)
 distances = [peaks[i+1] - peaks[i] for i in range(len(peaks)-1)]
@@ -219,16 +142,19 @@ sampled_test_df = test_df
 #tf.config.run_functions_eagerly(True)
 model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=1)
-train_inputs, train_labels, val_inputs, val_labels = classification_datasets([features[0]], features[0])
+model_wrapper = MyModelWrapper(features, INPUT_WIDTH, OUT_STEPS, multi_window, LOSS_FUNCTIONS, MAX_EPOCHS)
+
+train_inputs, train_labels, val_inputs, val_labels = model_wrapper.classification_datasets(
+    train_df, val_df, test_df, [features[0]], features[0])
 for run_id in range(NUM_RUNS):
-    feedback_model = autoregressive_model()
+    feedback_model = model_wrapper.autoregressive_model()
     feedback_model._name = 'RNN'
-    multi_cnn_model = multistep_cnn()
+    multi_cnn_model = model_wrapper.multistep_cnn()
     multi_cnn_model._name = 'CNN'
     fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, 1, train_df, features[0],
                                noise=0.0, period=period)
     fitted_sin._name = 'Baseline'
-    cnn_lstm_model = cnn_lstm(filters=[256, 128, 64], ks=[4, 3, 2], dilations=[1, 2, 4])
+    cnn_lstm_model = model_wrapper.cnn_lstm(filters=[256, 128, 64], ks=[4, 3, 2], dilations=[1, 2, 4])
     cnn_lstm_model._name = 'CNN+LSTM'
     #classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
     #classification_model._name = 'Classifier'
