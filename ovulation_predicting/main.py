@@ -1,17 +1,18 @@
 from collections import Counter
+from tensorflow.keras.callbacks import TensorBoard
 
 import IPython
 import IPython.display
 import matplotlib.pyplot as plt
 import scipy.signal
 import seaborn as sns
-from tensorflow.keras.callbacks import TensorBoard
 
 from ModelComparator import ModelComparator
-from TimeSeriesVisualizer import TimeSeriesVisualizer
 from models import FeedBack, WideCNN, ClassificationMLP, NoisySinCurve, CNN_LSTM
 from preprocessing_functions import *
+from TimeSeriesVisualizer import TimeSeriesVisualizer
 from windowGenerator import WindowGenerator
+
 
 """
     Parameters
@@ -21,8 +22,8 @@ TEST_DATA_SUFFIX = 'of_1'
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError()]
 
 # Set the parameters
-inputDir = os.path.join(os.getcwd(), "../Python_model/outputDir/")
-save_models_dir = os.path.join(os.getcwd(), "./saved_models/")
+INPUT_DIR = os.path.join(os.getcwd(), "../Python_model/outputDir/")
+SAVE_MODELS_DIR = os.path.join(os.getcwd(), "./saved_models/")
 SAMPLING_FREQUENCY = 24
 SAMPLING_FREQUENCY_UNIT = 'H'
 NUM_INITIAL_DAYS_TO_DISCARD = 50
@@ -39,30 +40,30 @@ PLOT_TESTING = False
 SAVE_MODELS = False
 
 
-def compile_and_fit(model, window, tensor_callback=None, patience=2):
+def compile_and_fit(model_to_refactor, window, tensor_callback=None, patience=2):
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                     patience=patience,
                                                     mode='min')
     history = None
     for loss in LOSS_FUNCTIONS:
-        model.compile(loss=loss,
-                    optimizer=tf.keras.optimizers.Adam(),
-                    metrics=[tf.keras.metrics.MeanAbsoluteError()])
+        model_to_refactor.compile(loss=loss,
+                                  optimizer=tf.keras.optimizers.Adam(),
+                                  metrics=[tf.keras.metrics.MeanAbsoluteError()])
         if tensor_callback is not None:
             callbacks = [early_stopping, tensor_callback]
         else:
             callbacks = [early_stopping]
-        history = model.fit(window.train, epochs=MAX_EPOCHS,
-                          validation_data=window.val,
-                          callbacks=callbacks)
+        history = model_to_refactor.fit(window.train, epochs=MAX_EPOCHS,
+                                        validation_data=window.val,
+                                        callbacks=callbacks)
     return history
 
 
 # test on a small TS
-test_dataframe = create_dataframe(inputDir, features, 'Time', TEST_DATA_SUFFIX)
+test_dataframe = create_dataframe(INPUT_DIR, features, 'Time', TEST_DATA_SUFFIX)
 test_dataframe['Time'] = test_dataframe['Time'] * 24
 # train on a long TS
-combined_df = create_dataframe(inputDir, features, 'Time', TRAIN_DATA_SUFFIX)
+combined_df = create_dataframe(INPUT_DIR, features, 'Time', TRAIN_DATA_SUFFIX)
 combined_df['Time'] = combined_df['Time'] * 24
 
 print('Num records in the loaded data for training:', len(combined_df['Time']))
@@ -242,7 +243,7 @@ for run_id in range(NUM_RUNS):
     if SAVE_MODELS:
         for model in models:
             model_name = model._name + "_RUN" + str(run_id) + "_IN" + str(INPUT_WIDTH)
-            model_save_path_full = os.path.join(save_models_dir, model_name)
+            model_save_path_full = os.path.join(SAVE_MODELS_DIR, model_name)
             saved_models_paths.append(model_save_path_full)
             model.save(model_save_path_full)
     list_of_models = models  # []
