@@ -123,6 +123,10 @@ def normalize_df(df, method='standard', values=None):
         for feature in df.columns:
             df[feature] = (df[feature] - values[feature][0]) / values[feature][1]
         prop = values
+    elif method == 'log':
+        for feature in df.columns:
+            df[feature] = np.log(df[feature]) / np.log(np.max(df[feature]))
+        return df, None
     return df, prop
 
 

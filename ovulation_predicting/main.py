@@ -93,6 +93,10 @@ train_df, norm_properties = normalize_df(train_df, method='minmax', values={feat
 val_df, _ = normalize_df(val_df, method='own', values=norm_properties)
 test_df, _ = normalize_df(test_df, method='own', values=norm_properties)
 
+#train_df, _ = normalize_df(train_df, method='log')
+#val_df, _ = normalize_df(val_df, method='log')
+#test_df, _ = normalize_df(test_df, method='log')
+
 
 for feature in features:
     plt.plot(train_df.index, train_df[feature], color='#1f77b4')
