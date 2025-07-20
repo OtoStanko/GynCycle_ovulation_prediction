@@ -8,6 +8,7 @@ import seaborn as sns
 from ModelComparator import ModelComparator
 from ovulation_predicting.models import MyModelWrapper, NoisySinCurve
 from preprocessing_functions import *
+from supporting_scripts import print_ts
 from TimeSeriesVisualizer import TimeSeriesVisualizer
 from windowGenerator import WindowGenerator
 
@@ -15,13 +16,14 @@ from windowGenerator import WindowGenerator
 """
     Parameters
 """
+#
+INPUT_DIR = os.path.join(os.getcwd(), "../Python_model/outputDir/")
 TRAIN_DATA_SUFFIX = '1_n'
 TEST_DATA_SUFFIX = 'of_1'
+SAVE_MODELS_DIR = os.path.join(os.getcwd(), "./saved_models/")
+
 LOSS_FUNCTIONS = [tf.keras.losses.MeanSquaredError()]
 
-# Set the parameters
-INPUT_DIR = os.path.join(os.getcwd(), "../Python_model/outputDir/")
-SAVE_MODELS_DIR = os.path.join(os.getcwd(), "./saved_models/")
 SAMPLING_FREQUENCY = 24
 SAMPLING_FREQUENCY_UNIT = 'H'
 NUM_INITIAL_DAYS_TO_DISCARD = 50
@@ -38,59 +40,50 @@ PLOT_TESTING = False
 SAVE_MODELS = False
 
 
-
-
-
 # test on a small TS
 test_dataframe = create_dataframe(INPUT_DIR, features, 'Time', TEST_DATA_SUFFIX)
 test_dataframe['Time'] = test_dataframe['Time'] * 24
 # train on a long TS
 combined_df = create_dataframe(INPUT_DIR, features, 'Time', TRAIN_DATA_SUFFIX)
 combined_df['Time'] = combined_df['Time'] * 24
+print('Number of records in the loaded data for training:', len(combined_df['Time']))
 
-print('Num records in the loaded data for training:', len(combined_df['Time']))
 # Plot the loaded data
 sns.set()
-plt.ylabel('{} levels'.format('Hormones'))
-plt.xlabel('Time in hours')
-plt.plot(combined_df['Time'], combined_df[features], )
-plt.title('Raw dataset {}'.format(features))
-plt.show()
+print_ts(combined_df['Time'], combined_df[features],
+        'Time in hours', '{} levels'.format('Hormones'),
+         'Raw dataset {}'.format(features))
 
-
-# First 50 days of the simulation may be a bit messy and thus we ignore them
+# The first 50 days of the simulation may be a bit messy and thus we ignore them
+filtered_test_df = test_dataframe[test_dataframe['Time'] > NUM_INITIAL_DAYS_TO_DISCARD * 24]
+filtered_test_df.set_index('Time', inplace=True)
 filtered_df = combined_df[combined_df['Time'] > NUM_INITIAL_DAYS_TO_DISCARD * 24]
 filtered_df.set_index('Time', inplace=True)
 
-filtered_test_df = test_dataframe[test_dataframe['Time'] > NUM_INITIAL_DAYS_TO_DISCARD * 24]
-filtered_test_df.set_index('Time', inplace=True)
+
+# Sample the time series
+index_for_ts_sampling = [i for i in range(NUM_INITIAL_DAYS_TO_DISCARD * 24, int(filtered_df.index[-1]) + 1, SAMPLING_FREQUENCY)]
+print("Number of days in the training data:", len(index_for_ts_sampling))
+sampled_ts = sample_data(filtered_df, index_for_ts_sampling, features)
+print('Num records in the sampled dataframe with raw hours: '
+      '(Should be the same as the number of days in the training data)', len(sampled_ts.index))
+print_ts(sampled_ts.index, sampled_ts[features],
+        'Time in hours', '{} levels'.format('Hormones'),
+         'Sampled dataframe with raw hours')
+
+index_for_test_ts_sampling = [i for i in range(NUM_INITIAL_DAYS_TO_DISCARD * 24, int(filtered_test_df.index[-1]) + 1, SAMPLING_FREQUENCY)]
+sampled_test_ts = sample_data(filtered_test_df, index_for_test_ts_sampling, features)
+print("Number of days in the testing data:", len(index_for_test_ts_sampling))
 
 
-print(filtered_df.index[-1])
+column_indices = {name: i for i, name in enumerate(sampled_ts.columns)}
+n = len(sampled_ts)
+train_df = sampled_ts[0:int(n * 0.7)]
+val_df = sampled_ts[int(n * 0.7):int(n * 0.9)]
+test_df = sampled_ts[int(n * 0.9):]
 
-sampled_df_timeH_index = [i for i in range(NUM_INITIAL_DAYS_TO_DISCARD * 24, int(filtered_df.index[-1]) + 1, SAMPLING_FREQUENCY)]
-print("Number of days in the training data:", len(sampled_df_timeH_index))
-sampled_df_timeH = sample_data(filtered_df, sampled_df_timeH_index, features)
-print('Num records in the sampled dataframe with raw hours: (Should be the same as the above number)', len(sampled_df_timeH.index))
-plt.plot(sampled_df_timeH.index, sampled_df_timeH[features], )
-plt.title('Sampled dataframe with raw hours')
-plt.xlabel('Time in hours')
-plt.show()
-
-sampled_test_df_timeH_index = [i for i in range(NUM_INITIAL_DAYS_TO_DISCARD * 24, int(filtered_test_df.index[-1]) + 1, SAMPLING_FREQUENCY)]
-sampled_test_df = sample_data(filtered_test_df, sampled_test_df_timeH_index, features)
-print("Number of days in the testing data:", len(sampled_test_df_timeH_index))
-
-
-column_indices = {name: i for i, name in enumerate(sampled_df_timeH.columns)}
-
-n = len(sampled_df_timeH)
-train_df = sampled_df_timeH[0:int(n*0.7)]
-val_df = sampled_df_timeH[int(n*0.7):int(n*0.9)]
-test_df = sampled_df_timeH[int(n*0.9):]
-
-num_features = sampled_df_timeH.shape[1]
-print("Num features", num_features)
+num_features = sampled_ts.shape[1]
+print("Number of features sanity check", num_features, len(features))
 
 train_mean = train_df.mean()
 train_std = train_df.std()
@@ -123,7 +116,6 @@ multi_window = WindowGenerator(input_width=INPUT_WIDTH, label_width=OUT_STEPS,  
                                label_columns=features)
 
 
-
 peaks, properties = scipy.signal.find_peaks(train_df[features[0]], distance=10, height=0.3)
 distances = [peaks[i+1] - peaks[i] for i in range(len(peaks)-1)]
 count = Counter(distances)
@@ -136,11 +128,11 @@ plt.show()
 period = sum(distances) / len(distances)
 print("Period:", period)
 
-sampled_test_df = test_df
+sampled_test_ts = test_df
 #sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
 ##sampled_test_df.index = (sampled_test_df.index - sampled_test_df.index[0]) / 24
 #tf.config.run_functions_eagerly(True)
-model_comparator = ModelComparator(sampled_test_df, INPUT_WIDTH, OUT_STEPS, features, features[0],
+model_comparator = ModelComparator(sampled_test_ts, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=1)
 model_wrapper = MyModelWrapper(features, INPUT_WIDTH, OUT_STEPS, multi_window, LOSS_FUNCTIONS, MAX_EPOCHS)
 
@@ -159,12 +151,6 @@ for run_id in range(NUM_RUNS):
     #classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
     #classification_model._name = 'Classifier'
     models = [feedback_model, multi_cnn_model, fitted_sin, cnn_lstm_model]
-    #for i in range(2, 37, 3):
-    #    model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, i)
-    #    model._name = 'minPeakDist_' + str(i)
-    #    models.append(model)
-    #combined = mmml(feedback_model, multi_cnn_model)
-    #combined._name = 'combined_RNN_CNN'
     saved_models_paths = []
     if SAVE_MODELS:
         for model in models:
@@ -185,7 +171,7 @@ for run_id in range(NUM_RUNS):
         sampled_test_df[[column]].to_csv(f"{inputDir}atsv_{column}.csv", index=False, header=False)
     df_index_data = np.array(sampled_test_df.index) - sampled_test_df.index[0]
     np.savetxt("../outputDir/atsv_time.csv", df_index_data, delimiter="\t", fmt='%d')"""
-    tsv = TimeSeriesVisualizer(sampled_test_df, features, INPUT_WIDTH, OUT_STEPS)
+    tsv = TimeSeriesVisualizer(sampled_test_ts, features, INPUT_WIDTH, OUT_STEPS)
     tsv.update_sliders(list_of_models)
     tsv.show()
 
