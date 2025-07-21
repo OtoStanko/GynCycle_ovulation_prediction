@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from plotly.subplots import make_subplots
 
 from custom_losses import Peak_loss
-from models import FeedBack, WideCNN, ClassificationMLP
+from ovulation_predicting.models.models import FeedBack, WideCNN, ClassificationMLP
 from preprocessing_functions import *
 
 TRAIN_DATA_SUFFIX = '1_n'

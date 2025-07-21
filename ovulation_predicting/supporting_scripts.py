@@ -127,3 +127,11 @@ def print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_o
                 out_width=peaks_out_length, percent_width=10, distances_width=distances_width))
     print("+-{}-+-{}-+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length + thr_width + 5) * "-",
                                               peaks_out_length * "-", 10 * "-", distances_width * "-"))
+
+
+def print_ts(x, y, x_label, y_label, title):
+    plt.plot(x, y, )
+    plt.ylabel(y_label)
+    plt.xlabel(x_label)
+    plt.title(title)
+    plt.show()

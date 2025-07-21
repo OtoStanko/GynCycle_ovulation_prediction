@@ -32,6 +32,8 @@ class TimeSeriesVisualizer:
         self.batch_size = 32
         self.fig = make_subplots(rows=1, cols=1)
         self.hoi_index = 0
+        self.max_value = max(df.values.max(), 1)
+        self.min_value = min(df.values.min(), 0)
 
         initial_window = df.iloc[:self.window_size]
         initial_window.index = (initial_window.index - initial_window.index[0]) / 24
@@ -145,7 +147,7 @@ class TimeSeriesVisualizer:
                 curr_peaks = self.peaks[hormone][self.peaks[hormone] < i + j + self.window_size]
                 curr_peaks = curr_peaks[curr_peaks >= i + j] - j - i
                 x_values += [window_data.index[curr_peaks]]
-                y_values += [ window_data[hormone].iloc[curr_peaks]]
+                y_values += [window_data[hormone].iloc[curr_peaks]]
                 args = [{
                     'x': x_values,
                     'y': y_values
@@ -189,6 +191,7 @@ class TimeSeriesVisualizer:
             pad={"t": 50},
             steps=self.steps,
         )]
+        padding = 0.05 * max(abs(self.min_value), abs(self.max_value))
         self.fig.update_layout(
             sliders=self.sliders,
             title='Sliding Window Time Series Visualization',
@@ -196,6 +199,6 @@ class TimeSeriesVisualizer:
             yaxis_title='{} levels'.format(self.hormones),
             width=800,
             height=400,
-            yaxis=dict(range=[0, 1]),
+            yaxis=dict(range=[self.min_value-padding, self.max_value+padding]),
         )
         self.fig.show()
