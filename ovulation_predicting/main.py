@@ -143,18 +143,20 @@ model_wrapper = MyModelWrapper(features, INPUT_WIDTH, OUT_STEPS, multi_window, L
 train_inputs, train_labels, val_inputs, val_labels = model_wrapper.classification_datasets(
     train_df, val_df, test_df, [features[0]], features[0])
 for run_id in range(NUM_RUNS):
-    feedback_model = model_wrapper.autoregressive_model()
-    feedback_model._name = 'RNN'
-    multi_cnn_model = model_wrapper.multistep_cnn()
-    multi_cnn_model._name = 'CNN'
-    fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, 1, train_df, features[0],
-                               noise=0.0, period=period)
-    fitted_sin._name = 'Baseline'
+    #feedback_model = model_wrapper.autoregressive_model()
+    #feedback_model._name = 'RNN'
+    #multi_cnn_model = model_wrapper.multistep_cnn()
+    #multi_cnn_model._name = 'CNN'
+    #fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, 1, train_df, features[0],
+    #                           noise=0.0, period=period)
+    #fitted_sin._name = 'Baseline'
     cnn_lstm_model = model_wrapper.cnn_lstm(filters=[256, 128, 64], ks=[4, 3, 2], dilations=[1, 2, 4])
     cnn_lstm_model._name = 'CNN+LSTM'
+    attention_model = model_wrapper.attention()
+    attention_model._name = 'Attention'
     #classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
     #classification_model._name = 'Classifier'
-    models = [feedback_model, multi_cnn_model, fitted_sin, cnn_lstm_model]
+    models = [cnn_lstm_model, attention_model]  # feedback_model, multi_cnn_model, fitted_sin,
     saved_models_paths = []
     if SAVE_MODELS:
         for model in models:

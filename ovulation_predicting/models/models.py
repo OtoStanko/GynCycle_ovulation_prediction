@@ -6,6 +6,7 @@ import IPython.display
 
 from ovulation_predicting.preprocessing_functions import create_classification_dataset
 
+from .model_attention import Attention
 from .model_classification import ClassificationMLP
 from .model_cnn import WideCnn
 from .model_cnn_lstm import CnnLstm
@@ -81,6 +82,12 @@ class MyModelWrapper:
         # print('Output shape (batch, time, features): ', cnn_lstm_model(multi_window.example[0]).shape)
         history = self.compile_and_fit(cnn_lstm_model, self.multi_window)
         return cnn_lstm_model
+
+    def attention(self):
+        attention_model = Attention(64, self.input_width, self.out_steps, len(self.features), 20)
+        IPython.display.clear_output()
+        history = self.compile_and_fit(attention_model, self.multi_window)
+        return attention_model
 
     def classification_mlp(self, train_inputs, train_labels, val_inputs, val_labels, min_peak_distance=20):
         classification_model = ClassificationMLP(self.input_width, self.out_steps, 1, min_peak_distance)
