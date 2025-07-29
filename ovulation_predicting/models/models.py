@@ -5,6 +5,7 @@ import IPython
 import IPython.display
 
 from ovulation_predicting.preprocessing_functions import create_classification_dataset
+from ovulation_predicting.windowGenerator import WindowGenerator
 
 from .model_attention import Attention
 from .model_classification import ClassificationMLP
@@ -28,30 +29,33 @@ class ResidualWrapper(tf.keras.Model):
 
 
 class MyModelWrapper:
-    def __init__(self, features, input_width, out_steps, multi_window, loss_functions, max_epochs):
+    def __init__(self, features, input_width, out_steps, datasets, loss_functions, max_epochs):
         self.features = features
         self.input_width = input_width
         self.out_steps = out_steps
-        self.multi_window = multi_window
         self.loss_functions = loss_functions
         self.max_epochs = max_epochs
 
+        train_df, val_df, test_df = datasets
+        self.multi_window = WindowGenerator(
+            input_width=input_width, label_width=out_steps, shift=out_steps,
+            train_df=train_df, val_df=val_df, test_df=test_df, label_columns=features)
+
     def compile_and_fit(self, model_to_refactor, window, tensor_callback=None, patience=2):
-        early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
-                                                          patience=patience,
-                                                          mode='min')
+        early_stopping = tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss', patience=patience,  mode='min')
         history = None
         for loss in self.loss_functions:
-            model_to_refactor.compile(loss=loss,
-                                      optimizer=tf.keras.optimizers.Adam(),
-                                      metrics=[tf.keras.metrics.MeanAbsoluteError()])
+            model_to_refactor.compile(
+                loss=loss, optimizer=tf.keras.optimizers.Adam(),
+                metrics=[tf.keras.metrics.MeanAbsoluteError()])
             if tensor_callback is not None:
                 callbacks = [early_stopping, tensor_callback]
             else:
                 callbacks = [early_stopping]
-            history = model_to_refactor.fit(window.train, epochs=self.max_epochs,
-                                            validation_data=window.val,
-                                            callbacks=callbacks)
+            history = model_to_refactor.fit(
+                window.train, epochs=self.max_epochs,
+                validation_data=window.val, callbacks=callbacks)
         return history
 
     def autoregressive_model(self):
@@ -64,7 +68,8 @@ class MyModelWrapper:
         #log_dir = "logs/fit/"
         #tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
         print(prediction.shape)
-        print('Output shape (batch, time, features): ', feedback_model(self.multi_window.example[0]).shape)
+        print('Output shape (batch, time, features): ',
+              feedback_model(self.multi_window.example[0]).shape)
         history = self.compile_and_fit(feedback_model, self.multi_window)
         return feedback_model
 
@@ -89,7 +94,9 @@ class MyModelWrapper:
         history = self.compile_and_fit(attention_model, self.multi_window)
         return attention_model
 
-    def classification_mlp(self, train_inputs, train_labels, val_inputs, val_labels, min_peak_distance=20):
+    def classification_mlp(
+        self, train_inputs, train_labels, val_inputs, val_labels, min_peak_distance=20
+    ):
         classification_model = ClassificationMLP(self.input_width, self.out_steps, 1, min_peak_distance)
         # log_dir = "logs/fit/"
         # tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
@@ -98,11 +105,15 @@ class MyModelWrapper:
         classification_model.compile(loss=tf.keras.losses.CategoricalCrossentropy(),
                                      optimizer=tf.keras.optimizers.Adam(),
                                      metrics=[tf.keras.metrics.CategoricalCrossentropy()])
-        history = classification_model.fit(x=train_inputs, y=train_labels, validation_data=(val_inputs, val_labels),
-                                           epochs=self.max_epochs, callbacks=[early_stopping], shuffle=True, batch_size=32)
+        history = (
+            classification_model.fit(
+                x=train_inputs, y=train_labels, validation_data=(val_inputs, val_labels),
+                epochs=self.max_epochs, callbacks=[early_stopping], shuffle=True, batch_size=32))
         return classification_model
 
-    def classification_datasets(self, train_df, val_df, test_df, features, feature_for_peaks, min_peak_height=0.3):
+    def classification_datasets(
+        self, train_df, val_df, test_df, features, feature_for_peaks, min_peak_height=0.3
+    ):
         # Dataset is normalized
         train_df_peaks, _ = scipy.signal.find_peaks(train_df[feature_for_peaks], distance=10, height=min_peak_height)
         val_df_peaks, _ = scipy.signal.find_peaks(val_df[feature_for_peaks], distance=10, height=min_peak_height)
