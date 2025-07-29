@@ -333,7 +333,7 @@ class ModelComparator:
         plt.title(title)
         plt.show()
 
-    def simulation_summary(self):
+    def _simulation_summary(self):
         """
         This method is called internally by plot_in_out_peaks and print_peak_statistics. The method iterates over the runs
         and extracts info which it concatenates to the summary results. This method basically sets contents of:
@@ -373,100 +373,110 @@ class ModelComparator:
                         self.peaks_outside_threshold_rev.get(model_name, list()) + [
                     num_peaks_outside_rev])
 
-    def plot_in_out_peaks(self, mode=(True,True)):
+    def plot_in_out_peaks(self):
         """
         Can plot number of peaks within the threshold vs number of peaks outside the threshold for predicted compared to gt
         and gt compared to predicted. Moreover, percentage of predicted peaks within threshold distance
          of the nearest ground truth peak (PPPWG) vs percentage of ground truth peaks within threshold distance of the nearest
         predicted peak (PGPWP).
-        :param mode: tuple of booleans. If mode[0] then plot predicted peaks compared to gt peaks.
-        If mode[1] then gt peaks compared to predicted peaks.
-        If both, plot also the PPPWG vs PGPWP.
         :return: None
         """
-        if len(mode) != 2:
-            print("Mode required a tuple of two bools")
-            return
-        self.simulation_summary()
+        self._simulation_summary()
         if len(self.peaks_within_threshold) == 0:
             print("Comparator data is empty, run compare_models.")
             return
         #colors = mpl.colormaps.get_cmap('tab10')  # Using tab10 colormap with as many colors as there are keys
         colors = mpl.cm.get_cmap('Set3', len(list(self.results[0].peaks_within_threshold.keys())))
-        if mode[0] and mode[1]:
-            plt.figure(figsize=(8, 6))
-            for idx, key in enumerate(self.peaks_within_threshold):
-                tp = np.array(self.peaks_within_threshold[key])
-                fp = np.array(self.peaks_outside_threshold[key])
-                fn = np.array(self.peaks_within_threshold_rev[key])
-                tn = np.array(self.peaks_outside_threshold_rev[key])
-                print('***************')
-                print('Model:', key)
-                print('Within:', tp)
-                print('Outside:', fp)
-                print('Sum:', tp+fp)
-                print('WithinRev:', fn)
-                print('OutsideRev:', tn)
-                print('SumRev:', fn+tn)
-                x = tp / (tp + fp)
-                y = fn / (fn + tn)
-                plt.scatter(x, y, color=colors(idx), label=key)
-            plt.xlim(0, 1)
-            plt.ylim(0, 1)
-            plt.plot([0, 1], [1, 0], 'r--',)
-            #plt.plot([0, 1], [0.5, 0.5], 'r--',)
-            #plt.plot([0.5, 0.5], [0, 1], 'r--',)
-            plt.xlabel('How well are the hits')
-            plt.ylabel('How well are the peaks hit')
-            plt.title('')
-            plt.legend(title="Model")
-            plt.show()
-        if mode[0]:
-            plt.figure(figsize=(8, 6))
-            for idx, key in enumerate(self.peaks_within_threshold):
-                x_values = self.peaks_outside_threshold[key]
-                y_values = self.peaks_within_threshold[key]
-                # Plot each key's data with a unique color and label it with the key
-                plt.scatter(x_values, y_values, color=colors(idx), label=key)
+        self._print_and_plot_in_out_summary(colors)
+        self._plot_pred_peaks_to_gt_peaks(colors)
+        self.plot_gt_peaks_to_pred_peaks(colors)
 
-            all_values = itertools.chain(*self.peaks_outside_threshold.values(), *self.peaks_within_threshold.values())
-            max_val = max(all_values) + 5
-            plt.xlim(0, max_val)
-            plt.ylim(0, max_val)
-            plt.plot([0, max_val], [0, max_val], 'r--', label='y=x')
-            plt.xlabel('# predicted peaks that were further than {} days away from the nearest gt peak'.format(self.peak_comparison_distance))
-            plt.ylabel('# predicted peaks that were within {} days of the nearest gt peak'.format(self.peak_comparison_distance))
-            plt.title('How well are the prediction peaks placed near the nearest gt peak '
-                      '\n(how well placed are the peaks from the prediction)')
-            plt.legend(title="Model")
-            plt.show()
-        if mode[1]:
-            plt.figure(figsize=(8, 6))
-            for idx, key in enumerate(self.peaks_within_threshold_rev):
-                x_values = self.peaks_outside_threshold_rev[key]
-                y_values = self.peaks_within_threshold_rev[key]
+    def _print_and_plot_in_out_summary(self, colors):
+        plt.figure(figsize=(8, 6))
+        for idx, key in enumerate(self.peaks_within_threshold):
+            tp = np.array(self.peaks_within_threshold[key])
+            fp = np.array(self.peaks_outside_threshold[key])
+            fn = np.array(self.peaks_within_threshold_rev[key])
+            tn = np.array(self.peaks_outside_threshold_rev[key])
+            print('***************')
+            print('Model:', key)
+            print('Within:', tp)
+            print('Outside:', fp)
+            print('Sum:', tp + fp)
+            print('WithinRev:', fn)
+            print('OutsideRev:', tn)
+            print('SumRev:', fn + tn)
+            x = tp / (tp + fp)
+            y = fn / (fn + tn)
+            plt.scatter(x, y, color=colors(idx), label=key)
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.plot([0, 1], [1, 0], 'r--', )
+        # plt.plot([0, 1], [0.5, 0.5], 'r--',)
+        # plt.plot([0.5, 0.5], [0, 1], 'r--',)
+        plt.xlabel('How well are the hits')
+        plt.ylabel('How well are the peaks hit')
+        plt.title('')
+        plt.legend(title="Model")
+        plt.show()
 
-                # Plot each key's data with a unique color and label it with the key
-                plt.scatter(x_values, y_values, color=colors(idx), label=key)
+    def _plot_pred_peaks_to_gt_peaks(self, colors):
+        plt.figure(figsize=(8, 6))
+        for idx, key in enumerate(self.peaks_within_threshold):
+            x_values = self.peaks_outside_threshold[key]
+            y_values = self.peaks_within_threshold[key]
+            # Plot each key's data with a unique color and label it with the key
+            plt.scatter(x_values, y_values, color=colors(idx), label=key)
 
-            all_values = itertools.chain(*self.peaks_outside_threshold_rev.values(), *self.peaks_within_threshold_rev.values())
-            max_val = max(all_values) + 5
-            plt.xlim(0, max_val)
-            plt.ylim(0, max_val)
-            plt.plot([0, max_val], [0, max_val], 'r--', label='y=x')
-            plt.xlabel('# gt peaks that have the nearest predicted peak further than {} days away'.format(self.peak_comparison_distance))
-            plt.ylabel('# gt peaks that have the nearest predicted peak within {} days'.format(self.peak_comparison_distance))
-            plt.title('How well are the gt peaks predicted by the nearest prediction peak '
-                      '\n(how well are the gt peaks identified by the nearest peak from the prediction)')
-            plt.legend(title="Model")
-            plt.show()
+        all_values = itertools.chain(*self.peaks_outside_threshold.values(),
+                                     *self.peaks_within_threshold.values())
+        max_val = max(all_values) + 5
+        plt.xlim(0, max_val)
+        plt.ylim(0, max_val)
+        plt.plot([0, max_val], [0, max_val], 'r--', label='y=x')
+        x_label = ("# predicted peaks that were further than "
+                   f"{self.peak_comparison_distance} days away from the nearest gt peak")
+        plt.xlabel(x_label)
+        y_label = ("# predicted peaks that were within "
+                   f"{self.peak_comparison_distance} days of the nearest gt peak")
+        plt.ylabel(y_label)
+        plt.title('How well are the prediction peaks placed near the nearest gt peak '
+                  '\n(how well placed are the peaks from the prediction)')
+        plt.legend(title="Model")
+        plt.show()
+
+    def plot_gt_peaks_to_pred_peaks(self, colors):
+        plt.figure(figsize=(8, 6))
+        for idx, key in enumerate(self.peaks_within_threshold_rev):
+            x_values = self.peaks_outside_threshold_rev[key]
+            y_values = self.peaks_within_threshold_rev[key]
+
+            # Plot each key's data with a unique color and label it with the key
+            plt.scatter(x_values, y_values, color=colors(idx), label=key)
+
+        all_values = itertools.chain(*self.peaks_outside_threshold_rev.values(),
+                                     *self.peaks_within_threshold_rev.values())
+        max_val = max(all_values) + 5
+        plt.xlim(0, max_val)
+        plt.ylim(0, max_val)
+        plt.plot([0, max_val], [0, max_val], 'r--', label='y=x')
+        x_label = ("# gt peaks that have the nearest predicted peak further than "
+                   f"{self.peak_comparison_distance} days away")
+        plt.xlabel(x_label)
+        y_label = ("# gt peaks that have the nearest predicted peak within "
+                   f"{self.peak_comparison_distance} days")
+        plt.ylabel(y_label)
+        plt.title('How well are the gt peaks predicted by the nearest prediction peak '
+                  '\n(how well are the gt peaks identified by the nearest peak from the prediction)')
+        plt.legend(title="Model")
+        plt.show()
 
     def print_peak_statistics(self):
         """
         Pretty print for statistics of predicted peaks compared to the nearest ground-truth peak.
         :return: None
         """
-        self.simulation_summary()
+        self._simulation_summary()
         if len(self.peaks_within_threshold) == 0:
             print("Comparator data is empty, run compare_models.")
             return
