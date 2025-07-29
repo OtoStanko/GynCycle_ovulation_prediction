@@ -10,20 +10,25 @@ import supporting_scripts as sp
 
 
 class ModelComparator:
+    """
+    This class server as a basis for comparison of different models for LH peak prediction.
+
+    :param test_df: dataframe used for testing and subsequently comparing the models
+    :param input_length: input length of the data for the models
+    (must be same for all the models)
+    :param pred_length: output length for the models (must be same for all the models)
+    :param features: list of string, features from the test_df (columns)
+    :param hormone: feature from features where peaks should be detected
+    :param step: difference between beginning of every consecutive input for comparison.
+    For the best comparison step=1 is advised
+    :param plot: if true, plot the individual input-prediction windows.
+    If step is 1 may result in large amount of plots.
+    :param peak_comparison_distance: threshold for comparing the peak prediction accuracy.
+    Maximum distance of every predicted peak from
+    the nearest gt peak to be considered truly predicted
+    """
     def __init__(self, test_df, input_length, pred_length, features, hormone,
                  step=5, plot=True, peak_comparison_distance=2):
-        """
-        This class server as a basis for comparison of different models for LH peak prediction.
-
-        :param test_df: dataframe used for testing and subsequently comparing the models
-        :param input_length: input length of the data for the models (must be same for all the models)
-        :param pred_length: output length for the models (must be same for all the models)
-        :param features: list of string, features from the test_df (columns)
-        :param hormone: feature from features where peaks should be detected
-        :param step: difference between beginning of every consecutive input for comparison. For the best comparison step=1 is advised
-        :param plot: if true, plot the individual input-prediction windows. If step is 1 may result in large amount of plots.
-        :param peak_comparison_distance: threshold for comparing the peak prediction accuracy. Maximum distance of every predicted peak from the nearest gt peak to be considered truly predicted
-        """
         self.test_df = test_df
         self.input_length = input_length
         self.pred_length = pred_length
@@ -52,11 +57,15 @@ class ModelComparator:
         Compares models based on the data in the ModelComparator.
         ModelComparator can compare models across multiple runs for the final statistics.
 
-        Comparator takes in list of models. For every model computes predictions and identifies peaks in it.
+        Comparator takes in list of models. For every model computes
+        predictions and identifies peaks in it.
         These peaks are then compared to the ground-truth peaks identified in the test_df.
-        ModelComparator tests for every predicted peak if it is within the threshold of the nearest gt peak
-        and for every gt peak in the output window if it is within the same threshold of the nearest predicted peak.
-        If plotting is enabled, the for every window also plots the models' outputs with detected peaks. Yellow predicted
+        ModelComparator tests for every predicted peak if it is within
+        the threshold of the nearest gt peak
+        and for every gt peak in the output window if it is within
+        the same threshold of the nearest predicted peak.
+        If plotting is enabled, the for every window also plots the models' outputs
+        with detected peaks. Yellow predicted
         peaks are those within the threshold of the nearest gt peak.
         :param list_of_models: list of models to compare
         :param run_id: id of a run
@@ -64,16 +73,16 @@ class ModelComparator:
         """
         hormone = self.hormone
         test_df = self.test_df
-        input_length = self.input_length
-        pred_length = self.pred_length
-        # reverse_offset serves as a cutoff of the last records from the testing data. The sliding window will not go
-        # over these last days. Peaks from this period are still taken into account for computing the statistics
-        # of models. This is just to ensure that there are no outlying predictions that don't have a corresponding
-        # ground-truth peak due to the end of the testing data. I advise to use value of last 20 days or so.
+        # reverse_offset serves as a cutoff of the last records from the testing data.
+        # The sliding window will not go over these last days.
+        # Peaks from this period are still taken into account for computing the statistics of models.
+        # This is just to ensure that there are no outlying predictions that don't have a corresponding
+        # ground-truth peak due to the end of the testing data.
+        # I advise to use value of last 20 days or so.
         reverse_offset = 20
         # Identify peaks in the ground-truth data and plot them
         peaks, _ = scipy.signal.find_peaks(
-            self.test_df[hormone], distance=self.MIN_PEAK_DISTANCE / 2, height=self.MIN_PEAK_HEIGHT)
+            self.test_df[hormone], distance=self.MIN_PEAK_DISTANCE/2, height=self.MIN_PEAK_HEIGHT)
         if self.plot:
             plt.plot(test_df.index, test_df[self.features])
             plt.scatter(test_df.index[peaks], test_df[hormone].iloc[peaks],
@@ -98,7 +107,7 @@ class ModelComparator:
         test_df = self.test_df
         hormone = self.hormone
 
-        for offset in range(0, self.duration - pred_length - input_length + 1 - reverse_offset, self.step):
+        for offset in range(0, self.duration-pred_length-input_length+1-reverse_offset, self.step):
             # For every model extract the prediction for the current sliding window
             # Ground-truth time in days shifted to start with 0
             gt_time = test_df.index[offset:input_length + pred_length + offset]
@@ -113,18 +122,23 @@ class ModelComparator:
             ground_truth = test_df[hormone][offset:input_length + pred_length + offset]
             # Take only the peaks in the prediction window (input and output window)
             # Shift them so that their time aligns with the offset data time
-            curr_peaks = np.array([x for x in peaks if offset <= x < input_length + pred_length + offset])
+            curr_peaks = (
+                np.array([x for x in peaks if offset <= x < input_length + pred_length + offset]))
             curr_peaks = curr_peaks - offset
-            peaks_for_first_method = np.array([x for x in peaks if offset <= x < input_length + pred_length + offset + reverse_offset])
+            peaks_for_first_method = (
+                np.array([x for x in peaks
+                          if offset <= x < input_length + pred_length + offset + reverse_offset]))
             peaks_for_first_method = peaks_for_first_method - offset
-            gt_peaks_pred_window = np.array([x for x in peaks if offset + input_length <= x < input_length + pred_length + offset])
+            gt_peaks_pred_window = (
+                np.array( [x for x in peaks
+                           if offset + input_length <= x < input_length + pred_length + offset]))
             gt_peaks_pred_window = gt_peaks_pred_window - offset
             #if len(gt_peaks_predWindow) >= 1:
             #    gt_peaks_predWindow = gt_peaks_predWindow[:1]
             # Try all the peaks, shift them to match the predicted data
             if self.plot:
                 plt.plot(gt_time, ground_truth, marker='.', )
-            # Plot the tips of the peaks that are in the input-prediction window (input and output window)
+            # Plot the tips of the peaks that are in the input and output window
             if len(curr_peaks) > 0 and self.plot:
                 plt.scatter(gt_time[curr_peaks], ground_truth.iloc[curr_peaks],
                             color='red', zorder=5, label='Test data peaks')
@@ -142,41 +156,42 @@ class ModelComparator:
         for model in list_of_models:
             model_name = model._name
             model_predictions = dict_of_model_predictions[model_name][offset]
-            # Detect peaks in the prediction part (forecast) and shift them to start from the right time
+            # Detect peaks in the forecast part and shift them to start from the right time
             pred_peaks = model.get_peaks(model_predictions, methods.pop(0))
-            # pred_peaks, _ = scipy.signal.find_peaks(model_predictions, distance=self.MIN_PEAK_DISTANCE)
             results.num_detected_peaks[model_name] = (
                     results.num_detected_peaks.get(model_name, 0) + len(pred_peaks))
             offset_pred_peaks = pred_peaks + self.input_length
-            unfiltered_signed_distances = sp.get_signed_distances(peaks_for_first_method,
-                                                                  offset_pred_peaks)
-            unfiltered_signed_distances_rev = sp.get_signed_distances(offset_pred_peaks,
-                                                                      gt_peaks_pred_window[:1])
-            unfiltered_abs_distances = np.array([abs(dist) for dist in unfiltered_signed_distances])
-            unfiltered_abs_distances_rev = np.array(
-                [abs(dist) for dist in unfiltered_signed_distances_rev])
+            unfiltered_signed_distances = (
+                sp.get_signed_distances(peaks_for_first_method, offset_pred_peaks))
+            unfiltered_signed_distances_rev = (
+                sp.get_signed_distances(offset_pred_peaks, gt_peaks_pred_window[:1]))
+            unfiltered_abs_distances = (
+                np.array([abs(dist) for dist in unfiltered_signed_distances]))
+            unfiltered_abs_distances_rev = (
+                np.array([abs(dist) for dist in unfiltered_signed_distances_rev]))
             # Proceed only if there are any ground-truth peaks in the output part
             if len(curr_peaks) > 0:
                 filtered_distances = np.array(
                     [distance for distance in unfiltered_abs_distances if
                      distance <= self.peak_comparison_distance])
                 results.peaks_within_threshold[model_name] = (
-                        results.peaks_within_threshold.get(model_name, 0) + len(filtered_distances))
+                        results.peaks_within_threshold.get(
+                            model_name, 0) + len(filtered_distances))
                 results.peaks_outside_threshold[model_name] = (
-                        results.peaks_outside_threshold.get(model_name, 0) + len(pred_peaks) - len(
-                    filtered_distances))
+                        results.peaks_outside_threshold.get(
+                            model_name, 0) + len(pred_peaks) - len(filtered_distances))
                 results.sum_of_dists_to_nearest_peak[model_name] = (
-                        results.sum_of_dists_to_nearest_peak.get(model_name, 0) + sum(
-                    unfiltered_abs_distances))
-                filtered_distances_rev = np.array(
-                    [distance for distance in unfiltered_abs_distances_rev if
-                     distance <= self.peak_comparison_distance])
+                        results.sum_of_dists_to_nearest_peak.get(
+                            model_name, 0) + sum(unfiltered_abs_distances))
+                filtered_distances_rev = (
+                    np.array([distance for distance in unfiltered_abs_distances_rev
+                              if distance <= self.peak_comparison_distance]))
                 results.peaks_within_threshold_rev[model_name] = (
-                        results.peaks_within_threshold_rev.get(model_name, 0) + len(
-                    filtered_distances_rev))
+                        results.peaks_within_threshold_rev.get(
+                            model_name, 0) + len(filtered_distances_rev))
                 results.peaks_outside_threshold_rev[model_name] = (
-                        results.peaks_outside_threshold_rev.get(model_name, 0)
-                        + len(gt_peaks_pred_window) - len(filtered_distances_rev))
+                        results.peaks_outside_threshold_rev.get(
+                            model_name, 0) + len(gt_peaks_pred_window) - len(filtered_distances_rev))
                 pdd = results.peak_distances_distribution.get(model_name, dict())
                 pddR = results.peak_distances_distribution_rev.get(model_name, dict())
                 for distance in unfiltered_signed_distances:
@@ -204,7 +219,8 @@ class ModelComparator:
         if self.plot:
             plt.axvline(x=self.input_length, color='r', linestyle='--', )
             plt.legend(loc='upper left')
-            plt.title('Prediction on {} days with offset {} days'.format(self.input_length, offset))
+            title = f"Prediction on {self.input_length} days with offset {offset} days"
+            plt.title(title)
             plt.show()
         return results
 
@@ -224,9 +240,8 @@ class ModelComparator:
         limit = self.duration - self.pred_length - self.input_length + 1
         while i < limit:
             current_batch_size = min(batch_size, limit - i)
-            batch_data = [self.test_df.iloc[i + j:i + j + self.input_length][self.features].values for j
-                          in
-                          range(current_batch_size)]
+            batch_data = [self.test_df.iloc[i + j:i + j + self.input_length][self.features].values
+                          for j in range(current_batch_size)]
             tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)
             reshaped_tensor_batch = tf.reshape(tensor_batch, (
             current_batch_size, self.input_length, self.num_features))
@@ -245,7 +260,8 @@ class ModelComparator:
 
     def get_run_results(self, run_id):
         """
-        Returns ComparisonResults object with results of given run_id. Will throw error if the run_id is invalid.
+        Returns ComparisonResults object with results of given run_id.
+        Will throw error if the run_id is invalid.
         :param run_id: id of a run
         :return: ComparisonResults object
         """
@@ -253,11 +269,14 @@ class ModelComparator:
 
     def get_run_results_tuple(self, run_id):
         """
-        Returns tuple with unwrapped results from ComparisonResults object for the run specified by run_id.
+        Returns tuple with unwrapped results from ComparisonResults object
+        for the run specified by run_id.
         Will throw error if the run_id is invalid.
         :param run_id: id of a run
-        :return: tuple of results in order: peaks_within_threshold, peaks_outside_threshold, peaks_within_threshold_rev,
-        peaks_outside_threshold_rev, sum_of_dists_to_nearest_peak, num_detected_peaks, peak_distances_distribution
+        :return: tuple of results in order: peaks_within_threshold,
+        peaks_outside_threshold, peaks_within_threshold_rev,
+        peaks_outside_threshold_rev, sum_of_dists_to_nearest_peak,
+        num_detected_peaks, peak_distances_distribution
         """
         results =  self.results[run_id]
         pwt = results.peaks_within_threshold
@@ -271,8 +290,8 @@ class ModelComparator:
 
     def plot_pred_peak_distribution(self, run_id=None):
         """
-        Plots how were predicted peaks distributed around the nearest ground-truth peak. Or (and) how were
-        ground-truth peaks distributed around the nearest predicted peak.
+        Plots how were predicted peaks distributed around the nearest ground-truth peak.
+        Or (and) how were ground-truth peaks distributed around the nearest predicted peak.
         :param run_id: if not specified, all the runs will be plotted.
         :return: None
         """
@@ -290,8 +309,11 @@ class ModelComparator:
             return
         peak_distances_distribution = results.peak_distances_distribution
         peak_distances_distribution_rev = results.peak_distances_distribution_rev
-        max_x_val = max(max(max(inner_dict.values()) for inner_dict in peak_distances_distribution.values()),
-                      max(max(inner_dict.values()) for inner_dict in peak_distances_distribution_rev.values())) + 1
+        max_x_val = max(
+            max(max(inner_dict.values())
+                for inner_dict in peak_distances_distribution.values()),
+            max(max(inner_dict.values())
+                for inner_dict in peak_distances_distribution_rev.values())) + 1
         for model_name in peak_distances_distribution.keys():
             self._plot_model_peak_distances_distribution_from_one_run(
                 peak_distances_distribution, model_name, run_id, max_x_val)
@@ -307,7 +329,7 @@ class ModelComparator:
         x_label = "Signed distance of forecasted peaks to the nearest ground truth peak"
         y_label = "Number of peaks"
         title = f"Model name: {model_name} (run ID: {run_id})"
-        self._plot_a_distribution(pdd, x_lim, y_lim, x_label, y_label, title)
+        self._plot_a_distribution(pdd,  x_label, y_label, title, x_lim, y_lim)
 
     def _plot_model_rev_peak_distances_distribution__from_one_run(
         self, peak_distances_distribution_rev, model_name, run_id, max_val
@@ -318,7 +340,7 @@ class ModelComparator:
         x_label = "Signed distance of ground truth peaks to the nearest forecasted peak"
         y_label = "Number of peaks"
         title = f"Model name: {model_name} (run ID: {run_id})"
-        self._plot_a_distribution(pddr, x_lim, y_lim, x_label, y_label, title)
+        self._plot_a_distribution(pddr, x_label, y_label, title, x_lim, y_lim)
 
     def _plot_a_distribution(self, distribution, x_label, y_label, title, x_lim, y_lim):
         keys = list(distribution.keys())
@@ -335,9 +357,11 @@ class ModelComparator:
 
     def _simulation_summary(self):
         """
-        This method is called internally by plot_in_out_peaks and print_peak_statistics. The method iterates over the runs
-        and extracts info which it concatenates to the summary results. This method basically sets contents of:
-        (self.) peaks_within_threshold, peaks_outside_threshold, peaks_within_threshold_rev, peaks_outside_threshold_rev,
+        This method is called internally by plot_in_out_peaks and print_peak_statistics.
+        The method iterates over the runs and extracts info which it concatenates
+        to the summary results. This method basically sets contents of:
+        (self.) peaks_within_threshold, peaks_outside_threshold,
+        peaks_within_threshold_rev, peaks_outside_threshold_rev,
         sum_of_dists_to_nearest_peak, num_detected_peaks.
         :return: None
         """
@@ -375,9 +399,11 @@ class ModelComparator:
 
     def plot_in_out_peaks(self):
         """
-        Can plot number of peaks within the threshold vs number of peaks outside the threshold for predicted compared to gt
-        and gt compared to predicted. Moreover, percentage of predicted peaks within threshold distance
-         of the nearest ground truth peak (PPPWG) vs percentage of ground truth peaks within threshold distance of the nearest
+        Can plot number of peaks within the threshold vs number of peaks outside
+        the threshold for predicted compared to gt and gt compared to predicted.
+        Moreover, percentage of predicted peaks within threshold distance
+        of the nearest ground truth peak (PPPWG) vs percentage of ground truth peaks
+        within threshold distance of the nearest
         predicted peak (PGPWP).
         :return: None
         """
@@ -385,8 +411,8 @@ class ModelComparator:
         if len(self.peaks_within_threshold) == 0:
             print("Comparator data is empty, run compare_models.")
             return
-        #colors = mpl.colormaps.get_cmap('tab10')  # Using tab10 colormap with as many colors as there are keys
-        colors = mpl.cm.get_cmap('Set3', len(list(self.results[0].peaks_within_threshold.keys())))
+        colors = (
+            mpl.cm.get_cmap('Set3', len(list(self.results[0].peaks_within_threshold.keys()))))
         self._print_and_plot_in_out_summary(colors)
         self._plot_pred_peaks_to_gt_peaks(colors)
         self.plot_gt_peaks_to_pred_peaks(colors)
@@ -466,8 +492,8 @@ class ModelComparator:
         y_label = ("# gt peaks that have the nearest predicted peak within "
                    f"{self.peak_comparison_distance} days")
         plt.ylabel(y_label)
-        plt.title('How well are the gt peaks predicted by the nearest prediction peak '
-                  '\n(how well are the gt peaks identified by the nearest peak from the prediction)')
+        plt.title('How well are the gt peaks predicted by the nearest prediction peak \n'
+                  '(how well are the gt peaks identified by the nearest peak from the prediction)')
         plt.legend(title="Model")
         plt.show()
 
