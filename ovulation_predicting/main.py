@@ -112,13 +112,10 @@ tsv_combined.update_sliders()
 tsv_combined.show()
 
 
-"""
-# Multi-step models
-"""
+
 multi_window = WindowGenerator(input_width=INPUT_WIDTH, label_width=OUT_STEPS,   shift=OUT_STEPS,
                                train_df=train_df, val_df=val_df, test_df=test_df,
                                label_columns=features)
-
 
 peaks, properties = scipy.signal.find_peaks(train_df[features[0]], distance=10, height=0.3)
 distances = [peaks[i+1] - peaks[i] for i in range(len(peaks)-1)]
@@ -139,9 +136,9 @@ sampled_test_ts = test_df
 model_comparator = ModelComparator(sampled_test_ts, INPUT_WIDTH, OUT_STEPS, features, features[0],
                                    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=1)
 model_wrapper = MyModelWrapper(features, INPUT_WIDTH, OUT_STEPS, multi_window, LOSS_FUNCTIONS, MAX_EPOCHS)
-
 train_inputs, train_labels, val_inputs, val_labels = model_wrapper.classification_datasets(
     train_df, val_df, test_df, [features[0]], features[0])
+
 for run_id in range(NUM_RUNS):
     #feedback_model = model_wrapper.autoregressive_model()
     #feedback_model._name = 'RNN'
@@ -170,7 +167,7 @@ for run_id in range(NUM_RUNS):
                 custom_objects={'FeedBack': FeedBack, 'WideCNN': WideCNN,
                                 'ClassificationMLP': ClassificationMLP, 'Peak_loss': Peak_loss})
         list_of_models.append(model)"""
-    model_comparator.compare_models(list_of_models, run_id)
+    model_comparator.compare_models_from_one_run(list_of_models, run_id)
     model_comparator.plot_pred_peak_distribution(run_id)
     #sampled_test_df.to_csv(f"{inputDir}atsv_df.csv")
     """for column in sampled_test_df.columns:

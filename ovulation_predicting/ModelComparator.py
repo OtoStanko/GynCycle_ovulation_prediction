@@ -47,7 +47,7 @@ class ModelComparator:
         self.sum_of_dists_to_nearest_peak = None
         self.num_detected_peaks = None
 
-    def compare_models(self, list_of_models, run_id):
+    def compare_models_from_one_run(self, list_of_models, run_id):
         """
         Compares models based on the data in the ModelComparator.
         ModelComparator can compare models across multiple runs for the final statistics.
@@ -55,7 +55,7 @@ class ModelComparator:
         Comparator takes in list of models. For every model computes predictions and identifies peaks in it.
         These peaks are then compared to the ground-truth peaks identified in the test_df.
         ModelComparator tests for every predicted peak if it is within the threshold of the nearest gt peak
-        and for every gt peak in the output window if it is with the same threshold of the nearest predicted peak.
+        and for every gt peak in the output window if it is within the same threshold of the nearest predicted peak.
         If plotting is enabled, the for every window also plots the models' outputs with detected peaks. Yellow predicted
         peaks are those within the threshold of the nearest gt peak.
         :param list_of_models: list of models to compare
@@ -69,12 +69,8 @@ class ModelComparator:
         # reverse_offset serves as a cutoff of the last records from the testing data. The sliding window will not go
         # over these last days. Peaks from this period are still taken into account for computing the statistics
         # of models. This is just to ensure that there are no outlying predictions that don't have a corresponding
-        # ground-truth peak due to the end of the testing data. I advise to use value of last 20 days or so
+        # ground-truth peak due to the end of the testing data. I advise to use value of last 20 days or so.
         reverse_offset = 20
-
-        # Statistics about the model forecast and peaks' predictions
-        results = ComparisonResults()
-
         # Identify peaks in the ground-truth data and plot them
         peaks, _ = scipy.signal.find_peaks(
             self.test_df[hormone], distance=self.MIN_PEAK_DISTANCE / 2, height=self.MIN_PEAK_HEIGHT)
@@ -85,39 +81,25 @@ class ModelComparator:
             plt.xlabel('Time [hours]')
             plt.title('Test {} data'.format(self.features))
             plt.show()
-        """
-        Move along the testing TS. For every window of input_length + pred_length:
-            extract the input data
-            make prediction
-            extract peaks in the current window (input and output)
-            shift peaks by the offset of the current window
-        """
-        dict_of_model_predictions = {model._name: [] for model in list_of_models}
-        batch_size = 32
-        i = 0
-        limit = self.duration - pred_length - input_length + 1
-        while i < limit:
-            current_batch_size = min(batch_size, limit - i)
-            batch_data = [test_df.iloc[i + j:i + j + self.input_length][self.features].values for j in
-                      range(current_batch_size)]
-            tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)
-            reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.input_length, self.num_features))
-            batch_predictions_dict = {model._name: None for model in list_of_models}
-            for model in list_of_models:
-                new_tensor = reshaped_tensor_batch[:, :, :model.num_features]
-                batch_predictions = model(new_tensor)
-                batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.pred_length, model.num_output_features))
-                batch_predictions_dict[model._name] = batch_predictions
-                for j in range(current_batch_size):
-                    predictions = batch_predictions_dict[model._name][j][:, self.hoi_index]
-                    dict_of_model_predictions[model._name].append(predictions)
-            i += current_batch_size
+
+        dict_of_model_predictions = self._compute_models_predictions(list_of_models)
+        # Statistics about the model forecast and peaks' predictions
+        results_for_this_run = ComparisonResults()
+        results_for_this_run = self._run_comparison_for_every_time_step(
+            list_of_models, dict_of_model_predictions,
+            peaks, reverse_offset, results_for_this_run)
+        self.results[run_id] = results_for_this_run
+
+    def _run_comparison_for_every_time_step(
+        self, list_of_models, dict_of_model_predictions, peaks, reverse_offset, results
+    ):
+        pred_length = self.pred_length
+        input_length = self.input_length
+        test_df = self.test_df
+        hormone = self.hormone
 
         for offset in range(0, self.duration - pred_length - input_length + 1 - reverse_offset, self.step):
-            # For every model extract the prediction for this time window
-            list_of_model_predictions = []
-            for model in list_of_models:
-                list_of_model_predictions.append(dict_of_model_predictions[model._name][offset])
+            # For every model extract the prediction for the current sliding window
             # Ground-truth time in days shifted to start with 0
             gt_time = test_df.index[offset:input_length + pred_length + offset]
             gt_time = gt_time / 24
@@ -127,88 +109,139 @@ class ModelComparator:
             pred_time = test_df.index[input_length + offset:input_length + pred_length + offset]
             pred_time = pred_time / 24
             pred_time = pred_time - first_elem
-            # Ground truth values for the whole window
+            # Ground truth hormones' values for the whole window
             ground_truth = test_df[hormone][offset:input_length + pred_length + offset]
             # Take only the peaks in the prediction window (input and output window)
-            # Shift them so that their time aligns with the offset data
+            # Shift them so that their time aligns with the offset data time
             curr_peaks = np.array([x for x in peaks if offset <= x < input_length + pred_length + offset])
             curr_peaks = curr_peaks - offset
             peaks_for_first_method = np.array([x for x in peaks if offset <= x < input_length + pred_length + offset + reverse_offset])
             peaks_for_first_method = peaks_for_first_method - offset
-            gt_peaks_predWindow = np.array([x for x in peaks if offset + input_length <= x < input_length + pred_length + offset])
-            gt_peaks_predWindow = gt_peaks_predWindow - offset
+            gt_peaks_pred_window = np.array([x for x in peaks if offset + input_length <= x < input_length + pred_length + offset])
+            gt_peaks_pred_window = gt_peaks_pred_window - offset
             #if len(gt_peaks_predWindow) >= 1:
             #    gt_peaks_predWindow = gt_peaks_predWindow[:1]
             # Try all the peaks, shift them to match the predicted data
-            all_peaks_offset = np.array([x for x in peaks]) - offset
             if self.plot:
                 plt.plot(gt_time, ground_truth, marker='.', )
             # Plot the tips of the peaks that are in the input-prediction window (input and output window)
             if len(curr_peaks) > 0 and self.plot:
                 plt.scatter(gt_time[curr_peaks], ground_truth.iloc[curr_peaks],
                             color='red', zorder=5, label='Test data peaks')
-            #methods = ['dense', 'combined', 'raw', 'smooth']
-            methods = ['raw' for _ in range(len(list_of_models))]
-            for i in range(len(list_of_model_predictions)):
-                model = list_of_models[i]
-                model_name = model._name
-                model_predictions = list_of_model_predictions[i]
-                # Detect peaks in the prediction part (forecast) and shift them to start from the right time
-                pred_peaks = model.get_peaks(model_predictions, methods[i])
-                #pred_peaks, _ = scipy.signal.find_peaks(model_predictions, distance=self.MIN_PEAK_DISTANCE)
-                results.num_detected_peaks[model_name] = results.num_detected_peaks.get(model_name, 0) + len(pred_peaks)
-                offset_pred_peaks = pred_peaks + input_length
-                unfiltered_signed_distances = sp.get_signed_distances(peaks_for_first_method, offset_pred_peaks)
-                unfiltered_signed_distances_rev = sp.get_signed_distances(offset_pred_peaks, gt_peaks_predWindow[:1])
-                unfiltered_abs_distances = np.array([abs(dist) for dist in unfiltered_signed_distances])
-                unfiltered_abs_distances_rev = np.array([abs(dist) for dist in unfiltered_signed_distances_rev])
-                # Proceed only if there are any ground-truth peaks in the output part
-                if len(curr_peaks) > 0:
-                    filtered_distances = np.array(
-                        [distance for distance in unfiltered_abs_distances if distance <= self.peak_comparison_distance])
-                    results.peaks_within_threshold[model_name] = (
-                            results.peaks_within_threshold.get(model_name, 0) + len(filtered_distances))
-                    results.peaks_outside_threshold[model_name] = (
-                            results.peaks_outside_threshold.get(model_name, 0) + len(pred_peaks) - len(filtered_distances))
-                    results.sum_of_dists_to_nearest_peak[model_name] = (
-                            results.sum_of_dists_to_nearest_peak.get(model_name, 0) + sum(unfiltered_abs_distances))
-                    filtered_distances_rev = np.array(
-                        [distance for distance in unfiltered_abs_distances_rev if distance <= self.peak_comparison_distance])
-                    results.peaks_within_threshold_rev[model_name] = (
-                        results.peaks_within_threshold_rev.get(model_name, 0) + len(filtered_distances_rev))
-                    results.peaks_outside_threshold_rev[model_name] = (
+            results = self._get_statistics_for_models_in_time_step(
+                list_of_models, dict_of_model_predictions, offset, results,
+                peaks_for_first_method, gt_peaks_pred_window, curr_peaks, pred_time)
+        return results
+
+    def _get_statistics_for_models_in_time_step(
+        self, list_of_models, dict_of_model_predictions, offset, results,
+        peaks_for_first_method, gt_peaks_pred_window, curr_peaks, pred_time
+    ):
+        # methods = ['dense', 'combined', 'raw', 'smooth']
+        methods = ['raw' for _ in range(len(list_of_models))]
+        for model in list_of_models:
+            model_name = model._name
+            model_predictions = dict_of_model_predictions[model_name][offset]
+            # Detect peaks in the prediction part (forecast) and shift them to start from the right time
+            pred_peaks = model.get_peaks(model_predictions, methods.pop(0))
+            # pred_peaks, _ = scipy.signal.find_peaks(model_predictions, distance=self.MIN_PEAK_DISTANCE)
+            results.num_detected_peaks[model_name] = (
+                    results.num_detected_peaks.get(model_name, 0) + len(pred_peaks))
+            offset_pred_peaks = pred_peaks + self.input_length
+            unfiltered_signed_distances = sp.get_signed_distances(peaks_for_first_method,
+                                                                  offset_pred_peaks)
+            unfiltered_signed_distances_rev = sp.get_signed_distances(offset_pred_peaks,
+                                                                      gt_peaks_pred_window[:1])
+            unfiltered_abs_distances = np.array([abs(dist) for dist in unfiltered_signed_distances])
+            unfiltered_abs_distances_rev = np.array(
+                [abs(dist) for dist in unfiltered_signed_distances_rev])
+            # Proceed only if there are any ground-truth peaks in the output part
+            if len(curr_peaks) > 0:
+                filtered_distances = np.array(
+                    [distance for distance in unfiltered_abs_distances if
+                     distance <= self.peak_comparison_distance])
+                results.peaks_within_threshold[model_name] = (
+                        results.peaks_within_threshold.get(model_name, 0) + len(filtered_distances))
+                results.peaks_outside_threshold[model_name] = (
+                        results.peaks_outside_threshold.get(model_name, 0) + len(pred_peaks) - len(
+                    filtered_distances))
+                results.sum_of_dists_to_nearest_peak[model_name] = (
+                        results.sum_of_dists_to_nearest_peak.get(model_name, 0) + sum(
+                    unfiltered_abs_distances))
+                filtered_distances_rev = np.array(
+                    [distance for distance in unfiltered_abs_distances_rev if
+                     distance <= self.peak_comparison_distance])
+                results.peaks_within_threshold_rev[model_name] = (
+                        results.peaks_within_threshold_rev.get(model_name, 0) + len(
+                    filtered_distances_rev))
+                results.peaks_outside_threshold_rev[model_name] = (
                         results.peaks_outside_threshold_rev.get(model_name, 0)
-                        + len(gt_peaks_predWindow) - len(filtered_distances_rev))
-                    pdd = results.peak_distances_distribution.get(model_name, dict())
-                    pddR = results.peak_distances_distribution_rev.get(model_name, dict())
-                    for distance in unfiltered_signed_distances:
-                        pdd[distance] = pdd.get(distance, 0) + 1
-                    for distance in unfiltered_signed_distances_rev:
-                        pddR[distance] = pddR.get(distance, 0) + 1
-                    results.peak_distances_distribution[model_name] = pdd
-                    results.peak_distances_distribution_rev[model_name] = pddR
-                if self.plot:
-                    line, = plt.plot(pred_time, model_predictions, marker='.', label=model_name)
-                    line_color = line.get_color()
-                    darker_line_color = sp.darken_color(line_color, 0.5)
-                    if len(unfiltered_abs_distances) != 0:
-                        for j in range(len(pred_peaks)):
-                            if unfiltered_abs_distances[j] <= self.peak_comparison_distance:
-                                plt.scatter(pred_time[pred_peaks[j]], model_predictions[pred_peaks[j]],
-                                            color='yellow', zorder=5)
-                            else:
-                                plt.scatter(pred_time[pred_peaks[j]], model_predictions[pred_peaks[j]],
-                                            color=darker_line_color, zorder=5)
-                    else:
-                        if len(pred_peaks) != 0:
-                            plt.scatter(pred_time[pred_peaks], model_predictions[pred_peaks],
-                                        color=darker_line_color, zorder=5)
+                        + len(gt_peaks_pred_window) - len(filtered_distances_rev))
+                pdd = results.peak_distances_distribution.get(model_name, dict())
+                pddR = results.peak_distances_distribution_rev.get(model_name, dict())
+                for distance in unfiltered_signed_distances:
+                    pdd[distance] = pdd.get(distance, 0) + 1
+                for distance in unfiltered_signed_distances_rev:
+                    pddR[distance] = pddR.get(distance, 0) + 1
+                results.peak_distances_distribution[model_name] = pdd
+                results.peak_distances_distribution_rev[model_name] = pddR
             if self.plot:
-                plt.axvline(x=input_length, color='r', linestyle='--', )
-                plt.legend(loc='upper left')
-                plt.title('Prediction on {} days with offset {} days'.format(input_length, offset))
-                plt.show()
-        self.results[run_id] = results
+                line, = plt.plot(pred_time, model_predictions, marker='.', label=model_name)
+                line_color = line.get_color()
+                darker_line_color = sp.darken_color(line_color, 0.5)
+                if len(unfiltered_abs_distances) != 0:
+                    for j in range(len(pred_peaks)):
+                        if unfiltered_abs_distances[j] <= self.peak_comparison_distance:
+                            plt.scatter(pred_time[pred_peaks[j]], model_predictions[pred_peaks[j]],
+                                        color='yellow', zorder=5)
+                        else:
+                            plt.scatter(pred_time[pred_peaks[j]], model_predictions[pred_peaks[j]],
+                                        color=darker_line_color, zorder=5)
+                else:
+                    if len(pred_peaks) != 0:
+                        plt.scatter(pred_time[pred_peaks], model_predictions[pred_peaks],
+                                    color=darker_line_color, zorder=5)
+        if self.plot:
+            plt.axvline(x=self.input_length, color='r', linestyle='--', )
+            plt.legend(loc='upper left')
+            plt.title('Prediction on {} days with offset {} days'.format(self.input_length, offset))
+            plt.show()
+        return results
+
+    def _compute_models_predictions(self, list_of_models):
+        """
+        Move along the testing TS. For every window of input_length + pred_length:
+            * extract the input data
+            * make prediction
+            * extract peaks in the current window (input and output)
+            * shift peaks by the offset of the current window
+        :param list_of_models: list of trained models
+        :return: dictionary of predictions of each model
+        """
+        dict_of_model_predictions = {model._name: [] for model in list_of_models}
+        batch_size = 32
+        i = 0
+        limit = self.duration - self.pred_length - self.input_length + 1
+        while i < limit:
+            current_batch_size = min(batch_size, limit - i)
+            batch_data = [self.test_df.iloc[i + j:i + j + self.input_length][self.features].values for j
+                          in
+                          range(current_batch_size)]
+            tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)
+            reshaped_tensor_batch = tf.reshape(tensor_batch, (
+            current_batch_size, self.input_length, self.num_features))
+            batch_predictions_dict = {model._name: None for model in list_of_models}
+            for model in list_of_models:
+                new_tensor = reshaped_tensor_batch[:, :, :model.num_features]
+                batch_predictions = model(new_tensor)
+                batch_predictions = tf.reshape(batch_predictions, (
+                current_batch_size, self.pred_length, model.num_output_features))
+                batch_predictions_dict[model._name] = batch_predictions
+                for j in range(current_batch_size):
+                    predictions = batch_predictions_dict[model._name][j][:, self.hoi_index]
+                    dict_of_model_predictions[model._name].append(predictions)
+            i += current_batch_size
+        return dict_of_model_predictions
 
     def get_run_results(self, run_id):
         """
