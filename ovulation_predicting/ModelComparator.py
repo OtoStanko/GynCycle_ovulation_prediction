@@ -269,55 +269,69 @@ class ModelComparator:
         pdd = results.peak_distances_distribution
         return pwt, pot, sodtnp, ndp, pdd, pwtr, potr
 
-    def plot_pred_peak_distribution(self, run_id=None, mode=(True,True)):
+    def plot_pred_peak_distribution(self, run_id=None):
         """
         Plots how were predicted peaks distributed around the nearest ground-truth peak. Or (and) how were
         ground-truth peaks distributed around the nearest predicted peak.
         :param run_id: if not specified, all the runs will be plotted.
-        :param mode: (plot predicted peaks to gt peaks, plot gt peaks to predicted)
         :return: None
         """
-        if len(mode) != 2:
-            print("Mode required a tuple of two bools")
-            return
         if run_id is None:
             ids_to_plot = [id for id in self.results.keys()]
         else:
             ids_to_plot = [run_id]
         for run_id in ids_to_plot:
-            results = self.results.get(run_id, None)
-            if results is None:
-                print("Wrong id for the results to plot")
-                return  # ADD COLOURS BASED ON THE DISTANCE
-            peak_distances_distribution = results.peak_distances_distribution
-            peak_distances_distribution_rev = results.peak_distances_distribution_rev
-            max_val = max(max(max(inner_dict.values()) for inner_dict in peak_distances_distribution.values()),
-                          max(max(inner_dict.values()) for inner_dict in peak_distances_distribution_rev.values())) + 1
-            for model_name in peak_distances_distribution.keys():
-                if mode[0]:
-                    pdd = peak_distances_distribution[model_name]
-                    keys = list(pdd.keys())
-                    values = list(pdd.values())
-                    colors = ['yellow' if abs(key) <= self.peak_comparison_distance else '#1f77b4' for key in keys]
-                    plt.bar(keys, values, color=colors)
-                    plt.xlim(-35, 35)
-                    plt.ylim(0, max_val)
-                    plt.xlabel('Signed distance of forecasted peaks to the nearest ground truth peak')
-                    plt.ylabel('Number of peaks')
-                    plt.title('Model name: ' + model_name + " (run ID: {})".format(run_id))
-                    plt.show()
-                if mode[1]:
-                    pddr = peak_distances_distribution_rev[model_name]
-                    keys = list(pddr.keys())
-                    values = list(pddr.values())
-                    colors = ['yellow' if abs(key) <= self.peak_comparison_distance else '#1f77b4' for key in keys]
-                    plt.bar(keys, values, color=colors)
-                    plt.xlim(-35, 35)
-                    plt.ylim(0, max_val)
-                    plt.xlabel('Signed distance of ground truth peaks to the nearest forecasted peak')
-                    plt.ylabel('Number of peaks')
-                    plt.title('Model name: ' + model_name + " (run ID: {})".format(run_id))
-                    plt.show()
+            self.plot_pred_peak_distribution_from_one_run(run_id)
+
+    def plot_pred_peak_distribution_from_one_run(self, run_id):
+        results = self.results.get(run_id, None)
+        if results is None:
+            print(f"Wrong id for the results to plot {run_id}")
+            return
+        peak_distances_distribution = results.peak_distances_distribution
+        peak_distances_distribution_rev = results.peak_distances_distribution_rev
+        max_x_val = max(max(max(inner_dict.values()) for inner_dict in peak_distances_distribution.values()),
+                      max(max(inner_dict.values()) for inner_dict in peak_distances_distribution_rev.values())) + 1
+        for model_name in peak_distances_distribution.keys():
+            self._plot_model_peak_distances_distribution_from_one_run(
+                peak_distances_distribution, model_name, run_id, max_x_val)
+            self._plot_model_rev_peak_distances_distribution__from_one_run(
+                peak_distances_distribution_rev, model_name, run_id, max_x_val)
+
+    def _plot_model_peak_distances_distribution_from_one_run(
+        self, peak_distances_distribution, model_name, run_id, max_val
+    ):
+        pdd = peak_distances_distribution[model_name]
+        x_lim = (-35, 35)
+        y_lim = (0, max_val)
+        x_label = "Signed distance of forecasted peaks to the nearest ground truth peak"
+        y_label = "Number of peaks"
+        title = f"Model name: {model_name} (run ID: {run_id})"
+        self._plot_a_distribution(pdd, x_lim, y_lim, x_label, y_label, title)
+
+    def _plot_model_rev_peak_distances_distribution__from_one_run(
+        self, peak_distances_distribution_rev, model_name, run_id, max_val
+    ):
+        pddr = peak_distances_distribution_rev[model_name]
+        x_lim = (-35, 35)
+        y_lim = (0, max_val)
+        x_label = "Signed distance of ground truth peaks to the nearest forecasted peak"
+        y_label = "Number of peaks"
+        title = f"Model name: {model_name} (run ID: {run_id})"
+        self._plot_a_distribution(pddr, x_lim, y_lim, x_label, y_label, title)
+
+    def _plot_a_distribution(self, distribution, x_label, y_label, title, x_lim, y_lim):
+        keys = list(distribution.keys())
+        values = list(distribution.values())
+        colors = ['yellow' if abs(key) <= self.peak_comparison_distance else '#1f77b4' for key in
+                  keys]
+        plt.bar(keys, values, color=colors)
+        plt.xlim(x_lim[0], x_lim[1])
+        plt.ylim(y_lim[0], y_lim[1])
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.title(title)
+        plt.show()
 
     def simulation_summary(self):
         """
@@ -456,8 +470,8 @@ class ModelComparator:
         if len(self.peaks_within_threshold) == 0:
             print("Comparator data is empty, run compare_models.")
             return
-        sp.print_peak_statistics(self.peaks_within_threshold, self.peaks_outside_threshold, self.sum_of_dists_to_nearest_peak,
-                                 self.peak_comparison_distance)
+        sp.print_peak_statistics(self.peaks_within_threshold, self.peaks_outside_threshold,
+                                 self.sum_of_dists_to_nearest_peak, self.peak_comparison_distance)
 
 
 class ComparisonResults:
