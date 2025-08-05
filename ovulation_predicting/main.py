@@ -33,7 +33,7 @@ INPUT_WIDTH = 35
 OUT_STEPS = 35
 
 NUM_RUNS = 1
-PEAK_COMPARISON_DISTANCE = 2
+PEAK_COMPARISON_DISTANCE = 3
 PLOT_TESTING = False
 SAVE_MODELS = False
 
@@ -165,6 +165,7 @@ for run_id in range(NUM_RUNS):
         list_of_models.append(model)"""
     model_comparator.compare_models_from_one_run(list_of_models, run_id)
     model_comparator.plot_pred_peak_distribution(run_id)
+    model_comparator.print_reference_distribution_statistics(run_id)
     #sampled_test_df.to_csv(f"{inputDir}atsv_df.csv")
     """for column in sampled_test_df.columns:
         sampled_test_df[[column]].to_csv(f"{inputDir}atsv_{column}.csv", index=False, header=False)
