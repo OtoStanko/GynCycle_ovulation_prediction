@@ -46,6 +46,8 @@ class ModelComparator:
         self.MIN_PEAK_HEIGHT = 0.3
         self.results = dict()
 
+        self.laplace = LaplaceDistribution(peak_comparison_distance, 0.9, 0)
+
         self.peaks_within_threshold = None
         self.peaks_outside_threshold = None
         self.peaks_within_threshold_rev = None
@@ -358,11 +360,9 @@ class ModelComparator:
         plt.ylim(y_lim[0], y_lim[1])
         if plot_reference_distribution:
             x = np.linspace(-self.pred_length, self.pred_length, 100)
-            mu = 0
-            b = 2 / np.log(10)
-            pdf = laplace.pdf(x, mu, b)
+            pdf = self.laplace.generate(x)
             pdf = pdf * max(values) / max(pdf)
-            plt.plot(x, pdf, 'r-', lw=1, label=f"Laplace{mu}, {round(b, 4)})")
+            plt.plot(x, pdf, 'r-', lw=1)
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.title(title)
@@ -533,3 +533,14 @@ class ComparisonResults:
         self.num_detected_peaks = {}
         self.peak_distances_distribution = {}
         self.peak_distances_distribution_rev = {}
+
+
+class LaplaceDistribution:
+    def __init__(self, peak_comparison_distance=2, portion_of_data_within=0.9, mu=0):
+        self.d = peak_comparison_distance
+        self.p = portion_of_data_within
+        self.mu = mu
+        self.b = 2 / np.log(pow(1-self.p, -1))
+
+    def generate(self, lin_space):
+        return laplace.pdf(lin_space, self.mu, self.b)
