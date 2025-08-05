@@ -64,9 +64,9 @@ class TimeSeriesVisualizer:
 
     def update_sliders(self, list_of_models=None):
         """
-        Method takes list of trained models with the same input and output length as this object and for every window
-        computes prediction and detects peaks. Then it creates tracks for predictions and peaks and adds them
-        into the visualization.
+        Method takes list of trained models with the same input and output length
+        as this object and for every window  computes prediction and detects peaks.
+        It then creates tracks for predictions and peaks and adds them  into the visualization.
 
         :param list_of_models: list of trained models that will be predicting hormone levels and peaks
         :return: None
@@ -86,7 +86,8 @@ class TimeSeriesVisualizer:
             for model in list_of_models:
                 new_tensor = reshaped_tensor[:, :, :model.num_features]
                 model_predictions = model(new_tensor)
-                predictions = tf.reshape(model_predictions, (1, self.OUTPUT_LENGTH, model.num_output_features))
+                predictions = tf.reshape(model_predictions,
+                                         (1, self.OUTPUT_LENGTH, model.num_output_features))
                 predictions = predictions[0][:, self.hoi_index]
                 x = window_data.index[self.INPUT_LENGTH:]
                 y = predictions.numpy()
@@ -123,15 +124,19 @@ class TimeSeriesVisualizer:
         while i < limit:
             current_batch_size = min(self.batch_size, limit - i)
             if list_of_models is not None:
-                batch_data = [self.df.iloc[i + j:i + j + self.INPUT_LENGTH][self.hormones].values for j in
-                              range(current_batch_size)]
+                batch_data = [self.df.iloc[i + j:i + j + self.INPUT_LENGTH][self.hormones].values
+                              for j in range(current_batch_size)]
                 tensor_batch = tf.convert_to_tensor(batch_data, dtype=tf.float32)
-                reshaped_tensor_batch = tf.reshape(tensor_batch, (current_batch_size, self.INPUT_LENGTH, self.num_features))
+                reshaped_tensor_batch = (
+                    tf.reshape(tensor_batch,
+                               (current_batch_size, self.INPUT_LENGTH, self.num_features)))
                 batch_predictions_dict = {model._name: None for model in list_of_models}
                 for model in list_of_models:
                     new_tensor = reshaped_tensor_batch[:, :, :model.num_features]
                     batch_predictions = model(new_tensor)
-                    batch_predictions = tf.reshape(batch_predictions, (current_batch_size, self.OUTPUT_LENGTH, model.num_output_features))
+                    batch_predictions = (
+                        tf.reshape(batch_predictions,
+                                   (current_batch_size, self.OUTPUT_LENGTH, model.num_output_features)))
                     batch_predictions_dict[model._name] = batch_predictions
 
             for j in range(current_batch_size):
@@ -183,6 +188,7 @@ class TimeSeriesVisualizer:
 
     def show(self):
         """
+        Show time series visualization.
         :return: None
         """
         self.sliders = [dict(

@@ -1,4 +1,5 @@
 __all__ = [
+    'Attention',
     'ClassificationMLP',
     'CnnLstm',
     'FeedBack',
@@ -8,6 +9,7 @@ __all__ = [
 ]
 
 
+from .model_attention import Attention
 from .model_baseline import NoisySinCurve
 from .model_classification import ClassificationMLP
 from .model_cnn import WideCnn

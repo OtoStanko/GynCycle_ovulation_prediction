@@ -6,17 +6,15 @@ import scipy.signal
 import seaborn as sns
 
 from ModelComparator import ModelComparator
-from ovulation_predicting.models import MyModelWrapper, NoisySinCurve
+from ovulation_predicting.models import MyModelWrapper
 from preprocessing_functions import *
 from supporting_scripts import print_ts
 from TimeSeriesVisualizer import TimeSeriesVisualizer
-from windowGenerator import WindowGenerator
 
 
 """
     Parameters
 """
-#
 INPUT_DIR = os.path.join(os.getcwd(), "../Python_model/outputDir/")
 TRAIN_DATA_SUFFIX = '1_n'
 TEST_DATA_SUFFIX = 'of_1'
@@ -111,15 +109,6 @@ tsv_combined = TimeSeriesVisualizer(test_df, features, 35, 35)
 tsv_combined.update_sliders()
 tsv_combined.show()
 
-
-"""
-# Multi-step models
-"""
-multi_window = WindowGenerator(input_width=INPUT_WIDTH, label_width=OUT_STEPS,   shift=OUT_STEPS,
-                               train_df=train_df, val_df=val_df, test_df=test_df,
-                               label_columns=features)
-
-
 peaks, properties = scipy.signal.find_peaks(train_df[features[0]], distance=10, height=0.3)
 distances = [peaks[i+1] - peaks[i] for i in range(len(peaks)-1)]
 count = Counter(distances)
@@ -136,25 +125,31 @@ sampled_test_ts = test_df
 #sampled_test_df, _ = normalize_df(sampled_test_df, method='own', values=norm_properties)
 ##sampled_test_df.index = (sampled_test_df.index - sampled_test_df.index[0]) / 24
 #tf.config.run_functions_eagerly(True)
-model_comparator = ModelComparator(sampled_test_ts, INPUT_WIDTH, OUT_STEPS, features, features[0],
-                                   plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=1)
-model_wrapper = MyModelWrapper(features, INPUT_WIDTH, OUT_STEPS, multi_window, LOSS_FUNCTIONS, MAX_EPOCHS)
+model_comparator = ModelComparator(
+    sampled_test_ts, INPUT_WIDTH, OUT_STEPS, features, features[0],
+    plot=PLOT_TESTING, peak_comparison_distance=PEAK_COMPARISON_DISTANCE, step=1)
+model_wrapper = (
+    MyModelWrapper(features, INPUT_WIDTH, OUT_STEPS,
+                   (train_df, val_df, test_df), LOSS_FUNCTIONS, MAX_EPOCHS))
+train_inputs, train_labels, val_inputs, val_labels = (
+    model_wrapper.classification_datasets(
+        train_df, val_df, test_df, [features[0]], features[0]))
 
-train_inputs, train_labels, val_inputs, val_labels = model_wrapper.classification_datasets(
-    train_df, val_df, test_df, [features[0]], features[0])
 for run_id in range(NUM_RUNS):
-    feedback_model = model_wrapper.autoregressive_model()
-    feedback_model._name = 'RNN'
-    multi_cnn_model = model_wrapper.multistep_cnn()
-    multi_cnn_model._name = 'CNN'
-    fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, 1, train_df, features[0],
-                               noise=0.0, period=period)
-    fitted_sin._name = 'Baseline'
+    #feedback_model = model_wrapper.autoregressive_model()
+    #feedback_model._name = 'RNN'
+    #multi_cnn_model = model_wrapper.multistep_cnn()
+    #multi_cnn_model._name = 'CNN'
+    #fitted_sin = NoisySinCurve(INPUT_WIDTH, OUT_STEPS, 1, train_df, features[0],
+    #                           noise=0.0, period=period)
+    #fitted_sin._name = 'Baseline'
     cnn_lstm_model = model_wrapper.cnn_lstm(filters=[256, 128, 64], ks=[4, 3, 2], dilations=[1, 2, 4])
     cnn_lstm_model._name = 'CNN+LSTM'
+    attention_model = model_wrapper.attention()
+    attention_model._name = 'Attention'
     #classification_model = classification_mlp(train_inputs, train_labels, val_inputs, val_labels, 24)
     #classification_model._name = 'Classifier'
-    models = [feedback_model, multi_cnn_model, fitted_sin, cnn_lstm_model]
+    models = [cnn_lstm_model, attention_model]  # feedback_model, multi_cnn_model, fitted_sin,
     saved_models_paths = []
     if SAVE_MODELS:
         for model in models:
@@ -168,7 +163,7 @@ for run_id in range(NUM_RUNS):
                 custom_objects={'FeedBack': FeedBack, 'WideCNN': WideCNN,
                                 'ClassificationMLP': ClassificationMLP, 'Peak_loss': Peak_loss})
         list_of_models.append(model)"""
-    model_comparator.compare_models(list_of_models, run_id)
+    model_comparator.compare_models_from_one_run(list_of_models, run_id)
     model_comparator.plot_pred_peak_distribution(run_id)
     #sampled_test_df.to_csv(f"{inputDir}atsv_df.csv")
     """for column in sampled_test_df.columns:
@@ -181,4 +176,3 @@ for run_id in range(NUM_RUNS):
 
 model_comparator.print_peak_statistics()
 model_comparator.plot_in_out_peaks()
-

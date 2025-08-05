@@ -96,15 +96,18 @@ def print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_o
     for model_name, peaks_out in peaks_outside_threshold.items():
         peaks_out_means[model_name] = round(np.mean(peaks_out), 2)
         peaks_out_stds[model_name] = round(np.std(peaks_out), 2)
-    peaks_in_length = max([len(str(mean))+len(str(std))+4 for mean, std in zip(peaks_in_means.values(), peaks_in_stds.values())] + [16])
-    peaks_out_length = max([len(str(mean))+len(str(std))+4 for mean, std in zip(peaks_out_means.values(), peaks_out_stds.values())] + [17])
+    peaks_in_length = max([len(str(mean))+len(str(std))+4 for mean, std in
+                           zip(peaks_in_means.values(), peaks_in_stds.values())] + [16])
+    peaks_out_length = max([len(str(mean))+len(str(std))+4 for mean, std in
+                            zip(peaks_out_means.values(), peaks_out_stds.values())] + [17])
     thr_width = len(str(peak_comparison_distance))
     distances_means = dict()
     distances_stds = dict()
     for model_name, dists in sum_of_dists_to_nearest_peak.items():
         distances_means[model_name] = round(np.mean(dists), 2)
         distances_stds[model_name] = round(np.std(dists), 2)
-    distances_width = max([len(str(mean))+len(str(std))+4 for mean, std in zip(distances_means.values(), distances_stds.values())] + [7])
+    distances_width = max([len(str(mean))+len(str(std))+4 for mean, std in
+                           zip(distances_means.values(), distances_stds.values())] + [7])
     print("+-{}-+-{}-+-{}-+-{}-+-{}-+".format(model_name_length * "-", (peaks_in_length + thr_width + 5) * "-",
                                               peaks_out_length * "-", 10 * "-", distances_width * "-"))
     print('| {:{model_width}} | {:{in_width}} (<={:{thr_width}}) | {:{out_width}} | {:{percent_width}} | {:{distances_width}} |'.format(
@@ -118,7 +121,9 @@ def print_peak_statistics(peaks_within_threshold, peaks_outside_threshold, sum_o
         peaks_in_value = str(peaks_in_means[model_name]) + " +- " + str(peaks_in_stds[model_name])
         peaks_out_value = str(peaks_out_means[model_name]) + " +- " + str(peaks_out_stds[model_name])
         distances_value = str(distances_means[model_name]) + " +- " + str(distances_stds[model_name])
-        percentage = sum(peaks_within_threshold[model_name]) / (sum(peaks_within_threshold[model_name])+sum(peaks_outside_threshold[model_name]))
+        percentage = (sum(peaks_within_threshold[model_name])
+                      / (sum(peaks_within_threshold[model_name])
+                         + sum(peaks_outside_threshold[model_name])))
         print('| {:{model_width}} | {:{in_width}}    {:{thr_width}}  | {:{out_width}} | {:{percent_width}} | {:{distances_width}} |'.format(
             model_name, peaks_in_value, "", peaks_out_value,
                 str(round(percentage, 4)*100)[:5],
