@@ -4,6 +4,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal
+from scipy.stats import laplace
 import tensorflow as tf
 
 import supporting_scripts as sp
@@ -324,25 +325,30 @@ class ModelComparator:
         self, peak_distances_distribution, model_name, run_id, max_val
     ):
         pdd = peak_distances_distribution[model_name]
-        x_lim = (-35, 35)
+        x_lim = (-self.pred_length, self.pred_length)
         y_lim = (0, max_val)
         x_label = "Signed distance of forecasted peaks to the nearest ground truth peak"
         y_label = "Number of peaks"
         title = f"Model name: {model_name} (run ID: {run_id})"
-        self._plot_a_distribution(pdd,  x_label, y_label, title, x_lim, y_lim)
+        self._plot_a_distribution(pdd,  x_label, y_label, title, x_lim, y_lim,
+                                  True)
 
     def _plot_model_rev_peak_distances_distribution__from_one_run(
         self, peak_distances_distribution_rev, model_name, run_id, max_val
     ):
         pddr = peak_distances_distribution_rev[model_name]
-        x_lim = (-35, 35)
+        x_lim = (-self.pred_length, self.pred_length)
         y_lim = (0, max_val)
         x_label = "Signed distance of ground truth peaks to the nearest forecasted peak"
         y_label = "Number of peaks"
         title = f"Model name: {model_name} (run ID: {run_id})"
-        self._plot_a_distribution(pddr, x_label, y_label, title, x_lim, y_lim)
+        self._plot_a_distribution(pddr, x_label, y_label, title, x_lim, y_lim,
+                                  True)
 
-    def _plot_a_distribution(self, distribution, x_label, y_label, title, x_lim, y_lim):
+    def _plot_a_distribution(
+        self, distribution, x_label, y_label, title, x_lim, y_lim,
+        plot_reference_distribution=False
+    ):
         keys = list(distribution.keys())
         values = list(distribution.values())
         colors = ['yellow' if abs(key) <= self.peak_comparison_distance else '#1f77b4' for key in
@@ -350,6 +356,13 @@ class ModelComparator:
         plt.bar(keys, values, color=colors)
         plt.xlim(x_lim[0], x_lim[1])
         plt.ylim(y_lim[0], y_lim[1])
+        if plot_reference_distribution:
+            x = np.linspace(-self.pred_length, self.pred_length, 100)
+            mu = 0
+            b = 2 / np.log(10)
+            pdf = laplace.pdf(x, mu, b)
+            pdf = pdf * max(values) / max(pdf)
+            plt.plot(x, pdf, 'r-', lw=1, label=f"Laplace{mu}, {round(b, 4)})")
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.title(title)
