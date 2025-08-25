@@ -1,10 +1,10 @@
-xfunction StartSimulation
+function StartSimulation
 %
 %-----------------------------------------------------------------------
 %
-runnum        = 30;
+runnum        = 1;
 %save simulation results
-ShowPlots     = 0;
+ShowPlots     = 1;
 SaveSim       = 0;
 SavePlotStuff = 0;
 SavePop       = 0;
@@ -34,7 +34,7 @@ for runind = 1:runnum
 %integration time beginning and end
 %
     tb = 0;
-    te = 300;
+    te = 100;
 %
 %-----------------------------------------------------------------------
 %
