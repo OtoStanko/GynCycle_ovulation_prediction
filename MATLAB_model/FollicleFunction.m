@@ -1,7 +1,7 @@
-function f=FollicleFunction(t,y,Tovu,Follicles,para,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction)
+function f=FollicleFunction(t,y,Tovu,Follicles,technicalParameters,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction)
 
 %determine number of active follicles
-NumFollicles=size(y,1)-para(2);
+NumFollicles=size(y,1)-technicalParameters.numNonFollicleEq;
 
 if( NumFollicles > 0 )
     x= y(1:NumFollicles);
@@ -9,7 +9,7 @@ else
     x=0;
 end
 
-if(NumFollicles > 0  && para(1)==0)
+if(NumFollicles > 0  && technicalParameters.shouldTest==0)
     for i = 1:(NumFollicles)
         if Follicles.Follicle{Follicles.Active(i)}.Destiny == -2 || ...
            Follicles.Follicle{Follicles.Active(i)}.Destiny == -3
@@ -52,13 +52,13 @@ for i = 1:(NumFollicles)
     %follicles growth equation
     X = ffsh*(xi-y(i))*y(i)*(gamma-(kappa*(SumV-(parafoll(4)*(y(i)^parafoll(1))))));
 
-    if (para(1)== 1)
+    if (technicalParameters.shouldTest== 1)
         if(X<=0)
             NoFoll=X;
         end
     end
 
-    if( para(1) == 0 )
+    if( technicalParameters.shouldTest == 0 )
         %if the size of the foll. is decreasing (or constant),
         %OR the size increases very slow and the follicle is 2 or more days alive
         %OR the foll. is big but alive for two or more days and has not ovulated
@@ -98,7 +98,7 @@ end
 %
 %%Calculate follicular surface
 %
-if(NumFollicles > 0  && para(1)==0)
+if(NumFollicles > 0  && technicalParameters.shouldTest==0)
     for i = 1:(NumFollicles)
         if( (Follicles.Follicle{Follicles.Active(i)}.Destiny == 4 ))
             x(i)=0;

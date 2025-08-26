@@ -38,15 +38,6 @@ for runind = 1:runnum
 %
 %-----------------------------------------------------------------------
 %
-% technical parameters
-%
-    para    = [];
-    para(1) = 0;               %ODE function called to test(0) or not (1)
-    para(2) = 17;              %number of non-follcile equations (NO DRUG)
-    para    = para';
-%
-%-----------------------------------------------------------------------
-%
 %follicle parameters
 %
     parafoll     = [];
@@ -180,7 +171,7 @@ for runind = 1:runnum
 
 if NormalCycle
     Stim = 0;
-    Simulation(para,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+    Simulation(TechnicalParameters,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------
@@ -199,7 +190,7 @@ if (LutStim)
     Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
     Par(72) = Par(71)+15;       %end time of dosing
     Par     = Par';
-    Simulation(para,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+    Simulation(TechnicalParameters,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------
@@ -218,7 +209,7 @@ if (FollStim)
     Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
     Par(72) = Par(71)+15;       %end time of dosing
     Par     = Par';
-    Simulation(para,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStimFoll_ModelPop, Horm_ModelPop,runind);
+    Simulation(TechnicalParameters,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStimFoll_ModelPop, Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------
@@ -243,7 +234,7 @@ if (DoubStim)
     Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
     Par(72) = Par(71)+15;       %end time of dosing
     Par     = Par';
-    Simulation(para,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+    Simulation(TechnicalParameters,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------
@@ -254,7 +245,7 @@ if (Foll_ModelPop)
     parafoll(4) = lognrnd(log(parafoll(4)),0.15);
     parafoll(5) = lognrnd(log(parafoll(5)),0.15);
     Par(33) = lognrnd(log(Par(33)),0.15);
-    Simulation(para,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop,Horm_ModelPop,runind);
+    Simulation(TechnicalParameters,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop,Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------
@@ -283,7 +274,7 @@ if (Horm_ModelPop)
     Par(47) = lognrnd(log(Par(47)),0.15);
     Par(51) = lognrnd(log(Par(51)),0.15);
     Par(73) = lognrnd(log(Par(73)),0.15);
-    Simulation(para,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+    Simulation(TechnicalParameters,paraPoi,parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------
