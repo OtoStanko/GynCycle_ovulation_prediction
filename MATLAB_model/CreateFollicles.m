@@ -1,4 +1,4 @@
-function [FSHVec, StartVec] = CreateFollicles(parafoll,paraPoi,tb,te)
+function [FSHVec, StartVec] = CreateFollicles(parafoll,poissonDistributionParameters,tb,te)
 
 %create normal distributed fsh sensitivities for each foll
 fileID2 = fopen('FSH.txt','w+');
@@ -15,7 +15,7 @@ fclose(fileID2);
 fileID = fopen('StartTimesPoiss.txt','w+');
 fprintf(fileID,'Start time\n');
 TotIntervall = te-tb;
-timevec=poissonproc(paraPoi(1),[tb,te]); 
+timevec=poissonproc(poissonDistributionParameters.lambda,[tb,te]); 
 arraysize=length(timevec);
 for i=1:arraysize
     fprintf(fileID,'%f \n',timevec(i));

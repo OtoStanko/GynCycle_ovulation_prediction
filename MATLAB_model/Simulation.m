@@ -4,7 +4,10 @@
 %%integration starttime, endtime, initial values,
 %%poisson distributed starttimes of the follicles, normal distributed FSH
 %%sensitivities of the follicles, ShowStuff, SaveStuff, DirStuff
-function [res] = Simulation(para,paraPoi,parafoll,Par,tb,te,StartValues,StartTimes,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop, runind)
+function [res] = Simulation( ...
+    technicalParameters, ...
+    poissonDistributionParameters, ...
+    parafoll,Par,tb,te,StartValues,StartTimes,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop, runind)
 %
 %-----------------------------------------------------------------------
 %
@@ -109,7 +112,7 @@ while (t<te)
     %HIER MUSS MED FSH WIEDER DAZU
     fshAll = y0(end-10)+y0(end);
     fshimp = fshAll^Par(32)/(fshAll^Par(32) + Par(33)^Par(32));
-    timevec=poissonproc(paraPoi(1)+6*paraPoi(1)*fshimp,[t,te]);
+    timevec=poissonproc(poissonDistributionParameters.lambda+6*poissonDistributionParameters.lambda*fshimp,[t,te]);
 
     %set integration period for the current follicle
      if (~isempty(timevec))
@@ -120,7 +123,7 @@ while (t<te)
     end
 
     %determine number of follicles
-    NumFollicles=size(y0,1)-para(2);
+    NumFollicles=size(y0,1)-technicalParameters.numNonFollicleEq;
 
     %set mass matrix for DAE system
     n=length(y0);
@@ -132,7 +135,7 @@ while (t<te)
 
     %event function stops the integration, when ever an ovulation takes
     %place within the intervall tspan
-    options = odeset('Mass',M,'events',@(t,y)EvaluateFollicle(t,y,para,parafoll,LH));
+    options = odeset('Mass',M,'events',@(t,y)EvaluateFollicle(t,y,technicalParameters,parafoll,LH));
 
     %search for dosing events in [tspan(1),tspan(2)]:
     dosing_timeIdx=[];
@@ -141,7 +144,7 @@ while (t<te)
     end
 
     %solve differential equations
-    para(1) = 0;
+    technicalParameters.shouldTest = 0;
     Y=[];
     T=[];
     if ~isempty(dosing_timeIdx)
@@ -151,7 +154,7 @@ while (t<te)
         for i=1:length(dosing_timeIdx)
             tspan=[tstart;dosing_events1(1,dosing_timeIdx(i))];
             if tspan(1)~=tspan(2)
-                [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,para,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction), tspan, yInitial, options);
+                [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction), tspan, yInitial, options);
                 T=[T;ti(2:end)];
                 Y=[Y;yi(2:end,:)];
                 tstart=T(end);
@@ -160,11 +163,11 @@ while (t<te)
             dd1 = dosing_events1(2,dosing_timeIdx(i));
         end
         tspan=[T(end);tend];
-        [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,para,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction), tspan, yInitial, options);
+        [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction), tspan, yInitial, options);
         T=[T;ti(2:end)];
         Y=[Y;yi(2:end,:)];
     else
-        [T,Y] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,para,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction),tspan,y0,options);
+        [T,Y] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction),tspan,y0,options);
     end
 
     for i = 1:Follicles.NumActive
@@ -266,13 +269,13 @@ while (t<te)
         Follicles.ActiveFSHS = [Follicles.ActiveFSHS Follicle1.FSHSensitivity];
         %Test if Follicle(s) could survive
         %(slope of growth-function positive or negative)
-        testyvalues = LastYValues(1:(end-para(2)));
-        testyvalues = [testyvalues; Follicle1.Y; LastYValues(end+1-para(2):end)];
-        para(1) = 1;
-        testyslope = FollicleFunction(T(end),testyvalues,Tovu,Follicles,para,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction);
+        testyvalues = LastYValues(1:(end-technicalParameters.numNonFollicleEq));
+        testyvalues = [testyvalues; Follicle1.Y; LastYValues(end+1-technicalParameters.numNonFollicleEq:end)];
+        technicalParameters.shouldTest = 1;
+        testyslope = FollicleFunction(T(end),testyvalues,Tovu,Follicles,technicalParameters,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction);
         %if follicle got chance to survive->initiate new follicle and update
         %follicles-vector
-        if( testyslope(end-para(2)) > 0 )
+        if( testyslope(end-technicalParameters.numNonFollicleEq) > 0 )
             Follicle1.Time = [ T(end) ];
             Follicle1.TimeDecrease = 0;
             Follicle1.Destiny = -1;
@@ -303,8 +306,8 @@ while (t<te)
     %helping variables
     ActiveHelp = [];
     %determine actual slope of growth of follicles
-    para(1) = 0;
-    res = FollicleFunction(T(end),LastYValues,Tovu,Follicles,para,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction);
+    technicalParameters.shouldTest = 0;
+    res = FollicleFunction(T(end),LastYValues,Tovu,Follicles,technicalParameters,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction);
     %reset vector of active FSH sensitivities
     Follicles.ActiveFSHS = [];
 
@@ -410,7 +413,7 @@ while (t<te)
         y0old = [y0old Follicles.Follicle{Follicles.Active(i)}.Y(end)];
     end
     y0old = y0old';
-    y0 = [y0old;LastYValues(end+1-para(2):end)];
+    y0 = [y0old;LastYValues(end+1-technicalParameters.numNonFollicleEq:end)];
 
     %integration end reached
     t = T(end);
@@ -823,7 +826,7 @@ if Foll_ModelPop || Horm_ModelPop
         end
 
         if ~isempty(FollOvulInfo)
-            H = [Par'; paraPoi; parafoll];
+            H = [Par'; poissonDistributionParameters; parafoll];
             ModelPop_Params = [ModelPop_Params H];
 
             F = [Cyclelengthmean; Cyclelengthstd; FollperCyclemean; Par(77)];
