@@ -1,9 +1,9 @@
-function [FSHVec, StartVec] = CreateFollicles(parafoll,poissonDistributionParameters,tb,te)
+function [FSHVec, StartVec] = CreateFollicles(follicleParameters,poissonDistributionParameters,tb,te)
 
 %create normal distributed fsh sensitivities for each foll
 fileID2 = fopen('FSH.txt','w+');
 fprintf(fileID2,'Number    FSH\n');
-FSHdistri = makedist('Normal','mu',parafoll(8),'sigma',parafoll(9));
+FSHdistri = makedist('Normal','mu',follicleParameters.meanFSHSensitivity,'sigma',follicleParameters.stdFSHSensitivity);
 for i=1:10000
     fsh = random(FSHdistri);
     fprintf(fileID2,'%f %f\n',i,fsh);

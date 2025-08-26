@@ -2,7 +2,7 @@ classdef PoissonDistributionParameters
 %
 %-----------------------------------------------------------------------
 %
-%parameters for poisson distribution
+% parameters for poisson distribution
 %
     properties
         lambda = 10/14;      %lambda - #Follikels/days

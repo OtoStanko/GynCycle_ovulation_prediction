@@ -38,29 +38,8 @@ for runind = 1:runnum
     te = 100;
 %
 %-----------------------------------------------------------------------
-%
-%follicle parameters
-%
-    parafoll     = [];
-    parafoll(1)  = 2;                  %v - fractal dimension
-    parafoll(2)  = 0.04/2;             %gamma - growth rate
-    parafoll(3)  = 25;                 %xi - max. diameter of follicles
-    parafoll(4)  = 1;                  %mu - proportion of self harm
-    parafoll(5)  = 0.065/ ...          %k - strength of competition
-                  (parafoll(3)^parafoll(1));
-    parafoll(6)  = 0.01;               %rho - rate of decline
-    parafoll(7)  = 18;                 %min. ovulation size
-    parafoll(8)  = (3/10);             %mean for FSH Sensitivity
-    parafoll(9)  = 0.1;                %std.deviation for FSH Sensitivity %0.55
-    parafoll(10) = 25;                 %threshold LH concentration for ovulation
-    parafoll(11) = 5;                  %big but not ovulated follicle livetime
-    parafoll(12) = 0.01;               %too slow foll growth
-    parafoll(13) = 0.1;                %very slow foll growth
-    parafoll(14) = 2;                  %max life time for a small slow growing follciles
-    parafoll(15) = 25;                 %max follicle life time for a big follicles that start to rest
-    parafoll     = parafoll';
-%
 
+follicleParameters = FollicleParameters;
 poissonDistributionParameters = PoissonDistributionParameters;
 technicalParameters = TechnicalParameters;
 
@@ -157,7 +136,10 @@ technicalParameters = TechnicalParameters;
         FSHVec = csvread('/Users/sophie/Documents/GynCycleModel_Pub2021/NonVec_Model/ModelPopulation/ControlRun/FSHS.txt',1,0);
         StartVec = csvread('/Users/sophie/Documents/GynCycleModel_Pub2021/NonVec_Model/ModelPopulation/ControlRun/StartTimesPoiss.txt', 1, 0);
     else
-        [FSHVec, StartVec] = CreateFollicles(parafoll,poissonDistributionParameters,tb,te);
+        [FSHVec, StartVec] = CreateFollicles( ...
+            follicleParameters, ...
+            poissonDistributionParameters, ...
+            tb,te);
     end
 %
 %-----------------------------------------------------------------------
@@ -170,7 +152,8 @@ if NormalCycle
     Simulation( ...
         technicalParameters, ...
         poissonDistributionParameters, ...
-        parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+        follicleParameters, ...
+        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------
@@ -192,7 +175,8 @@ if (LutStim)
     Simulation( ...
         technicalParameters, ...
         poissonDistributionParameters, ...
-        parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+        follicleParameters, ...
+        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------
@@ -214,7 +198,8 @@ if (FollStim)
     Simulation( ...
         technicalParameters, ...
         poissonDistributionParameters, ...
-        parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStimFoll_ModelPop, Horm_ModelPop,runind);
+        follicleParameters, ...
+        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStimFoll_ModelPop, Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------
@@ -227,7 +212,10 @@ if (DoubStim)
     poissonDistributionParameters.lambda = 5/14;
     y0Foll = 4;
     StartValues = [y0Foll; yInitial]';
-    [FSHVec, StartVec] = CreateFollicles(parafoll,poissonDistributionParameters,tb,te);
+    [FSHVec, StartVec] = CreateFollicles( ...
+        follicleParameters, ...
+        poissonDistributionParameters, ...
+        tb,te);
 
     Par(64) = 0;                %set 1 if protocol starts
     Par(65) = 13.387/2.6667;      %D FSH
@@ -242,21 +230,23 @@ if (DoubStim)
     Simulation( ...
         technicalParameters, ...
         poissonDistributionParameters, ...
-        parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+        follicleParameters, ...
+        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------
 %
 if (Foll_ModelPop)
     Stim = 0;
-    parafoll(2) = lognrnd(log(parafoll(2)),0.15);
-    parafoll(4) = lognrnd(log(parafoll(4)),0.15);
-    parafoll(5) = lognrnd(log(parafoll(5)),0.15);
+    follicleParameters.gamma = lognrnd(log(follicleParameters.gamma),0.15);
+    follicleParameters.mu = lognrnd(log(follicleParameters.mu),0.15);
+    follicleParameters.k = lognrnd(log(follicleParameters.k),0.15);
     Par(33) = lognrnd(log(Par(33)),0.15);
     Simulation( ...
         technicalParameters, ...
         poissonDistributionParameters, ...
-        parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop,Horm_ModelPop,runind);
+        follicleParameters, ...
+        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop,Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------
@@ -288,7 +278,8 @@ if (Horm_ModelPop)
     Simulation( ...
         technicalParameters, ...
         poissonDistributionParameters, ...
-        parafoll,Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+        follicleParameters, ...
+        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
 end
 %
 %-----------------------------------------------------------------------

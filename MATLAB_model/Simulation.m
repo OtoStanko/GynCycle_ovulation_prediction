@@ -7,7 +7,8 @@
 function [res] = Simulation( ...
     technicalParameters, ...
     poissonDistributionParameters, ...
-    parafoll,Par,tb,te,StartValues,StartTimes,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop, runind)
+    follicleParameters, ...
+    Par,tb,te,StartValues,StartTimes,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop, runind)
 %
 %-----------------------------------------------------------------------
 %
@@ -135,7 +136,7 @@ while (t<te)
 
     %event function stops the integration, when ever an ovulation takes
     %place within the intervall tspan
-    options = odeset('Mass',M,'events',@(t,y)EvaluateFollicle(t,y,technicalParameters,parafoll,LH));
+    options = odeset('Mass',M,'events',@(t,y)EvaluateFollicle(t,y,technicalParameters,follicleParameters,LH));
 
     %search for dosing events in [tspan(1),tspan(2)]:
     dosing_timeIdx=[];
@@ -154,7 +155,7 @@ while (t<te)
         for i=1:length(dosing_timeIdx)
             tspan=[tstart;dosing_events1(1,dosing_timeIdx(i))];
             if tspan(1)~=tspan(2)
-                [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction), tspan, yInitial, options);
+                [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction), tspan, yInitial, options);
                 T=[T;ti(2:end)];
                 Y=[Y;yi(2:end,:)];
                 tstart=T(end);
@@ -163,11 +164,11 @@ while (t<te)
             dd1 = dosing_events1(2,dosing_timeIdx(i));
         end
         tspan=[T(end);tend];
-        [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction), tspan, yInitial, options);
+        [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction), tspan, yInitial, options);
         T=[T;ti(2:end)];
         Y=[Y;yi(2:end,:)];
     else
-        [T,Y] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction),tspan,y0,options);
+        [T,Y] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction),tspan,y0,options);
     end
 
     for i = 1:Follicles.NumActive
@@ -272,7 +273,7 @@ while (t<te)
         testyvalues = LastYValues(1:(end-technicalParameters.numNonFollicleEq));
         testyvalues = [testyvalues; Follicle1.Y; LastYValues(end+1-technicalParameters.numNonFollicleEq:end)];
         technicalParameters.shouldTest = 1;
-        testyslope = FollicleFunction(T(end),testyvalues,Tovu,Follicles,technicalParameters,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction);
+        testyslope = FollicleFunction(T(end),testyvalues,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction);
         %if follicle got chance to survive->initiate new follicle and update
         %follicles-vector
         if( testyslope(end-technicalParameters.numNonFollicleEq) > 0 )
@@ -307,7 +308,7 @@ while (t<te)
     ActiveHelp = [];
     %determine actual slope of growth of follicles
     technicalParameters.shouldTest = 0;
-    res = FollicleFunction(T(end),LastYValues,Tovu,Follicles,technicalParameters,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction);
+    res = FollicleFunction(T(end),LastYValues,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction);
     %reset vector of active FSH sensitivities
     Follicles.ActiveFSHS = [];
 
@@ -328,14 +329,14 @@ while (t<te)
         end
 
         %follicle is big, but doesn't ovulate yet because there is not enough LH
-        if(yCurFoll >= (parafoll(7))) && (Y(end,end-8) < parafoll(10) && ...
+        if(yCurFoll >= (follicleParameters.minOvulationSize)) && (Y(end,end-8) < follicleParameters.cLHForOvulation && ...
            Follicles.Follicle{Follicles.Active(i)}.Destiny == -1)
                Follicles.Follicle{Follicles.Active(i)}.Destiny = 3;
                Follicles.Follicle{Follicles.Active(i)}.TimeDecrease=t;
         end
 
         if Follicles.Follicle{Follicles.Active(i)}.Destiny == 3 && ...
-           (t-Follicles.Follicle{Follicles.Active(i)}.TimeDecrease)>=parafoll(11)
+           (t-Follicles.Follicle{Follicles.Active(i)}.TimeDecrease)>=follicleParameters.bigFollLivetime
                 Follicles.Follicle{Follicles.Active(i)}.Destiny =-2;
         end
 
@@ -345,12 +346,12 @@ while (t<te)
        % end
 
         %if LH high enough dominant follicle rest until ovulation shortly after LH peak
-        if Y(end,end-8) >= parafoll(10)
-            if (yCurFoll >= parafoll(7)) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==-1) ||...
-               (yCurFoll >= parafoll(7)) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==3)
+        if Y(end,end-8) >= follicleParameters.cLHForOvulation
+            if (yCurFoll >= follicleParameters.minOvulationSize) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==-1) ||...
+               (yCurFoll >= follicleParameters.minOvulationSize) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==3)
                 th = t-0.5;
                 [val, idx] = min(abs(LH.Time-th));
-               if (LH.Y(idx)) >= parafoll(10)
+               if (LH.Y(idx)) >= follicleParameters.cLHForOvulation
                     Follicles.Follicle{Follicles.Active(i)}.Destiny = 4;
                     Follicles.Follicle{Follicles.Active(i)}.TimeDecrease=t;
                end
@@ -826,7 +827,7 @@ if Foll_ModelPop || Horm_ModelPop
         end
 
         if ~isempty(FollOvulInfo)
-            H = [Par'; poissonDistributionParameters; parafoll];
+            H = [Par'; poissonDistributionParameters; follicleParameters];
             ModelPop_Params = [ModelPop_Params H];
 
             F = [Cyclelengthmean; Cyclelengthstd; FollperCyclemean; Par(77)];
