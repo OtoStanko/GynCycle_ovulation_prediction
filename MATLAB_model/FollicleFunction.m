@@ -27,7 +27,7 @@ f=dy;
 %
 %-----------------------------------------------------------------------
 %
-[r,c] = size(y);
+[r,~] = size(y);
 
 fshrezcomp = y(r-14);
 p4all = y(r-15);
@@ -37,7 +37,7 @@ for i = 1:(NumFollicles)
 
     %FSH sensitivity of the follicles
     fFSH=Follicles.ActiveFSHS(i);
-    fsize = y(i);
+    %fsize = y(i);
 
     %growth rate
     gamma = follicleParameters.gamma*((1/(1+(p4all/3)^3))+(fshrezcomp^5)/(0.95^5+fshrezcomp^5)); %1 %5
@@ -51,12 +51,6 @@ for i = 1:(NumFollicles)
 
     %follicles growth equation
     X = ffsh*(xi-y(i))*y(i)*(gamma-(kappa*(SumV-(follicleParameters.mu*(y(i)^follicleParameters.fractalDim)))));
-
-    if (technicalParameters.shouldTest== 1)
-        if(X<=0)
-            NoFoll=X;
-        end
-    end
 
     if( technicalParameters.shouldTest == 0 )
         %if the size of the foll. is decreasing (or constant),
@@ -137,7 +131,7 @@ if (simulationSettings.lutStim)
              dt = Par(71) + i - 1 ;
              h  = ((Par(65)*(Par(66)^2))/((Par(66)-Par(67))^2)) ...
                         * [exp(-Par(66)*(t-dt)) * (Par(67)*(t-dt) ...
-                        -Par(66)*(t-dt)-1)+exp(-Par(67)*(t-dt))];
+                        -Par(66)*(t-dt)-1)+exp(-Par(67)*(t-dt))]; %#ok<*NBRAK1>
              H  = H + h;
 
              j  = ((Par(68)*(Par(69)^2))/((Par(69)-Par(70))^2)) ...

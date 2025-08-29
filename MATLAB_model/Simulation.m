@@ -10,7 +10,7 @@ function [res] = Simulation( ...
     follicleParameters, ...
     Par,tb,te, ...
     simulationSettings, ...
-    StartValues,StartTimes,FSHVec,runind)
+    StartValues,~,FSHVec,runind)
 DirStuff = simulationSettings.OutputDir;
 %
 %-----------------------------------------------------------------------
@@ -25,10 +25,6 @@ Tovu = 14;
 %
 %initial values ACHTUNG
 y0Foll = StartValues(1);    %startsize of the follicle
-y0E = StartValues(2);       %startvalue estradiol
-y0P4 = StartValues(3);      %startvalue progesterone
-y0LH = StartValues(10);      %startvalue LH
-y0FSH = StartValues(8);     %startvalue FSH
 y0 = StartValues';
 %
 %-----------------------------------------------------------------------
@@ -42,13 +38,11 @@ FollCounter = FollCounter + 1;
 
 %values needed for the first integrations
 TimeCounter=1;
-NextStart=StartTimes(TimeCounter);
 TimeFol = t';
 
 %arrays to save times when new follicles emerge or when they can't emerge
 NewFollicle = [];
 NoNewFollicle = [];
-LastYValues = [];
 result=zeros(5,2);
 %
 %-----------------------------------------------------------------------
@@ -60,7 +54,7 @@ firstExtraction = 0;
 %
 %-----------------------------------------------------------------------
 %
-global ModelPop_Params
+global ModelPop_Params %#ok<*GVMIS>
 global ModelPop_CycleInfo
 %
 %-----------------------------------------------------------------------
@@ -190,7 +184,7 @@ while (t<te)
                         Par(72)=Par(71)+15;
                         %Menopur
                         numDoses=Par(72)-Par(71)+1;
-                        dosing_events1=[[Par(71):Par(72)];[1:numDoses]];
+                        dosing_events1=[[Par(71):Par(72)];[1:numDoses]]; %#ok<*NBRAK2>
                         Par(64) = 1;
                     end
                 end
@@ -351,7 +345,7 @@ while (t<te)
             if (yCurFoll >= follicleParameters.minOvulationSize) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==-1) ||...
                (yCurFoll >= follicleParameters.minOvulationSize) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==3)
                 th = t-0.5;
-                [val, idx] = min(abs(LH.Time-th));
+                [~, idx] = min(abs(LH.Time-th));
                if (LH.Y(idx)) >= follicleParameters.cLHForOvulation
                     Follicles.Follicle{Follicles.Active(i)}.Destiny = 4;
                     Follicles.Follicle{Follicles.Active(i)}.TimeDecrease=t;
@@ -487,7 +481,7 @@ end
 
 %plotting
 if(simulationSettings.showPlots)
-    hf=figure(1);
+    figure(1);
     clf;
     widthofline = 2;
     hold on;
@@ -502,14 +496,6 @@ for i = 1:Follicles.Number
     %fill follicle information variable...
     help = [Follicles.Follicle{i}.Time(1); Follicles.Follicle{i}.Time(end); Follicles.Follicle{i}.Destiny; Follicles.Follicle{i}.FSHSensitivity; i];
     FollInfo = [FollInfo help];
-
-    FollInfo2 = [Follicles.Follicle{i}.Time Follicles.Follicle{i}.Y];
-
-    %if (SavePlot)
-    %   FileName = sprintf('Follicle%d.csv',i);
-    %    fullFileName = fullfile(DirStuff, FileName);
-    %    csvwrite(fullFileName,FollInfo2)
-    %end
 
     if Follicles.Follicle{i}.Destiny==1 && Follicles.Follicle{i}.Time(1) > 20
         helpFOT=[i;Follicles.Follicle{i}.Time(1);Follicles.Follicle{i}.Time(end);...
@@ -616,7 +602,6 @@ if(simulationSettings.showPlots)
             if Data(j,end) == ID(i)
                 Data_LH = [Data_LH; Data(j,:)];
             end
-            Data_LH;
         end
     scatter(Data_LH(:,1),Data_LH(:,2), 'x')
     hold on
@@ -626,8 +611,8 @@ if(simulationSettings.showPlots)
             Tovu = FollOvulInfo(3,i);
             t1 = Tovu -14;
             t2 = Tovu +14;
-            [val,idx1]=min(abs(LH.Time-t1));
-            [val,idx2]=min(abs(LH.Time-t2));
+            [~,idx1]=min(abs(LH.Time-t1));
+            [~,idx2]=min(abs(LH.Time-t2));
             Timenew = LH.Time(idx1:idx2)-t1;
             plot(Timenew,LH.Y(idx1:idx2), 'k--')
             hold on
@@ -641,7 +626,6 @@ if(simulationSettings.showPlots)
             if Data(j,end) == ID(i)
                 H = [H; Data(j,:)];
             end
-            H;
         end
     scatter(H(:,1),H(:,3), 'x')
     hold on
@@ -651,8 +635,8 @@ if(simulationSettings.showPlots)
             Tovu = FollOvulInfo(3,i);
             t1 = Tovu -14;
             t2 = Tovu +14;
-            [val,idx1]=min(abs(FSH.Time-t1));
-            [val,idx2]=min(abs(FSH.Time-t2));
+            [~,idx1]=min(abs(FSH.Time-t1));
+            [~,idx2]=min(abs(FSH.Time-t2));
             Timenew = FSH.Time(idx1:idx2)-t1;
             plot(Timenew,FSH.Y(idx1:idx2), 'k--')
             hold on
@@ -666,7 +650,6 @@ if(simulationSettings.showPlots)
             if Data(j,end) == ID(i)
                 H = [H; Data(j,:)];
             end
-            H;
         end
     scatter(H(:,1),H(:,4), 'x')
     hold on
@@ -676,8 +659,8 @@ if(simulationSettings.showPlots)
             Tovu = FollOvulInfo(3,i);
             t1 = Tovu -14;
             t2 = Tovu +14;
-            [val,idx1]=min(abs(E2.Time-t1));
-            [val,idx2]=min(abs(E2.Time-t2));
+            [~,idx1]=min(abs(E2.Time-t1));
+            [~,idx2]=min(abs(E2.Time-t2));
             Timenew = E2.Time(idx1:idx2)-t1;
             plot(Timenew,E2.Y(idx1:idx2), 'k--')
             hold on
@@ -691,7 +674,6 @@ if(simulationSettings.showPlots)
             if Data(j,end) == ID(i)
                 H = [H; Data(j,:)];
             end
-            H;
         end
     scatter(H(:,1),H(:,5), 'x')
     hold on
@@ -701,8 +683,8 @@ if(simulationSettings.showPlots)
             Tovu = FollOvulInfo(3,i);
             t1 = Tovu -14;
             t2 = Tovu +14;
-            [val,idx1]=min(abs(P4.Time-t1));
-            [val,idx2]=min(abs(P4.Time-t2));
+            [~,idx1]=min(abs(P4.Time-t1));
+            [~,idx2]=min(abs(P4.Time-t2));
             Timenew = P4.Time(idx1:idx2)-t1;
             plot(Timenew,P4.Y(idx1:idx2), 'k--')
             hold on
@@ -726,37 +708,37 @@ if(simulationSettings.showPlots)
 end
 
 if Par(64) == 1
-    [val, idx] = min(abs(E2.Time-(Par(71)-1)));
+    [~, idx] = min(abs(E2.Time-(Par(71)-1)));
     E2dm1 = E2.Y(idx);
-    [val, idx] = min(abs(E2.Time-(Par(71)+1)));
+    [~, idx] = min(abs(E2.Time-(Par(71)+1)));
     E2d1 = E2.Y(idx);
-    [val, idx] = min(abs(E2.Time-(Par(71)+5)));
+    [~, idx] = min(abs(E2.Time-(Par(71)+5)));
     E2d6 = E2.Y(idx);
     E2dend= E2.Y(end);
 
-    [val, idx] = min(abs(P4.Time-(Par(71)-1)));
+    [~, idx] = min(abs(P4.Time-(Par(71)-1)));
     P4dm1 = P4.Y(idx);
-    [val, idx] = min(abs(P4.Time-(Par(71)+1)));
+    [~, idx] = min(abs(P4.Time-(Par(71)+1)));
     P4d1 = P4.Y(idx);
-    [val, idx] = min(abs(P4.Time-(Par(71)+5)));
+    [~, idx] = min(abs(P4.Time-(Par(71)+5)));
     P4d6 = P4.Y(idx);
     P4dend= P4.Y(end);
 
-    [val, idx] = min(abs(LH.Time-(Par(71)-1)));
+    [~, idx] = min(abs(LH.Time-(Par(71)-1)));
     LHdm1 = LH.Y(idx);
-    [val, idx] = min(abs(LH.Time-(Par(71)+1)));
+    [~, idx] = min(abs(LH.Time-(Par(71)+1)));
     LHd1 = LH.Y(idx);
-    [val, idx] = min(abs(LH.Time-(Par(71)+5)));
+    [~, idx] = min(abs(LH.Time-(Par(71)+5)));
     LHd6 = LH.Y(idx);
     LHdend= LH.Y(end);
 
     sumFSH = FSH.Y + FSHmed.Y;
 
-    [val, idx] = min(abs(FSH.Time-(Par(71)-1)));
+    [~, idx] = min(abs(FSH.Time-(Par(71)-1)));
     FSHdm1 = sumFSH(idx);
-    [val, idx] = min(abs(FSH.Time-(Par(71)+1)));
+    [~, idx] = min(abs(FSH.Time-(Par(71)+1)));
     FSHd1 = sumFSH(idx);
-    [val, idx] = min(abs(FSH.Time-(Par(71)+5)));
+    [~, idx] = min(abs(FSH.Time-(Par(71)+5)));
     FSHd6 = sumFSH(idx);
     FSHdend= sumFSH(end);
 
@@ -788,10 +770,10 @@ if simulationSettings.foll_ModelPop || simulationSettings.horm_ModelPop
             t2 = Tovu - 2;
             t3 = Tovu + 0.05;
             t4 = Tovu + 7;
-            [val,idx1]=min(abs(FSH.Time-t1));
-            [val,idx2]=min(abs(FSH.Time-t2));
-            [val,idx3]=min(abs(FSH.Time-t3));
-            [val,idx4]=min(abs(FSH.Time-t4));
+            [~,idx1]=min(abs(FSH.Time-t1));
+            [~,idx2]=min(abs(FSH.Time-t2));
+            [~,idx3]=min(abs(FSH.Time-t3));
+            [~,idx4]=min(abs(FSH.Time-t4));
 
             check = 0;
 

@@ -6,7 +6,7 @@ runnum        = 1;
 %
 %-----------------------------------------------------------------------
 %
-global ModelPop_Params
+global ModelPop_Params %#ok<*GVMIS>
 ModelPop_Params =[];
 global ModelPop_CycleInfo
 ModelPop_CycleInfo = [];

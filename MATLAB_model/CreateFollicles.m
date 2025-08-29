@@ -14,7 +14,6 @@ fclose(fileID2);
 %create poisson distributed starting times for each foll
 fileID = fopen('StartTimesPoiss.txt','w+');
 fprintf(fileID,'Start time\n');
-TotIntervall = te-tb;
 timevec=poissonproc(poissonDistributionParameters.lambda,[tb,te]); 
 arraysize=length(timevec);
 for i=1:arraysize
