@@ -3,19 +3,6 @@ function StartSimulation
 %-----------------------------------------------------------------------
 %
 runnum        = 1;
-%save simulation results
-ShowPlots     = 0;
-SaveSim       = 0;
-SavePlotStuff = 0;
-SavePop       = 0;
-DirStuff      = '/Users/sophie/Documents/GynCycleModel_Pub2021/NonVec_Model/ModelPopulation/HormPopulation';
-%select type of simulation
-NormalCycle   = 1;
-LutStim       = 0;
-FollStim      = 0;
-DoubStim      = 0;
-Foll_ModelPop = 0;
-Horm_ModelPop = 0;
 %
 %-----------------------------------------------------------------------
 %
@@ -42,6 +29,7 @@ for runind = 1:runnum
 follicleParameters = FollicleParameters;
 poissonDistributionParameters = PoissonDistributionParameters;
 technicalParameters = TechnicalParameters;
+simulationSettings = SimulationSettings;
 
 %-----------------------------------------------------------------------
 %
@@ -132,9 +120,9 @@ technicalParameters = TechnicalParameters;
     y0Foll = 4;
     StartValues = [y0Foll; yInitial]';
 
-    if Foll_ModelPop || Horm_ModelPop
-        FSHVec = csvread('/Users/sophie/Documents/GynCycleModel_Pub2021/NonVec_Model/ModelPopulation/ControlRun/FSHS.txt',1,0);
-        StartVec = csvread('/Users/sophie/Documents/GynCycleModel_Pub2021/NonVec_Model/ModelPopulation/ControlRun/StartTimesPoiss.txt', 1, 0);
+    if simulationSettings.foll_ModelPop || simulationSettings.horm_ModelPop
+        FSHVec = csvread(simulationSettings.FSHVecPath,1,0);
+        StartVec = csvread(simulationSettings.StartVecPath, 1, 0);
     else
         [FSHVec, StartVec] = CreateFollicles( ...
             follicleParameters, ...
@@ -147,21 +135,23 @@ technicalParameters = TechnicalParameters;
 %Normal Cycle
 %
 
-if NormalCycle
-    Stim = 0;
+if simulationSettings.normalCycle
+    simulationSettings.stim = 0;
     Simulation( ...
         technicalParameters, ...
         poissonDistributionParameters, ...
         follicleParameters, ...
-        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+        Par,tb,te, ...
+        simulationSettings, ...
+        StartValues,StartVec,FSHVec,runind);
 end
 %
 %-----------------------------------------------------------------------
 %
 %Luteal Phase Stimulation: FSH/LH administartion (Menopur)
 %
-if (LutStim)
-    Stim = 1;
+if (simulationSettings.lutStim)
+    simulationSettings.stim = 1;
     Par(64) = 0;                %set 1 if protocol starts
     Par(65) = 13.387/2.6667;    %D FSH
     Par(66) = 9.87;             %beta FSH
@@ -176,15 +166,17 @@ if (LutStim)
         technicalParameters, ...
         poissonDistributionParameters, ...
         follicleParameters, ...
-        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+        Par,tb,te, ...
+        simulationSettings, ...
+        StartValues,StartVec,FSHVec,runind);
 end
 %
 %-----------------------------------------------------------------------
 %
 %Follicular Phase Stimulation: FSH/LH administartion (Menopur)
 %
-if (FollStim)
-    Stim = 1;
+if (simulationSettings.follStim)
+    simulationSettings.stim = 1;
     Par(64) = 0;                %set 1 if protocol starts
     Par(65) = 13.387/2.6667;      %D FSH
     Par(66) = 9.87;             %beta FSH
@@ -199,15 +191,17 @@ if (FollStim)
         technicalParameters, ...
         poissonDistributionParameters, ...
         follicleParameters, ...
-        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStimFoll_ModelPop, Horm_ModelPop,runind);
+        Par,tb,te, ...
+        simulationSettings, ...
+        StartValues,StartVec,FSHVec,runind);
 end
 %
 %-----------------------------------------------------------------------
 %
 %Double Stimulation: FSH/LH administartion (Menopur)
 %
-if (DoubStim)
-    Stim = 1;
+if (simulationSettings.doubStim)
+    simulationSettings.stim = 1;
 
     poissonDistributionParameters.lambda = 5/14;
     y0Foll = 4;
@@ -231,13 +225,15 @@ if (DoubStim)
         technicalParameters, ...
         poissonDistributionParameters, ...
         follicleParameters, ...
-        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SaveFoll,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+        Par,tb,te, ...
+        simulationSettings, ...
+        StartValues,StartVec,FSHVec,runind);
 end
 %
 %-----------------------------------------------------------------------
 %
-if (Foll_ModelPop)
-    Stim = 0;
+if (simulationSettings.foll_ModelPop)
+    simulationSettings.stim = 0;
     follicleParameters.gamma = lognrnd(log(follicleParameters.gamma),0.15);
     follicleParameters.mu = lognrnd(log(follicleParameters.mu),0.15);
     follicleParameters.k = lognrnd(log(follicleParameters.k),0.15);
@@ -246,13 +242,15 @@ if (Foll_ModelPop)
         technicalParameters, ...
         poissonDistributionParameters, ...
         follicleParameters, ...
-        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop,Horm_ModelPop,runind);
+        Par,tb,te, ...
+        simulationSettings, ...
+        StartValues,StartVec,FSHVec,runind);
 end
 %
 %-----------------------------------------------------------------------
 %
-if (Horm_ModelPop)
-    Stim = 0;
+if (simulationSettings.horm_ModelPop)
+    simulationSettings.stim = 0;
     Par(1)  = lognrnd(log(Par(1)),0.15);
     Par(2)  = lognrnd(log(Par(2)),0.15);
     Par(5)  = lognrnd(log(Par(5)),0.15);
@@ -279,21 +277,23 @@ if (Horm_ModelPop)
         technicalParameters, ...
         poissonDistributionParameters, ...
         follicleParameters, ...
-        Par,tb,te,StartValues,StartVec,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop,runind);
+        Par,tb,te, ...
+        simulationSettings, ...
+        StartValues,StartVec,FSHVec,runind);
 end
 %
 %-----------------------------------------------------------------------
 %
-if SavePop && mod(runind, 10) == 0
+if simulationSettings.savePop && mod(runind, 10) == 0
     FileName = sprintf('ModelPopulation_Parameters.txt');
-    fullFileName = fullfile(DirStuff, FileName);
+    fullFileName = fullfile(simulationSettings.OutputDir, FileName);
     M = load(fullFileName);
     M = [M ModelPop_Params];
     csvwrite(fullFileName,M);
     ModelPop_Params = [];
 
     FileName = sprintf('ModelPopulation_CycleInfo.txt');
-    fullFileName = fullfile(DirStuff, FileName);
+    fullFileName = fullfile(simulationSettings.OutputDir, FileName);
     M = load(fullFileName);
     M = [M ModelPop_CycleInfo];
     csvwrite(fullFileName,M);

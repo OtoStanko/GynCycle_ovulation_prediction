@@ -1,4 +1,4 @@
-function f=FollicleFunction(t,y,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction)
+function f=FollicleFunction(t,y,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,simulationSettings,firstExtraction)
 
 %determine number of active follicles
 NumFollicles=size(y,1)-technicalParameters.numNonFollicleEq;
@@ -123,12 +123,12 @@ f(NumFollicles+2)=y(NumFollicles+2)- Par(76) - Par(63)*exp(-Par(62)*(t-(Tovu+7))
 %
 %-----------------------------------------------------------------------
 %
-if Stim == 0
+if simulationSettings.stim == 0
     f(NumFollicles+17)=y(NumFollicles+17)-0;
     f(NumFollicles+16)=y(NumFollicles+16)-0;
 end
 %
-if (LutStim)
+if (simulationSettings.lutStim)
     if Par(64) > 0 && t > Par(71)
          n = dd1;
          H = 0;
@@ -153,7 +153,7 @@ if (LutStim)
     end
 end
 %
-if (FollStim)
+if (simulationSettings.follStim)
     if Par(64) > 0 && t > Par(71)
          n = dd1;
          s = (-1)^(dd1);
@@ -210,7 +210,7 @@ if (FollStim)
     end
 end
 %
-if (DoubStim)
+if (simulationSettings.doubStim)
     if Par(64) > 0 && t > Par(71)
         n = dd1;
         H = 0;
