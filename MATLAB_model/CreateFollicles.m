@@ -1,4 +1,4 @@
-function [FSHVec, StartVec] = CreateFollicles(follicleParameters,poissonDistributionParameters,tb,te)
+function FSHVec = CreateFollicles(follicleParameters,poissonDistributionParameters,tb,te)
 
 %create normal distributed fsh sensitivities for each foll
 fileID2 = fopen('FSH.txt','w+');
@@ -23,18 +23,10 @@ fclose(fileID);
 
 
 %load StartNumbers and FSH Sensitivities from File
-file = 'StartTimesPoiss.txt';
 file2 = 'FSH.txt';
 delimiterIn=' ';
 headerlinesIn=1;
-data=importdata(file,delimiterIn,headerlinesIn);
 data2=importdata(file2,delimiterIn,headerlinesIn);
-NumValStart = size(data.data(1:end,1));
-NumValStart = max(NumValStart);
-StartVec = zeros(NumValStart,1);
-for i = 1:NumValStart
-    StartVec(i) = data.data(i,1);
-end
 NumValFSH = size(data2.data(1:end,1));
 NumValFSH = max(NumValFSH);
 FSHVec = zeros(NumValFSH,1);
