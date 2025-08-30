@@ -587,7 +587,7 @@ if(simulationSettings.showPlots)
     %indexes of solutions are number from Model28_ODE + 1
     solutions = [solutions.Time solutions.Y];
 
-    file = '/Users/sophie/Documents/GynCycleModel_Pub2021/NonVec_Model/pfizer_normal.txt';
+    file = './NonVec_Model/pfizer_normal.txt';
     delimiterIn='\t';
     headerlinesIn=0;
     Data=importdata(file,delimiterIn,headerlinesIn);
@@ -760,8 +760,8 @@ end
 % FollSens = FollInfo(4,:)';
 % dlmwrite("FSH.txt", FollSens);
 
-if (simulationSettings.simulationType.FollModelPop ...
-    || simulationSettings.simulationType.HormModelPop)
+if (simulationSettings.simulationType == SimulationType.FollModelPop ...
+    || simulationSettings.simulationType == SimulationType.HormModelPop)
     totalcheck = 0;
     if ~isempty(FollOvulInfo)
         for i = 2:length(FollOvulInfo(end,:))
