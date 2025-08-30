@@ -1,4 +1,4 @@
-function dy = ODE_Model_NormalCycle(t,y,Par)
+function dy = HormoneModel(t,y,Par)
 %
 %-----------------------------------------------------------------------
 %

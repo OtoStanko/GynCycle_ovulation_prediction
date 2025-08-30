@@ -3,13 +3,18 @@
 %%Parameter(programming, Poisson distribution, ODE calculations),
 %%integration starttime, endtime, initial values,
 %%poisson distributed starttimes of the follicles, normal distributed FSH
-%%sensitivities of the follicles, ShowStuff, SaveStuff, DirStuff
-function [res] = Simulation(para,paraPoi,parafoll,Par,tb,te,StartValues,StartTimes,FSHVec,ShowPlots,SaveSim,SavePlotStuff,DirStuff,Stim,LutStim,FollStim,DoubStim,Foll_ModelPop, Horm_ModelPop, runind)
+%%sensitivities of the follicles
+function [res] = Simulation( ...
+    technicalParameters, ...
+    poissonDistributionParameters, ...
+    follicleParameters, ...
+    Par,tb,te, ...
+    simulationSettings, ...
+    StartValues,FSHVec,runind)
+DirStuff = simulationSettings.OutputDir;
 %
 %-----------------------------------------------------------------------
 %
-%integration period
-tspan=[tb,te];
 %variable for the current time
 t=tb;
 %Timepoint of last ovulation, initiated as 14 will be change in the cause
@@ -20,10 +25,6 @@ Tovu = 14;
 %
 %initial values ACHTUNG
 y0Foll = StartValues(1);    %startsize of the follicle
-y0E = StartValues(2);       %startvalue estradiol
-y0P4 = StartValues(3);      %startvalue progesterone
-y0LH = StartValues(10);      %startvalue LH
-y0FSH = StartValues(8);     %startvalue FSH
 y0 = StartValues';
 %
 %-----------------------------------------------------------------------
@@ -37,13 +38,11 @@ FollCounter = FollCounter + 1;
 
 %values needed for the first integrations
 TimeCounter=1;
-NextStart=StartTimes(TimeCounter);
 TimeFol = t';
 
 %arrays to save times when new follicles emerge or when they can't emerge
 NewFollicle = [];
 NoNewFollicle = [];
-LastYValues = [];
 result=zeros(5,2);
 %
 %-----------------------------------------------------------------------
@@ -55,7 +54,7 @@ firstExtraction = 0;
 %
 %-----------------------------------------------------------------------
 %
-global ModelPop_Params
+global ModelPop_Params %#ok<*GVMIS>
 global ModelPop_CycleInfo
 %
 %-----------------------------------------------------------------------
@@ -109,18 +108,18 @@ while (t<te)
     %HIER MUSS MED FSH WIEDER DAZU
     fshAll = y0(end-10)+y0(end);
     fshimp = fshAll^Par(32)/(fshAll^Par(32) + Par(33)^Par(32));
-    timevec=poissonproc(paraPoi(1)+6*paraPoi(1)*fshimp,[t,te]);
+    timevec=poissonproc(poissonDistributionParameters.lambda+6*poissonDistributionParameters.lambda*fshimp,[t,te]);
 
     %set integration period for the current follicle
-     if (~isempty(timevec))
-         NextStart=timevec(1);
-         tspan=[t,NextStart];
-     else
+    if (~isempty(timevec))
+        NextStart=timevec(1);
+        tspan=[t,NextStart];
+    else
         tspan=[t,te];
     end
 
     %determine number of follicles
-    NumFollicles=size(y0,1)-para(2);
+    NumFollicles=size(y0,1)-technicalParameters.numNonFollicleEq;
 
     %set mass matrix for DAE system
     n=length(y0);
@@ -130,9 +129,9 @@ while (t<te)
     M(NumFollicles+16,NumFollicles+16)=0;     %alg. eq. for LH med
     M(NumFollicles+17,NumFollicles+17)=0;     %alg. eq. for FSH med
 
-    %event function stops the integration, when ever an ovulation takes
+    %event function stops the integration, whenever an ovulation takes
     %place within the intervall tspan
-    options = odeset('Mass',M,'events',@(t,y)EvaluateFollicle(t,y,para,parafoll,LH));
+    options = odeset('Mass',M,'events',@(t,y)EvaluateFollicle(t,y,technicalParameters,follicleParameters,LH));
 
     %search for dosing events in [tspan(1),tspan(2)]:
     dosing_timeIdx=[];
@@ -141,7 +140,7 @@ while (t<te)
     end
 
     %solve differential equations
-    para(1) = 0;
+    technicalParameters.shouldTest = 0;
     Y=[];
     T=[];
     if ~isempty(dosing_timeIdx)
@@ -151,7 +150,7 @@ while (t<te)
         for i=1:length(dosing_timeIdx)
             tspan=[tstart;dosing_events1(1,dosing_timeIdx(i))];
             if tspan(1)~=tspan(2)
-                [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,para,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction), tspan, yInitial, options);
+                [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,simulationSettings,firstExtraction), tspan, yInitial, options);
                 T=[T;ti(2:end)];
                 Y=[Y;yi(2:end,:)];
                 tstart=T(end);
@@ -160,11 +159,11 @@ while (t<te)
             dd1 = dosing_events1(2,dosing_timeIdx(i));
         end
         tspan=[T(end);tend];
-        [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,para,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction), tspan, yInitial, options);
+        [ ti, yi ] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,simulationSettings,firstExtraction), tspan, yInitial, options);
         T=[T;ti(2:end)];
         Y=[Y;yi(2:end,:)];
     else
-        [T,Y] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,para,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction),tspan,y0,options);
+        [T,Y] = ode15s(@(t,y)FollicleFunction(t,y,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,simulationSettings,firstExtraction),tspan,y0,options);
     end
 
     for i = 1:Follicles.NumActive
@@ -173,8 +172,8 @@ while (t<te)
         %saves all sizes of the foll that was active during last run
         Follicles.Follicle{Follicles.Active(i)}.Y = [Follicles.Follicle{Follicles.Active(i)}.Y; Y(2:end,i)];
     end
-
-    if (LutStim)
+    switch simulationSettings.simulationType
+        case SimulationType.LutStim
         %Werte f�r die Medikamentengabe setzen
         if Par(71) == Tovu && Par(64) == 0
             for i = 1:Follicles.NumActive
@@ -185,15 +184,13 @@ while (t<te)
                         Par(72)=Par(71)+15;
                         %Menopur
                         numDoses=Par(72)-Par(71)+1;
-                        dosing_events1=[[Par(71):Par(72)];[1:numDoses]];
+                        dosing_events1=[[Par(71):Par(72)];[1:numDoses]]; %#ok<*NBRAK2>
                         Par(64) = 1;
                     end
                 end
             end
         end
-    end
-
-    if (FollStim)
+        case SimulationType.FollStim
         if Par(71)== Tovu && Par(64) == 0
             if t > Par(71)+14
                 for i = 1:Follicles.NumActive
@@ -208,9 +205,7 @@ while (t<te)
                 end
             end
         end
-    end
-
-    if(DoubStim)
+        case SimulationType.DoubleStim
         if Par(71)== Tovu && Par(64) == 0
             Par(71)=ceil(t)+20;
             Par(72)=Par(71)+15;
@@ -266,13 +261,13 @@ while (t<te)
         Follicles.ActiveFSHS = [Follicles.ActiveFSHS Follicle1.FSHSensitivity];
         %Test if Follicle(s) could survive
         %(slope of growth-function positive or negative)
-        testyvalues = LastYValues(1:(end-para(2)));
-        testyvalues = [testyvalues; Follicle1.Y; LastYValues(end+1-para(2):end)];
-        para(1) = 1;
-        testyslope = FollicleFunction(T(end),testyvalues,Tovu,Follicles,para,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction);
+        testyvalues = LastYValues(1:(end-technicalParameters.numNonFollicleEq));
+        testyvalues = [testyvalues; Follicle1.Y; LastYValues(end+1-technicalParameters.numNonFollicleEq:end)];
+        technicalParameters.shouldTest = 1;
+        testyslope = FollicleFunction(T(end),testyvalues,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,simulationSettings,firstExtraction);
         %if follicle got chance to survive->initiate new follicle and update
         %follicles-vector
-        if( testyslope(end-para(2)) > 0 )
+        if( testyslope(end-technicalParameters.numNonFollicleEq) > 0 )
             Follicle1.Time = [ T(end) ];
             Follicle1.TimeDecrease = 0;
             Follicle1.Destiny = -1;
@@ -303,8 +298,8 @@ while (t<te)
     %helping variables
     ActiveHelp = [];
     %determine actual slope of growth of follicles
-    para(1) = 0;
-    res = FollicleFunction(T(end),LastYValues,Tovu,Follicles,para,parafoll,Par,dd1,Stim,LutStim,FollStim,DoubStim,firstExtraction);
+    technicalParameters.shouldTest = 0;
+    res = FollicleFunction(T(end),LastYValues,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,simulationSettings,firstExtraction);
     %reset vector of active FSH sensitivities
     Follicles.ActiveFSHS = [];
 
@@ -325,14 +320,14 @@ while (t<te)
         end
 
         %follicle is big, but doesn't ovulate yet because there is not enough LH
-        if(yCurFoll >= (parafoll(7))) && (Y(end,end-8) < parafoll(10) && ...
+        if(yCurFoll >= (follicleParameters.minOvulationSize)) && (Y(end,end-8) < follicleParameters.cLHForOvulation && ...
            Follicles.Follicle{Follicles.Active(i)}.Destiny == -1)
                Follicles.Follicle{Follicles.Active(i)}.Destiny = 3;
                Follicles.Follicle{Follicles.Active(i)}.TimeDecrease=t;
         end
 
         if Follicles.Follicle{Follicles.Active(i)}.Destiny == 3 && ...
-           (t-Follicles.Follicle{Follicles.Active(i)}.TimeDecrease)>=parafoll(11)
+           (t-Follicles.Follicle{Follicles.Active(i)}.TimeDecrease)>=follicleParameters.bigFollLivetime
                 Follicles.Follicle{Follicles.Active(i)}.Destiny =-2;
         end
 
@@ -342,12 +337,12 @@ while (t<te)
        % end
 
         %if LH high enough dominant follicle rest until ovulation shortly after LH peak
-        if Y(end,end-8) >= parafoll(10)
-            if (yCurFoll >= parafoll(7)) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==-1) ||...
-               (yCurFoll >= parafoll(7)) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==3)
+        if Y(end,end-8) >= follicleParameters.cLHForOvulation
+            if (yCurFoll >= follicleParameters.minOvulationSize) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==-1) ||...
+               (yCurFoll >= follicleParameters.minOvulationSize) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==3)
                 th = t-0.5;
-                [val, idx] = min(abs(LH.Time-th));
-               if (LH.Y(idx)) >= parafoll(10)
+                [~, idx] = min(abs(LH.Time-th));
+               if (LH.Y(idx)) >= follicleParameters.cLHForOvulation
                     Follicles.Follicle{Follicles.Active(i)}.Destiny = 4;
                     Follicles.Follicle{Follicles.Active(i)}.TimeDecrease=t;
                end
@@ -360,21 +355,25 @@ while (t<te)
                 Follicles.Follicle{Follicles.Active(i)}.Destiny = 1;
                 Tovu=T(end);
                 OvulationNumber = i;
-            if (Stim)
+            if (simulationSettings.stim)
                 if Tovu > Par(71) && Par(64) == 0
                     Par(71) = Tovu;
                 end
             end
         end
 
-        if(Follicles.Follicle{Follicles.Active(i)}.Destiny ~= 1)
+        if (Follicles.Follicle{Follicles.Active(i)}.Destiny ~= 1 ...
+            && (Follicles.Follicle{Follicles.Active(i)}.Time(1) + 20 > t ...
+                || Follicles.Follicle{Follicles.Active(i)}.Y(end) >= 0.1 ...
+                ) ...
+            )
             %put the follicle back to the list of actives and its FSH
             ActiveHelp = [ActiveHelp Follicles.Active(i)];
             %sensitivity back in the FSH vector...
             Follicles.ActiveFSHS = [Follicles.ActiveFSHS Follicles.Follicle{Follicles.Active(i)}.FSHSensitivity];
         end
 
-        if(Stim)
+        if(simulationSettings.stim)
             if Par(64) == 1 && t > dosing_events1(1,1)
                 %Save y-values of i-th (current) follicle
                 if yCurFoll >= 10
@@ -403,6 +402,7 @@ while (t<te)
     Follicles.Active = ActiveHelp;
     %find out how many follicles are active...
     Follicles.NumActive = size(ActiveHelp,2);
+    Follicles.NumActive
 
     %determine new initial values for all differential equations
     y0old = [];
@@ -410,7 +410,7 @@ while (t<te)
         y0old = [y0old Follicles.Follicle{Follicles.Active(i)}.Y(end)];
     end
     y0old = y0old';
-    y0 = [y0old;LastYValues(end+1-para(2):end)];
+    y0 = [y0old;LastYValues(end+1-technicalParameters.numNonFollicleEq:end)];
 
     %integration end reached
     t = T(end);
@@ -418,71 +418,69 @@ while (t<te)
         t = te;
     end
 
-    if (LutStim)
-        if Par(64) == 1 && t > Par(72)+1 || ...
-           Par(64) == 1 && count18 >= 3 || ...
-           Par(64) == 1 && count20 >= 1
-            break
-        end
-    end
-
-    if (FollStim)
-        if Par(64) == 1 && t > Par(72)+1 || ...
-           Par(64) == 1 && count18 >= 3
-            break
-        end
-    end
-
-    if (DoubStim)
-        if ~firstExtraction
-            if Par(64) == 1
-                if Par(72) < t
-                    break
-                end
-                if count18 > 0
-                    result(1,1) = count10;
-                    result(2,1) = count14;
-                    result(3,1) = count18;
-                    result(4,1) = Par(71);
-                    result(5,1) = t;
-                    %change medicaments
-                    Par(71) = ceil(t)+1;
-                    Par(72) = Par(71) + 20;
-                    numDoses = Par(72)-Par(71)+1;
-                    dosing_events1=[[Par(71):Par(72)];[1:numDoses]];
-                    %change follicle size and destination
-                    %for all follicles >8mm
-                    for i=1:size(indexFollGreater8,2)
-                        currentIndex = indexFollGreater8(1,i);
-                        Follicles.Follicle{Follicles.Active(currentIndex)}.Destiny = -3;
-                        Follicles.Follicle{Follicles.Active(currentIndex)}.Y(end,1) = 0;
+    switch simulationSettings.simulationType
+        case SimulationType.LutStim
+            if Par(64) == 1 && t > Par(72)+1 || ...
+               Par(64) == 1 && count18 >= 3 || ...
+               Par(64) == 1 && count20 >= 1
+                break
+            end
+        case SimulationType.FollStim
+            if Par(64) == 1 && t > Par(72)+1 || ...
+               Par(64) == 1 && count18 >= 3
+                break
+            end
+        case SimulationType.DoubleStim
+            if ~firstExtraction
+                if Par(64) == 1
+                    if Par(72) < t
+                        break
                     end
-                    if antralcount >= 2
-                        firstExtraction = 1;
-                    else
+                    if count18 > 0
+                        result(1,1) = count10;
+                        result(2,1) = count14;
+                        result(3,1) = count18;
+                        result(4,1) = Par(71);
+                        result(5,1) = t;
+                        %change medicaments
+                        Par(71) = ceil(t)+1;
+                        Par(72) = Par(71) + 20;
+                        numDoses = Par(72)-Par(71)+1;
+                        dosing_events1=[[Par(71):Par(72)];[1:numDoses]];
+                        %change follicle size and destination
+                        %for all follicles >8mm
+                        for i=1:size(indexFollGreater8,2)
+                            currentIndex = indexFollGreater8(1,i);
+                            Follicles.Follicle{Follicles.Active(currentIndex)}.Destiny = -3;
+                            Follicles.Follicle{Follicles.Active(currentIndex)}.Y(end,1) = 0;
+                        end
+                        if antralcount >= 2
+                            firstExtraction = 1;
+                        else
+                            break
+                        end
+                    end
+                end
+            else
+                if Par(64) == 1
+                    if count20 > 0 || count18 >= 3 || Par(72) < t
+                        result(1,2) = count10;
+                        result(2,2) = count14;
+                        result(3,2) = count18;
+                        result(4,2) = Par(71);
+                        result(5,2) = t;
                         break
                     end
                 end
             end
-        else
-            if Par(64) == 1
-                if count20 > 0 || count18 >= 3 || Par(72) < t
-                    result(1,2) = count10;
-                    result(2,2) = count14;
-                    result(3,2) = count18;
-                    result(4,2) = Par(71);
-                    result(5,2) = t;
-                    break
-                end
-            end
-        end
     end
 
 end
+NumFollicles
 
 %plotting
-if(ShowPlots)
-    hf=figure(1);
+if(simulationSettings.showPlots)
+    figure(1);
     clf;
     widthofline = 2;
     hold on;
@@ -498,21 +496,13 @@ for i = 1:Follicles.Number
     help = [Follicles.Follicle{i}.Time(1); Follicles.Follicle{i}.Time(end); Follicles.Follicle{i}.Destiny; Follicles.Follicle{i}.FSHSensitivity; i];
     FollInfo = [FollInfo help];
 
-    FollInfo2 = [Follicles.Follicle{i}.Time Follicles.Follicle{i}.Y];
-
-    %if (SavePlot)
-    %   FileName = sprintf('Follicle%d.csv',i);
-    %    fullFileName = fullfile(DirStuff, FileName);
-    %    csvwrite(fullFileName,FollInfo2)
-    %end
-
     if Follicles.Follicle{i}.Destiny==1 && Follicles.Follicle{i}.Time(1) > 20
         helpFOT=[i;Follicles.Follicle{i}.Time(1);Follicles.Follicle{i}.Time(end);...
             (Follicles.Follicle{i}.Y(end)-Follicles.Follicle{i}.Y(1))/(Follicles.Follicle{i}.Time(end)-Follicles.Follicle{i}.Time(1)-2)];
         FollOvulInfo=[FollOvulInfo helpFOT];
     end
 
-    if(ShowPlots)
+    if(simulationSettings.showPlots)
         h = plot(Follicles.Follicle{i}.Time,Follicles.Follicle{i}.Y,'Color',[0 0 0],...
                  'DisplayName','x1','LineWidth', widthofline);
     end
@@ -547,7 +537,7 @@ rest = n - a;
 
 CycleInfo = [[0 Cyclelength]; [rest FollperCycle]; OvuT];
 
-if(ShowPlots)
+if(simulationSettings.showPlots)
    %fsh
     hfsh = plot(FSH.Time,FSH.Y,'Color',[1/2 1 1/2],...
          'DisplayName','x1','LineWidth', widthofline);
@@ -597,7 +587,7 @@ if(ShowPlots)
     %indexes of solutions are number from Model28_ODE + 1
     solutions = [solutions.Time solutions.Y];
 
-    file = '/Users/sophie/Documents/GynCycleModel_Pub2021/NonVec_Model/pfizer_normal.txt';
+    file = './NonVec_Model/pfizer_normal.txt';
     delimiterIn='\t';
     headerlinesIn=0;
     Data=importdata(file,delimiterIn,headerlinesIn);
@@ -611,7 +601,6 @@ if(ShowPlots)
             if Data(j,end) == ID(i)
                 Data_LH = [Data_LH; Data(j,:)];
             end
-            Data_LH;
         end
     scatter(Data_LH(:,1),Data_LH(:,2), 'x')
     hold on
@@ -621,8 +610,8 @@ if(ShowPlots)
             Tovu = FollOvulInfo(3,i);
             t1 = Tovu -14;
             t2 = Tovu +14;
-            [val,idx1]=min(abs(LH.Time-t1));
-            [val,idx2]=min(abs(LH.Time-t2));
+            [~,idx1]=min(abs(LH.Time-t1));
+            [~,idx2]=min(abs(LH.Time-t2));
             Timenew = LH.Time(idx1:idx2)-t1;
             plot(Timenew,LH.Y(idx1:idx2), 'k--')
             hold on
@@ -636,7 +625,6 @@ if(ShowPlots)
             if Data(j,end) == ID(i)
                 H = [H; Data(j,:)];
             end
-            H;
         end
     scatter(H(:,1),H(:,3), 'x')
     hold on
@@ -646,8 +634,8 @@ if(ShowPlots)
             Tovu = FollOvulInfo(3,i);
             t1 = Tovu -14;
             t2 = Tovu +14;
-            [val,idx1]=min(abs(FSH.Time-t1));
-            [val,idx2]=min(abs(FSH.Time-t2));
+            [~,idx1]=min(abs(FSH.Time-t1));
+            [~,idx2]=min(abs(FSH.Time-t2));
             Timenew = FSH.Time(idx1:idx2)-t1;
             plot(Timenew,FSH.Y(idx1:idx2), 'k--')
             hold on
@@ -661,7 +649,6 @@ if(ShowPlots)
             if Data(j,end) == ID(i)
                 H = [H; Data(j,:)];
             end
-            H;
         end
     scatter(H(:,1),H(:,4), 'x')
     hold on
@@ -671,8 +658,8 @@ if(ShowPlots)
             Tovu = FollOvulInfo(3,i);
             t1 = Tovu -14;
             t2 = Tovu +14;
-            [val,idx1]=min(abs(E2.Time-t1));
-            [val,idx2]=min(abs(E2.Time-t2));
+            [~,idx1]=min(abs(E2.Time-t1));
+            [~,idx2]=min(abs(E2.Time-t2));
             Timenew = E2.Time(idx1:idx2)-t1;
             plot(Timenew,E2.Y(idx1:idx2), 'k--')
             hold on
@@ -686,7 +673,6 @@ if(ShowPlots)
             if Data(j,end) == ID(i)
                 H = [H; Data(j,:)];
             end
-            H;
         end
     scatter(H(:,1),H(:,5), 'x')
     hold on
@@ -696,8 +682,8 @@ if(ShowPlots)
             Tovu = FollOvulInfo(3,i);
             t1 = Tovu -14;
             t2 = Tovu +14;
-            [val,idx1]=min(abs(P4.Time-t1));
-            [val,idx2]=min(abs(P4.Time-t2));
+            [~,idx1]=min(abs(P4.Time-t1));
+            [~,idx2]=min(abs(P4.Time-t2));
             Timenew = P4.Time(idx1:idx2)-t1;
             plot(Timenew,P4.Y(idx1:idx2), 'k--')
             hold on
@@ -721,37 +707,37 @@ if(ShowPlots)
 end
 
 if Par(64) == 1
-    [val, idx] = min(abs(E2.Time-(Par(71)-1)));
+    [~, idx] = min(abs(E2.Time-(Par(71)-1)));
     E2dm1 = E2.Y(idx);
-    [val, idx] = min(abs(E2.Time-(Par(71)+1)));
+    [~, idx] = min(abs(E2.Time-(Par(71)+1)));
     E2d1 = E2.Y(idx);
-    [val, idx] = min(abs(E2.Time-(Par(71)+5)));
+    [~, idx] = min(abs(E2.Time-(Par(71)+5)));
     E2d6 = E2.Y(idx);
     E2dend= E2.Y(end);
 
-    [val, idx] = min(abs(P4.Time-(Par(71)-1)));
+    [~, idx] = min(abs(P4.Time-(Par(71)-1)));
     P4dm1 = P4.Y(idx);
-    [val, idx] = min(abs(P4.Time-(Par(71)+1)));
+    [~, idx] = min(abs(P4.Time-(Par(71)+1)));
     P4d1 = P4.Y(idx);
-    [val, idx] = min(abs(P4.Time-(Par(71)+5)));
+    [~, idx] = min(abs(P4.Time-(Par(71)+5)));
     P4d6 = P4.Y(idx);
     P4dend= P4.Y(end);
 
-    [val, idx] = min(abs(LH.Time-(Par(71)-1)));
+    [~, idx] = min(abs(LH.Time-(Par(71)-1)));
     LHdm1 = LH.Y(idx);
-    [val, idx] = min(abs(LH.Time-(Par(71)+1)));
+    [~, idx] = min(abs(LH.Time-(Par(71)+1)));
     LHd1 = LH.Y(idx);
-    [val, idx] = min(abs(LH.Time-(Par(71)+5)));
+    [~, idx] = min(abs(LH.Time-(Par(71)+5)));
     LHd6 = LH.Y(idx);
     LHdend= LH.Y(end);
 
     sumFSH = FSH.Y + FSHmed.Y;
 
-    [val, idx] = min(abs(FSH.Time-(Par(71)-1)));
+    [~, idx] = min(abs(FSH.Time-(Par(71)-1)));
     FSHdm1 = sumFSH(idx);
-    [val, idx] = min(abs(FSH.Time-(Par(71)+1)));
+    [~, idx] = min(abs(FSH.Time-(Par(71)+1)));
     FSHd1 = sumFSH(idx);
-    [val, idx] = min(abs(FSH.Time-(Par(71)+5)));
+    [~, idx] = min(abs(FSH.Time-(Par(71)+5)));
     FSHd6 = sumFSH(idx);
     FSHdend= sumFSH(end);
 
@@ -774,7 +760,8 @@ end
 % FollSens = FollInfo(4,:)';
 % dlmwrite("FSH.txt", FollSens);
 
-if Foll_ModelPop || Horm_ModelPop
+if (simulationSettings.simulationType == SimulationType.FollModelPop ...
+    || simulationSettings.simulationType == SimulationType.HormModelPop)
     totalcheck = 0;
     if ~isempty(FollOvulInfo)
         for i = 2:length(FollOvulInfo(end,:))
@@ -783,10 +770,10 @@ if Foll_ModelPop || Horm_ModelPop
             t2 = Tovu - 2;
             t3 = Tovu + 0.05;
             t4 = Tovu + 7;
-            [val,idx1]=min(abs(FSH.Time-t1));
-            [val,idx2]=min(abs(FSH.Time-t2));
-            [val,idx3]=min(abs(FSH.Time-t3));
-            [val,idx4]=min(abs(FSH.Time-t4));
+            [~,idx1]=min(abs(FSH.Time-t1));
+            [~,idx2]=min(abs(FSH.Time-t2));
+            [~,idx3]=min(abs(FSH.Time-t3));
+            [~,idx4]=min(abs(FSH.Time-t4));
 
             check = 0;
 
@@ -823,7 +810,7 @@ if Foll_ModelPop || Horm_ModelPop
         end
 
         if ~isempty(FollOvulInfo)
-            H = [Par'; paraPoi; parafoll];
+            H = [Par'; poissonDistributionParameters; follicleParameters];
             ModelPop_Params = [ModelPop_Params H];
 
             F = [Cyclelengthmean; Cyclelengthstd; FollperCyclemean; Par(77)];
@@ -832,7 +819,7 @@ if Foll_ModelPop || Horm_ModelPop
     end
 end
 
-if (SavePlotStuff)
+if (simulationSettings.savePlotStuff)
     FileName = sprintf('%s_%d.csv','E2',runind);
     fullFileName = fullfile(DirStuff, FileName);
     csvwrite(fullFileName,E2.Y)
@@ -862,7 +849,7 @@ if (SavePlotStuff)
     csvwrite(fullFileName,solutions.Y)
 end
 
-if (SaveSim)
+if (simulationSettings.saveSim)
     FileName = sprintf('%s_%d.csv','DomFolGrowth',runind)
     fullFileName = fullfile(DirStuff, FileName);
     csvwrite(fullFileName,FollOvulInfo(4,:))

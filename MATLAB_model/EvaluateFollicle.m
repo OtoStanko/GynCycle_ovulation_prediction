@@ -1,19 +1,19 @@
 %event function, specifies when the integration has to stop, i.e. when a
 %follicle ovulates (growths bigger than max. size m)
 %m = ovulation size
-function [lookfor,stop,direction] = EvaluateFollicle(t,y,para,parafoll,LH)
+function [lookfor,stop,direction] = EvaluateFollicle(t,y,technicalParameters,follicleParameters,LH)
 
-m = parafoll(7);
+m = follicleParameters.minOvulationSize;
 th = t-0.5;
 [~, idx] = min(abs(LH.Time-th));
 y_lh  = LH.Y(idx);
 
 %number of current follicle(s)
-NumFoll=size(y,1)-para(2);
+NumFoll=size(y,1)-technicalParameters.numNonFollicleEq;
 %size(s) of current follicle(s)
 FollSize = y(1:NumFoll);
 
-if max(FollSize) >= (m-0.001) &&  y_lh>= parafoll(10)
+if max(FollSize) >= (m-0.001) &&  y_lh>= follicleParameters.cLHForOvulation
     %a follicle might ovulate
     lookfor = ((m-0.001) - max(FollSize));
     stop = 1;

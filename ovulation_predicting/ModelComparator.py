@@ -4,6 +4,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal
+from scipy.stats import chisquare, laplace, norm
 import tensorflow as tf
 
 import supporting_scripts as sp
@@ -44,6 +45,10 @@ class ModelComparator:
         self.MIN_PEAK_DISTANCE = 20
         self.MIN_PEAK_HEIGHT = 0.3
         self.results = dict()
+
+        self.laplace = LaplaceDistribution(peak_comparison_distance, 0.9, 0)
+        self.normal = NormalDistribution(peak_comparison_distance, 0.9, 0)
+        self.reference_distribution = "normal"
 
         self.peaks_within_threshold = None
         self.peaks_outside_threshold = None
@@ -324,25 +329,30 @@ class ModelComparator:
         self, peak_distances_distribution, model_name, run_id, max_val
     ):
         pdd = peak_distances_distribution[model_name]
-        x_lim = (-35, 35)
+        x_lim = (-self.pred_length, self.pred_length)
         y_lim = (0, max_val)
         x_label = "Signed distance of forecasted peaks to the nearest ground truth peak"
         y_label = "Number of peaks"
         title = f"Model name: {model_name} (run ID: {run_id})"
-        self._plot_a_distribution(pdd,  x_label, y_label, title, x_lim, y_lim)
+        self._plot_a_distribution(pdd,  x_label, y_label, title, x_lim, y_lim,
+                                  True)
 
     def _plot_model_rev_peak_distances_distribution__from_one_run(
         self, peak_distances_distribution_rev, model_name, run_id, max_val
     ):
         pddr = peak_distances_distribution_rev[model_name]
-        x_lim = (-35, 35)
+        x_lim = (-self.pred_length, self.pred_length)
         y_lim = (0, max_val)
         x_label = "Signed distance of ground truth peaks to the nearest forecasted peak"
         y_label = "Number of peaks"
         title = f"Model name: {model_name} (run ID: {run_id})"
-        self._plot_a_distribution(pddr, x_label, y_label, title, x_lim, y_lim)
+        self._plot_a_distribution(pddr, x_label, y_label, title, x_lim, y_lim,
+                                  True)
 
-    def _plot_a_distribution(self, distribution, x_label, y_label, title, x_lim, y_lim):
+    def _plot_a_distribution(
+        self, distribution, x_label, y_label, title, x_lim, y_lim,
+        plot_reference_distribution=False
+    ):
         keys = list(distribution.keys())
         values = list(distribution.values())
         colors = ['yellow' if abs(key) <= self.peak_comparison_distance else '#1f77b4' for key in
@@ -350,6 +360,17 @@ class ModelComparator:
         plt.bar(keys, values, color=colors)
         plt.xlim(x_lim[0], x_lim[1])
         plt.ylim(y_lim[0], y_lim[1])
+        if plot_reference_distribution:
+            x = np.linspace(-self.pred_length, self.pred_length, 100)
+            ref_distribution = self.reference_distribution
+            if ref_distribution == "normal":
+                pdf = self.normal.generate(x)
+            elif ref_distribution == "laplace":
+                pdf = self.laplace.generate(x)
+            else:
+                return
+            pdf = pdf * sum(values)
+            plt.plot(x, pdf, 'r-', lw=1)
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.title(title)
@@ -509,6 +530,81 @@ class ModelComparator:
         sp.print_peak_statistics(self.peaks_within_threshold, self.peaks_outside_threshold,
                                  self.sum_of_dists_to_nearest_peak, self.peak_comparison_distance)
 
+    def print_reference_distribution_statistics(self, run_id):
+        results = self.results.get(run_id, None)
+        if results is None:
+            print(f"Wrong id for the results to plot {run_id}")
+            return
+        peak_distances_distribution = results.peak_distances_distribution
+        self._print_ref_statistics(peak_distances_distribution)
+
+    def _print_ref_statistics(self, peak_distances_distribution):
+        for model_name in peak_distances_distribution.keys():
+            data = peak_distances_distribution[model_name]
+            x_vals = np.array(sorted(data.keys()))
+            observed = np.array([data[x] for x in x_vals])
+            total_count = observed.sum()
+            expected = self._get_expected_values_for_reference_distribution(
+                x_vals, total_count, observed.sum()
+            )
+
+            merged_obs = []
+            merged_exp = []
+            temp_obs = 0
+            temp_exp = 0
+            for o, e in zip(observed, expected):
+                temp_obs += o
+                temp_exp += e
+                if temp_exp >= 5:
+                    merged_obs.append(temp_obs)
+                    merged_exp.append(temp_exp)
+                    temp_obs = 0
+                    temp_exp = 0
+
+            # Append remainder
+            if temp_exp > 0:
+                if merged_obs:
+                    merged_obs[-1] += temp_obs
+                    merged_exp[-1] += temp_exp
+                else:
+                    merged_obs.append(temp_obs)
+                    merged_exp.append(temp_exp)
+
+            chi2_stat, p_value = chisquare(f_obs=observed, f_exp=expected)
+            print(f"Model: {model_name}")
+            print(f"  Total data points: {total_count}")
+            print(f"  Chi-squared: {chi2_stat:.4f}")
+            print(f"  P-value: {p_value:.4f}")
+            if p_value < 0.05:
+                print(f"  ❌ Reject null hypothesis (not {self.reference_distribution})")
+            else:
+                print(f"  ✅ Data consistent with {self.reference_distribution}")
+            plt.bar(x_vals - 0.2, observed, width=0.4, label="Observed")
+            plt.bar(x_vals + 0.2, expected, width=0.4, label=f"Expected ({self.reference_distribution})", alpha=0.7)
+            plt.title(f"Model: {model_name}")
+            plt.legend()
+            plt.show()
+
+    def _get_expected_values_for_reference_distribution(self, x_vals, total_count, observed_sum):
+        expected = []
+        mu_l = self.laplace.mu
+        b = self.laplace.b
+        mu_n = self.normal.mu
+        sigma = self.normal.sigma
+        for x in x_vals:
+            lower = x - 0.5
+            upper = x + 0.5
+            if self.reference_distribution == "normal":
+                prob = norm.cdf(upper, loc=mu_n, scale=sigma) - norm.cdf(lower, loc=mu_n, scale=sigma)
+            elif self.reference_distribution == "laplace":
+                prob = laplace.cdf(upper, loc=mu_l, scale=b) - laplace.cdf(lower, loc=mu_l, scale=b)
+            else:
+                return []
+            expected.append(prob * total_count)
+        expected = np.array(expected)
+        expected *= observed_sum / expected.sum()
+        return expected
+
 
 class ComparisonResults:
     def __init__(self):
@@ -520,3 +616,26 @@ class ComparisonResults:
         self.num_detected_peaks = {}
         self.peak_distances_distribution = {}
         self.peak_distances_distribution_rev = {}
+
+
+class LaplaceDistribution:
+    def __init__(self, peak_comparison_distance=2, portion_of_data_within=0.9, mu=0):
+        self.d = peak_comparison_distance
+        self.p = portion_of_data_within
+        self.mu = mu
+        self.b = 2 / np.log(pow(1-self.p, -1))
+
+    def generate(self, lin_space):
+        return laplace.pdf(lin_space, self.mu, self.b)
+
+
+class NormalDistribution:
+    def __init__(self, peak_comparison_distance=2, portion_of_data_within=0.9, mu=0):
+        self.d = peak_comparison_distance
+        self.p = portion_of_data_within
+        self.mu = mu
+        z_score = norm.ppf((1 + self.p) / 2)
+        self.sigma = peak_comparison_distance / z_score
+
+    def generate(self, lin_space):
+        return norm.pdf(lin_space, self.mu, self.sigma)
