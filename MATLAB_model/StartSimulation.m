@@ -29,7 +29,8 @@ for runind = 1:runnum
 follicleParameters = FollicleParameters;
 poissonDistributionParameters = PoissonDistributionParameters;
 technicalParameters = TechnicalParameters;
-simulationSettings = SimulationSettings;
+simulationSettings = SimulationSettings('NormalCycle');
+simulationSettings
 
 %-----------------------------------------------------------------------
 %
@@ -120,7 +121,8 @@ simulationSettings = SimulationSettings;
     y0Foll = 4;
     StartValues = [y0Foll; yInitial]';
 
-    if simulationSettings.foll_ModelPop || simulationSettings.horm_ModelPop
+    if (simulationSettings.simulationType == SimulationType.FollModelPop ...
+        || simulationSettings.simulationType == SimulationType.HormModelPop)
         FSHVec = csvread(simulationSettings.FSHVecPath,1,0);
     else
         FSHVec = CreateFollicles( ...
@@ -128,157 +130,129 @@ simulationSettings = SimulationSettings;
             poissonDistributionParameters, ...
             tb,te);
     end
-%
-%-----------------------------------------------------------------------
-%
-%Normal Cycle
-%
 
-if simulationSettings.normalCycle
-    simulationSettings.stim = 0;
-    Simulation( ...
-        technicalParameters, ...
-        poissonDistributionParameters, ...
-        follicleParameters, ...
-        Par,tb,te, ...
-        simulationSettings, ...
-        StartValues,FSHVec,runind);
-end
-%
-%-----------------------------------------------------------------------
-%
-%Luteal Phase Stimulation: FSH/LH administartion (Menopur)
-%
-if (simulationSettings.lutStim)
-    simulationSettings.stim = 1;
-    Par(64) = 0;                %set 1 if protocol starts
-    Par(65) = 13.387/2.6667;    %D FSH
-    Par(66) = 9.87;             %beta FSH
-    Par(67) = 0.42;             %clearance rate FSH
-    Par(68) = 2.14;             %D LH
-    Par(69) = 6.04;             %beta LH
-    Par(70) = 3.199;            %clearance rate LH
-    Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
-    Par(72) = Par(71)+15;       %end time of dosing
-    Par     = Par';
-    Simulation( ...
-        technicalParameters, ...
-        poissonDistributionParameters, ...
-        follicleParameters, ...
-        Par,tb,te, ...
-        simulationSettings, ...
-        StartValues,FSHVec,runind);
-end
-%
-%-----------------------------------------------------------------------
-%
-%Follicular Phase Stimulation: FSH/LH administartion (Menopur)
-%
-if (simulationSettings.follStim)
-    simulationSettings.stim = 1;
-    Par(64) = 0;                %set 1 if protocol starts
-    Par(65) = 13.387/2.6667;      %D FSH
-    Par(66) = 9.87;             %beta FSH
-    Par(67) = 0.42;             %clearance rate FSH
-    Par(68) = 2.14;             %D LH
-    Par(69) = 6.04;             %beta LH
-    Par(70) = 3.199;            %clearance rate LH
-    Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
-    Par(72) = Par(71)+15;       %end time of dosing
-    Par     = Par';
-    Simulation( ...
-        technicalParameters, ...
-        poissonDistributionParameters, ...
-        follicleParameters, ...
-        Par,tb,te, ...
-        simulationSettings, ...
-        StartValues,FSHVec,runind);
-end
-%
-%-----------------------------------------------------------------------
-%
-%Double Stimulation: FSH/LH administartion (Menopur)
-%
-if (simulationSettings.doubStim)
-    simulationSettings.stim = 1;
-
-    poissonDistributionParameters.lambda = 5/14;
-    y0Foll = 4;
-    StartValues = [y0Foll; yInitial]';
-    [FSHVec, StartVec] = CreateFollicles( ...
-        follicleParameters, ...
-        poissonDistributionParameters, ...
-        tb,te);
-
-    Par(64) = 0;                %set 1 if protocol starts
-    Par(65) = 13.387/2.6667;      %D FSH
-    Par(66) = 9.87;             %beta FSH
-    Par(67) = 0.42;             %clearance rate FSH
-    Par(68) = 2.14;             %D LH
-    Par(69) = 6.04;             %beta LH
-    Par(70) = 3.199;            %clearance rate LH
-    Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
-    Par(72) = Par(71)+15;       %end time of dosing
-    Par     = Par';
-    Simulation( ...
-        technicalParameters, ...
-        poissonDistributionParameters, ...
-        follicleParameters, ...
-        Par,tb,te, ...
-        simulationSettings, ...
-        StartValues,FSHVec,runind);
-end
-%
-%-----------------------------------------------------------------------
-%
-if (simulationSettings.foll_ModelPop)
-    simulationSettings.stim = 0;
-    follicleParameters.gamma = lognrnd(log(follicleParameters.gamma),0.15);
-    follicleParameters.mu = lognrnd(log(follicleParameters.mu),0.15);
-    follicleParameters.k = lognrnd(log(follicleParameters.k),0.15);
-    Par(33) = lognrnd(log(Par(33)),0.15);
-    Simulation( ...
-        technicalParameters, ...
-        poissonDistributionParameters, ...
-        follicleParameters, ...
-        Par,tb,te, ...
-        simulationSettings, ...
-        StartValues,FSHVec,runind);
-end
-%
-%-----------------------------------------------------------------------
-%
-if (simulationSettings.horm_ModelPop)
-    simulationSettings.stim = 0;
-    Par(1)  = lognrnd(log(Par(1)),0.15);
-    Par(2)  = lognrnd(log(Par(2)),0.15);
-    Par(5)  = lognrnd(log(Par(5)),0.15);
-    Par(6)  = lognrnd(log(Par(6)),0.15);
-    Par(8)  = lognrnd(log(Par(8)),0.15);
-    Par(9)  = lognrnd(log(Par(9)),0.15);
-    Par(22) = lognrnd(log(Par(22)),0.15);
-    Par(24) = lognrnd(log(Par(24)),0.15);
-    Par(26) = lognrnd(log(Par(26)),0.15);
-    Par(27) = lognrnd(log(Par(27)),0.15);
-    Par(28) = lognrnd(log(Par(28)),0.15);
-    Par(34) = lognrnd(log(Par(34)),0.15);
-    Par(35) = lognrnd(log(Par(35)),0.15);
-    Par(36) = lognrnd(log(Par(36)),0.15);
-    Par(40) = lognrnd(log(Par(40)),0.15);
-    Par(41) = lognrnd(log(Par(41)),0.15);
-    Par(43) = lognrnd(log(Par(43)),0.15);
-    Par(45) = lognrnd(log(Par(45)),0.15);
-    Par(46) = lognrnd(log(Par(46)),0.15);
-    Par(47) = lognrnd(log(Par(47)),0.15);
-    Par(51) = lognrnd(log(Par(51)),0.15);
-    Par(73) = lognrnd(log(Par(73)),0.15);
-    Simulation( ...
-        technicalParameters, ...
-        poissonDistributionParameters, ...
-        follicleParameters, ...
-        Par,tb,te, ...
-        simulationSettings, ...
-        StartValues,FSHVec,runind);
+switch simulationSettings.simulationType
+    case SimulationType.NormalCycle
+        %Normal Cycle
+        simulationSettings.stim = 0;
+        Simulation( ...
+            technicalParameters, ...
+            poissonDistributionParameters, ...
+            follicleParameters, ...
+            Par,tb,te, ...
+            simulationSettings, ...
+            StartValues,FSHVec,runind);
+    case SimulationType.LutStim
+        %Luteal Phase Stimulation: FSH/LH administartion (Menopur)
+        simulationSettings.stim = 1;
+        Par(64) = 0;                %set 1 if protocol starts
+        Par(65) = 13.387/2.6667;    %D FSH
+        Par(66) = 9.87;             %beta FSH
+        Par(67) = 0.42;             %clearance rate FSH
+        Par(68) = 2.14;             %D LH
+        Par(69) = 6.04;             %beta LH
+        Par(70) = 3.199;            %clearance rate LH
+        Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
+        Par(72) = Par(71)+15;       %end time of dosing
+        Par     = Par';
+        Simulation( ...
+            technicalParameters, ...
+            poissonDistributionParameters, ...
+            follicleParameters, ...
+            Par,tb,te, ...
+            simulationSettings, ...
+            StartValues,FSHVec,runind);
+    case SimulationType.FollStim
+        %Follicular Phase Stimulation: FSH/LH administartion (Menopur)
+        simulationSettings.stim = 1;
+        Par(64) = 0;                %set 1 if protocol starts
+        Par(65) = 13.387/2.6667;    %D FSH
+        Par(66) = 9.87;             %beta FSH
+        Par(67) = 0.42;             %clearance rate FSH
+        Par(68) = 2.14;             %D LH
+        Par(69) = 6.04;             %beta LH
+        Par(70) = 3.199;            %clearance rate LH
+        Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
+        Par(72) = Par(71)+15;       %end time of dosing
+        Par     = Par';
+        Simulation( ...
+            technicalParameters, ...
+            poissonDistributionParameters, ...
+            follicleParameters, ...
+            Par,tb,te, ...
+            simulationSettings, ...
+            StartValues,FSHVec,runind);
+    case SimulationType.DoubleStim
+        %Double Stimulation: FSH/LH administartion (Menopur)
+        simulationSettings.stim = 1;
+        poissonDistributionParameters.lambda = 5/14;
+        y0Foll = 4;
+        StartValues = [y0Foll; yInitial]';
+        FSHVec = CreateFollicles( ...
+            follicleParameters, ...
+            poissonDistributionParameters, ...
+            tb,te);
+        Par(64) = 0;                %set 1 if protocol starts
+        Par(65) = 13.387/2.6667;    %D FSH
+        Par(66) = 9.87;             %beta FSH
+        Par(67) = 0.42;             %clearance rate FSH
+        Par(68) = 2.14;             %D LH
+        Par(69) = 6.04;             %beta LH
+        Par(70) = 3.199;            %clearance rate LH
+        Par(71) = 150;              %start of dosing - fiktive Zeitpunkte, werde in der Simulation gesetzt
+        Par(72) = Par(71)+15;       %end time of dosing
+        Par     = Par';
+        Simulation( ...
+            technicalParameters, ...
+            poissonDistributionParameters, ...
+            follicleParameters, ...
+            Par,tb,te, ...
+            simulationSettings, ...
+            StartValues,FSHVec,runind);
+    case SimulationType.FollModelPop
+        simulationSettings.stim = 0;
+        follicleParameters.gamma = lognrnd(log(follicleParameters.gamma),0.15);
+        follicleParameters.mu = lognrnd(log(follicleParameters.mu),0.15);
+        follicleParameters.k = lognrnd(log(follicleParameters.k),0.15);
+        Par(33) = lognrnd(log(Par(33)),0.15);
+        Simulation( ...
+            technicalParameters, ...
+            poissonDistributionParameters, ...
+            follicleParameters, ...
+            Par,tb,te, ...
+            simulationSettings, ...
+            StartValues,FSHVec,runind);
+    case SimulationType.HormModelPop
+        simulationSettings.stim = 0;
+        Par(1)  = lognrnd(log(Par(1)),0.15);
+        Par(2)  = lognrnd(log(Par(2)),0.15);
+        Par(5)  = lognrnd(log(Par(5)),0.15);
+        Par(6)  = lognrnd(log(Par(6)),0.15);
+        Par(8)  = lognrnd(log(Par(8)),0.15);
+        Par(9)  = lognrnd(log(Par(9)),0.15);
+        Par(22) = lognrnd(log(Par(22)),0.15);
+        Par(24) = lognrnd(log(Par(24)),0.15);
+        Par(26) = lognrnd(log(Par(26)),0.15);
+        Par(27) = lognrnd(log(Par(27)),0.15);
+        Par(28) = lognrnd(log(Par(28)),0.15);
+        Par(34) = lognrnd(log(Par(34)),0.15);
+        Par(35) = lognrnd(log(Par(35)),0.15);
+        Par(36) = lognrnd(log(Par(36)),0.15);
+        Par(40) = lognrnd(log(Par(40)),0.15);
+        Par(41) = lognrnd(log(Par(41)),0.15);
+        Par(43) = lognrnd(log(Par(43)),0.15);
+        Par(45) = lognrnd(log(Par(45)),0.15);
+        Par(46) = lognrnd(log(Par(46)),0.15);
+        Par(47) = lognrnd(log(Par(47)),0.15);
+        Par(51) = lognrnd(log(Par(51)),0.15);
+        Par(73) = lognrnd(log(Par(73)),0.15);
+        Simulation( ...
+            technicalParameters, ...
+            poissonDistributionParameters, ...
+            follicleParameters, ...
+            Par,tb,te, ...
+            simulationSettings, ...
+            StartValues,FSHVec,runind);
 end
 %
 %-----------------------------------------------------------------------

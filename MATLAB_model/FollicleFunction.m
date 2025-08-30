@@ -122,7 +122,8 @@ if simulationSettings.stim == 0
     f(NumFollicles+16)=y(NumFollicles+16)-0;
 end
 %
-if (simulationSettings.lutStim)
+switch simulationSettings.simulationType
+    case SimulationType.LutStim
     if Par(64) > 0 && t > Par(71)
          n = dd1;
          H = 0;
@@ -145,9 +146,7 @@ if (simulationSettings.lutStim)
         f(NumFollicles+17)=y(NumFollicles+17)-0;
         f(NumFollicles+16)=y(NumFollicles+16)-0;
     end
-end
-%
-if (simulationSettings.follStim)
+    case SimulationType.FollStim
     if Par(64) > 0 && t > Par(71)
          n = dd1;
          s = (-1)^(dd1);
@@ -202,9 +201,7 @@ if (simulationSettings.follStim)
         f(NumFollicles+16)=y(NumFollicles+16)-0;
 
     end
-end
-%
-if (simulationSettings.doubStim)
+    case SimulationType.DoubleStim
     if Par(64) > 0 && t > Par(71)
         n = dd1;
         H = 0;

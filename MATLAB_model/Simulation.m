@@ -172,8 +172,8 @@ while (t<te)
         %saves all sizes of the foll that was active during last run
         Follicles.Follicle{Follicles.Active(i)}.Y = [Follicles.Follicle{Follicles.Active(i)}.Y; Y(2:end,i)];
     end
-
-    if (simulationSettings.lutStim)
+    switch simulationSettings.simulationType
+        case SimulationType.LutStim
         %Werte f�r die Medikamentengabe setzen
         if Par(71) == Tovu && Par(64) == 0
             for i = 1:Follicles.NumActive
@@ -190,9 +190,7 @@ while (t<te)
                 end
             end
         end
-    end
-
-    if (simulationSettings.follStim)
+        case SimulationType.FollStim
         if Par(71)== Tovu && Par(64) == 0
             if t > Par(71)+14
                 for i = 1:Follicles.NumActive
@@ -207,9 +205,7 @@ while (t<te)
                 end
             end
         end
-    end
-
-    if(simulationSettings.doubStim)
+        case SimulationType.DoubleStim
         if Par(71)== Tovu && Par(64) == 0
             Par(71)=ceil(t)+20;
             Par(72)=Par(71)+15;
@@ -417,67 +413,65 @@ while (t<te)
         t = te;
     end
 
-    if (simulationSettings.lutStim)
-        if Par(64) == 1 && t > Par(72)+1 || ...
-           Par(64) == 1 && count18 >= 3 || ...
-           Par(64) == 1 && count20 >= 1
-            break
-        end
-    end
-
-    if (simulationSettings.follStim)
-        if Par(64) == 1 && t > Par(72)+1 || ...
-           Par(64) == 1 && count18 >= 3
-            break
-        end
-    end
-
-    if (simulationSettings.doubStim)
-        if ~firstExtraction
-            if Par(64) == 1
-                if Par(72) < t
-                    break
-                end
-                if count18 > 0
-                    result(1,1) = count10;
-                    result(2,1) = count14;
-                    result(3,1) = count18;
-                    result(4,1) = Par(71);
-                    result(5,1) = t;
-                    %change medicaments
-                    Par(71) = ceil(t)+1;
-                    Par(72) = Par(71) + 20;
-                    numDoses = Par(72)-Par(71)+1;
-                    dosing_events1=[[Par(71):Par(72)];[1:numDoses]];
-                    %change follicle size and destination
-                    %for all follicles >8mm
-                    for i=1:size(indexFollGreater8,2)
-                        currentIndex = indexFollGreater8(1,i);
-                        Follicles.Follicle{Follicles.Active(currentIndex)}.Destiny = -3;
-                        Follicles.Follicle{Follicles.Active(currentIndex)}.Y(end,1) = 0;
+    switch simulationSettings.simulationType
+        case SimulationType.LutStim
+            if Par(64) == 1 && t > Par(72)+1 || ...
+               Par(64) == 1 && count18 >= 3 || ...
+               Par(64) == 1 && count20 >= 1
+                break
+            end
+        case SimulationType.FollStim
+            if Par(64) == 1 && t > Par(72)+1 || ...
+               Par(64) == 1 && count18 >= 3
+                break
+            end
+        case SimulationType.DoubleStim
+            if ~firstExtraction
+                if Par(64) == 1
+                    if Par(72) < t
+                        break
                     end
-                    if antralcount >= 2
-                        firstExtraction = 1;
-                    else
+                    if count18 > 0
+                        result(1,1) = count10;
+                        result(2,1) = count14;
+                        result(3,1) = count18;
+                        result(4,1) = Par(71);
+                        result(5,1) = t;
+                        %change medicaments
+                        Par(71) = ceil(t)+1;
+                        Par(72) = Par(71) + 20;
+                        numDoses = Par(72)-Par(71)+1;
+                        dosing_events1=[[Par(71):Par(72)];[1:numDoses]];
+                        %change follicle size and destination
+                        %for all follicles >8mm
+                        for i=1:size(indexFollGreater8,2)
+                            currentIndex = indexFollGreater8(1,i);
+                            Follicles.Follicle{Follicles.Active(currentIndex)}.Destiny = -3;
+                            Follicles.Follicle{Follicles.Active(currentIndex)}.Y(end,1) = 0;
+                        end
+                        if antralcount >= 2
+                            firstExtraction = 1;
+                        else
+                            break
+                        end
+                    end
+                end
+            else
+                if Par(64) == 1
+                    if count20 > 0 || count18 >= 3 || Par(72) < t
+                        result(1,2) = count10;
+                        result(2,2) = count14;
+                        result(3,2) = count18;
+                        result(4,2) = Par(71);
+                        result(5,2) = t;
                         break
                     end
                 end
             end
-        else
-            if Par(64) == 1
-                if count20 > 0 || count18 >= 3 || Par(72) < t
-                    result(1,2) = count10;
-                    result(2,2) = count14;
-                    result(3,2) = count18;
-                    result(4,2) = Par(71);
-                    result(5,2) = t;
-                    break
-                end
-            end
-        end
     end
 
 end
+NumFollicles
 
 %plotting
 if(simulationSettings.showPlots)
@@ -761,7 +755,8 @@ end
 % FollSens = FollInfo(4,:)';
 % dlmwrite("FSH.txt", FollSens);
 
-if simulationSettings.foll_ModelPop || simulationSettings.horm_ModelPop
+if (simulationSettings.simulationType.FollModelPop ...
+    || simulationSettings.simulationType.HormModelPop)
     totalcheck = 0;
     if ~isempty(FollOvulInfo)
         for i = 2:length(FollOvulInfo(end,:))
