@@ -111,10 +111,10 @@ while (t<te)
     timevec=poissonproc(poissonDistributionParameters.lambda+6*poissonDistributionParameters.lambda*fshimp,[t,te]);
 
     %set integration period for the current follicle
-     if (~isempty(timevec))
-         NextStart=timevec(1);
-         tspan=[t,NextStart];
-     else
+    if (~isempty(timevec))
+        NextStart=timevec(1);
+        tspan=[t,NextStart];
+    else
         tspan=[t,te];
     end
 
@@ -129,7 +129,7 @@ while (t<te)
     M(NumFollicles+16,NumFollicles+16)=0;     %alg. eq. for LH med
     M(NumFollicles+17,NumFollicles+17)=0;     %alg. eq. for FSH med
 
-    %event function stops the integration, when ever an ovulation takes
+    %event function stops the integration, whenever an ovulation takes
     %place within the intervall tspan
     options = odeset('Mass',M,'events',@(t,y)EvaluateFollicle(t,y,technicalParameters,follicleParameters,LH));
 
@@ -362,7 +362,11 @@ while (t<te)
             end
         end
 
-        if(Follicles.Follicle{Follicles.Active(i)}.Destiny ~= 1)
+        if (Follicles.Follicle{Follicles.Active(i)}.Destiny ~= 1 ...
+            && (Follicles.Follicle{Follicles.Active(i)}.Time(1) + 20 > t ...
+                || Follicles.Follicle{Follicles.Active(i)}.Y(end) >= 0.1 ...
+                ) ...
+            )
             %put the follicle back to the list of actives and its FSH
             ActiveHelp = [ActiveHelp Follicles.Active(i)];
             %sensitivity back in the FSH vector...
@@ -398,6 +402,7 @@ while (t<te)
     Follicles.Active = ActiveHelp;
     %find out how many follicles are active...
     Follicles.NumActive = size(ActiveHelp,2);
+    Follicles.NumActive
 
     %determine new initial values for all differential equations
     y0old = [];
