@@ -572,6 +572,15 @@ if(simulationSettings.showPlots)
     legend(h,{'follicle growth','temperature','FSH','measurable','P4', 'LH'},'fontsize',15,...
         'Location','NorthEastOutside');%,'ovulation');
     
+    %temperature plot
+    figureCounter = figureCounter+1;
+    figure(figureCounter);
+    plot(solutions.Time,solutions.Y(:,end-nnfe+18),'Color',[0 0 0], ...
+        'DisplayName','x1','LineWidth', widthofline);
+    set(gca,'fontsize',24);
+    legend({'Temperature'},'fontsize',24,...
+        'Location','NorthEastOutside');
+
     figureCounter = figureCounter+1;
     figure(figureCounter);
     plot(P4.Time,P4.Y, FSH.Time,FSH.Y,'LineWidth',2);
