@@ -480,8 +480,9 @@ end
 NumFollicles
 
 %plotting
+figureCounter = 1;
 if(simulationSettings.showPlots)
-    figure(1);
+    figure(figureCounter);
     clf;
     widthofline = 2;
     hold on;
@@ -539,6 +540,10 @@ rest = n - a;
 CycleInfo = [[0 Cyclelength]; [rest FollperCycle]; OvuT];
 
 if(simulationSettings.showPlots)
+    %temperature
+    temp = plot(solutions.Time,solutions.Y(:,end-nnfe+18),'Color',[0 0 0], ...
+        'DisplayName','x1','LineWidth', widthofline);
+
     %fsh
     hfsh = plot(FSH.Time,FSH.Y,'Color',[1/2 1 1/2], ...
         'DisplayName','x1','LineWidth', widthofline);
@@ -555,7 +560,7 @@ if(simulationSettings.showPlots)
     hTwo=plot(xlim,[4 4],'Color','r');
 
     %plot for the follicle size, amount of FSH and amount of P4
-    h=[h hfsh hTwo hp4 hLH];
+    h=[h temp hfsh hTwo hp4 hLH];
     xlabel('time in d','fontsize',15);
     ylabel('follicle diameter in mm','fontsize',15);
     ylim([0 50])
@@ -564,22 +569,25 @@ if(simulationSettings.showPlots)
     set(ax, 'Box', 'off' );
     ax.FontSize = 15;
     set(gca,'linewidth',1.5);
-    legend(h,{'follicle growth','FSH','measurable','P4', 'LH'},'fontsize',15,...
-        'Location','NorthEast');%,'ovulation');
-
-    figure(2);
+    legend(h,{'follicle growth','temperature','FSH','measurable','P4', 'LH'},'fontsize',15,...
+        'Location','NorthEastOutside');%,'ovulation');
+    
+    figureCounter = figureCounter+1;
+    figure(figureCounter);
     plot(P4.Time,P4.Y, FSH.Time,FSH.Y,'LineWidth',2);
     set(gca,'fontsize',24);
     legend({'P4','FSH'},'fontsize',24,...
         'Location','NorthEastOutside');
 
-    figure(3);
+    figureCounter = figureCounter+1;
+    figure(figureCounter);
     plot(E2.Time,E2.Y, LH.Time, LH.Y, 'LineWidth',2);
     set(gca,'fontsize',24);
     legend({'E2', 'LH'},'fontsize',24,...
         'Location','NorthEastOutside');
 
-    figure(4);
+    figureCounter = figureCounter+1;
+    figure(figureCounter);
     plot(GnRH.Time,GnRH.Y, 'LineWidth',2);
     set(gca,'fontsize',24);
     legend({'GnRH'},'fontsize',24,...
@@ -594,7 +602,8 @@ if(simulationSettings.showPlots)
     Data=importdata(file,delimiterIn,headerlinesIn);
     ID = unique(Data(:,end));
 
-    figure(5)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     hold on
     for i = 1:length(ID)
     Data_LH = [];
@@ -618,7 +627,8 @@ if(simulationSettings.showPlots)
             hold on
     end
 
-    figure(6)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     hold on
     for i = 1:length(ID)
     H = [];
@@ -642,7 +652,8 @@ if(simulationSettings.showPlots)
             hold on
     end
 
-    figure(7)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     hold on
     for i = 1:length(ID)
     H = [];
@@ -666,7 +677,8 @@ if(simulationSettings.showPlots)
             hold on
     end
 
-    figure(8)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     hold on
     for i = 1:length(ID)
     H = [];
@@ -699,10 +711,12 @@ if(simulationSettings.showPlots)
           freq = [freq yGfreq];
     end
 
-    figure(9)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     plot(E2.Time, freq)
 
-    figure(10)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     plot(FSHRez.Time, FSHRez.Y)
 
 end

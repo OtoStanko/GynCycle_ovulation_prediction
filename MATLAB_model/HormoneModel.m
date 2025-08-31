@@ -8,6 +8,7 @@ nnfe = 18;
 %
 %-----------------------------------------------------------------------
 %
+i_tempt    = r;
 i_FSH_med  = r-1;
 i_LH_med   = r-2;
 
@@ -32,6 +33,8 @@ i_E2       =  r-17;
 %
 %-----------------------------------------------------------------------
 %
+%Temperature
+  dy(i_tempt) = 0.01*(4-y(i_P4));
 %GnRH
 %%GnRH frequency and mass 
 %
@@ -53,10 +56,10 @@ i_E2       =  r-17;
 %
 %%%active GnRH receptor
 %
-  dy(i_RecGa) =   Par(12) * y(i_GReca) ...
+  dy(i_RecGa) =  Par(12) * y(i_GReca) ...
                - Par(11) * y(i_GnRH) * y(i_RecGa) ...  
                - Par(14) * y(i_RecGa) ...
-                + Par(15) * y(i_RecGi);
+               + Par(15) * y(i_RecGi);
 %
 %%%inactive GnRH receptor	 
 %
