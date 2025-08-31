@@ -89,6 +89,11 @@ end
 %
 %-----------------------------------------------------------------------
 %
+%Calculate temperature
+f(NumFollicles+18)=f(NumFollicles+18) + 0.5*((36.5-y(r-nnfe+18))) + 0.02*(y(r-nnfe+2));
+%
+%-----------------------------------------------------------------------
+%
 %E2 production
 %
 %%Calculate follicular surface
@@ -104,13 +109,12 @@ end
 SF = pi*sum((x.^Par(57))./(x.^Par(57)+Par(58)^Par(57)).*(x.^2));
 %
 %%calculate E2 concentration
-%
 f(NumFollicles+1)=y(NumFollicles+1) - Par(75) - (Par(59) + Par(60)*SF) - Par(61)*exp(-Par(62)*(t-(Tovu+7))^2);
 %
 %-----------------------------------------------------------------------
 %
 %Calculation of P4 values
-f(NumFollicles+2)=y(NumFollicles+2)- Par(76) - Par(63)*exp(-Par(62)*(t-(Tovu+7))^2);
+f(NumFollicles+2)=y(NumFollicles+2) - Par(76) - Par(63)*exp(-Par(62)*(t-(Tovu+7))^2);
 %
 %-----------------------------------------------------------------------
 %

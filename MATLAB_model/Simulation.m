@@ -541,7 +541,7 @@ CycleInfo = [[0 Cyclelength]; [rest FollperCycle]; OvuT];
 
 if(simulationSettings.showPlots)
     %temperature
-    temp = plot(solutions.Time,solutions.Y(:,end-nnfe+18),'Color',[0 0 0], ...
+    temp = plot(solutions.Time,solutions.Y(:,end-nnfe+18),'Color',[1/2 1/2 1/2], ...
         'DisplayName','x1','LineWidth', widthofline);
 
     %fsh
@@ -575,7 +575,7 @@ if(simulationSettings.showPlots)
     %temperature plot
     figureCounter = figureCounter+1;
     figure(figureCounter);
-    plot(solutions.Time,solutions.Y(:,end-nnfe+18),'Color',[0 0 0], ...
+    plot(solutions.Time,solutions.Y(:,end-nnfe+18),'Color',[1/2 1/2 1/2], ...
         'DisplayName','x1','LineWidth', widthofline);
     set(gca,'fontsize',24);
     legend({'Temperature'},'fontsize',24,...
