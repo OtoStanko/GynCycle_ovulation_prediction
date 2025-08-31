@@ -1,7 +1,8 @@
 function f=FollicleFunction(t,y,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,simulationSettings,firstExtraction)
 
+nnfe = technicalParameters.numNonFollicleEq;
 %determine number of active follicles
-NumFollicles=size(y,1)-technicalParameters.numNonFollicleEq;
+NumFollicles=size(y,1)-nnfe;
 
 if( NumFollicles > 0 )
     x= y(1:NumFollicles);
@@ -29,8 +30,8 @@ f=dy;
 %
 [r,~] = size(y);
 
-fshrezcomp = y(r-14);
-p4all = y(r-15);
+fshrezcomp = y(r-nnfe+3);
+p4all = y(r-nnfe+2);
 SumV = sum(x.^follicleParameters.fractalDim);
 
 for i = 1:(NumFollicles)
