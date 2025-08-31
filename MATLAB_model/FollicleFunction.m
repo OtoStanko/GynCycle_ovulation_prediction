@@ -23,7 +23,7 @@ end
 %
 % solve differential equations
 %
-dy = HormoneModel(t, y, Par);
+dy = HormoneModel(t, y, Par, nnfe);
 f=dy;
 %
 %-----------------------------------------------------------------------

@@ -1,35 +1,34 @@
-function dy = HormoneModel(t,y,Par)
+function dy = HormoneModel(t,y,Par, nnfe)
 %
 %-----------------------------------------------------------------------
 %
 [r,c] = size(y);
 dy=zeros(r,c);
-nnfe = 18;
 %
 %-----------------------------------------------------------------------
 %
-i_temp     = r;
-i_FSH_med  = r-1;
-i_LH_med   = r-2;
+i_temp     = r-nnfe+18;
+i_FSH_med  = r-nnfe+17;
+i_LH_med   = r-nnfe+16;
 
-i_GnRH     =  r-3;
-i_RecGa    =  r-4;
-i_RecGi    =  r-5;
-i_GReca    =  r-6;
-i_GReci    =  r-7; 
+i_GnRH     =  r-nnfe+15;
+i_RecGa    =  r-nnfe+14;
+i_RecGi    =  r-nnfe+13;
+i_GReca    =  r-nnfe+12;
+i_GReci    =  r-nnfe+11; 
 
-i_RP_LH    =  r-8;
-i_LH       =  r-9;
+i_RP_LH    =  r-nnfe+10;
+i_LH       =  r-nnfe+9;
 
-i_RP_FSH   =  r-10;
-i_FSH      =  r-11;
-i_FSHfoll  =  r-12;
-i_RFSH     =  r-13;
-i_RFSH_des =  r-14;
-i_FSHR     =  r-15;
+i_RP_FSH   =  r-nnfe+8;
+i_FSH      =  r-nnfe+7;
+i_FSHfoll  =  r-nnfe+6;
+i_RFSH     =  r-nnfe+5;
+i_RFSH_des =  r-nnfe+4;
+i_FSHR     =  r-nnfe+3;
 
-i_P4       =  r-16;
-i_E2       =  r-17;
+i_P4       =  r-nnfe+2;
+i_E2       =  r-nnfe+1;
 %
 %-----------------------------------------------------------------------
 %
