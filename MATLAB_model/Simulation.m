@@ -575,12 +575,14 @@ if(simulationSettings.showPlots)
     %temperature plot
     figureCounter = figureCounter+1;
     figure(figureCounter);
-    plot(solutions.Time,solutions.Y(:,end-nnfe+18),'Color',[1/2 1/2 1/2], ...
+    temperatureVec = solutions.Y(:,end-nnfe+18);
+    plot(solutions.Time,temperatureVec,'Color',[1/2 1/2 1/2], ...
         'DisplayName','x1','LineWidth', widthofline);
-    set(gca,'fontsize',24);
-    legend({'Temperature'},'fontsize',24,...
-        'Location','NorthEastOutside');
+    xlabel('time in d','fontsize',15);
+    ylabel('temperature in centigrades','fontsize',15);
+    ylim([min(temperatureVec)-0.5 max(temperatureVec)+0.5])
 
+    %P4 FSH plot
     figureCounter = figureCounter+1;
     figure(figureCounter);
     plot(P4.Time,P4.Y, FSH.Time,FSH.Y,'LineWidth',2);
@@ -588,6 +590,7 @@ if(simulationSettings.showPlots)
     legend({'P4','FSH'},'fontsize',24,...
         'Location','NorthEastOutside');
 
+    %E2 LH plot
     figureCounter = figureCounter+1;
     figure(figureCounter);
     plot(E2.Time,E2.Y, LH.Time, LH.Y, 'LineWidth',2);
@@ -595,6 +598,7 @@ if(simulationSettings.showPlots)
     legend({'E2', 'LH'},'fontsize',24,...
         'Location','NorthEastOutside');
 
+    %GnRH plot
     figureCounter = figureCounter+1;
     figure(figureCounter);
     plot(GnRH.Time,GnRH.Y, 'LineWidth',2);
