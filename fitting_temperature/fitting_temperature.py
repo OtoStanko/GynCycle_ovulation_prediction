@@ -8,7 +8,7 @@ SAMPLING_FREQUENCY = 1
 TRAIN_DATA_SUFFIX = "1"
 
 features = ["LH","P4",]
-INPUT_DIR = os.path.join(os.getcwd(), "time_series")
+INPUT_DIR = os.path.join(os.getcwd(), "..", "MATLAB_model", "hormone_populations")
 
 combined_df = create_dataframe(INPUT_DIR, features, 'Time', TRAIN_DATA_SUFFIX)
 combined_df.set_index('Time', inplace=True)
