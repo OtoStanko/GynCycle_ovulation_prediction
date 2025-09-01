@@ -866,7 +866,8 @@ if (simulationSettings.savePlotStuff)
 
     FileName = sprintf('%s_%d.csv','Time',runind);
     fullFileName = fullfile(DirStuff, FileName);
-    csvwrite(fullFileName,E2.Time)
+    dlmwrite(fullFileName, E2.Time, 'delimiter', ',', 'precision', 9);
+    %csvwrite(fullFileName,solutions.Time)
 
     FileName = sprintf('%s_%d.csv','OvulationInfo',runind');
     fullFileName = fullfile(DirStuff, FileName);
