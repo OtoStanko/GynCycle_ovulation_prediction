@@ -90,7 +90,8 @@ end
 %-----------------------------------------------------------------------
 %
 %Calculate temperature
-f(NumFollicles+18)=f(NumFollicles+18) + 0.02*(y(r-nnfe+2)) + 0.5*((36.5-y(r-nnfe+18)));
+%f(NumFollicles+18)=f(NumFollicles+18) + 0.02*(y(r-nnfe+2)) + 0.5*((36.5-y(r-nnfe+18)));
+f(NumFollicles+18)=f(NumFollicles+18) + 0.5*(( (35.5+0.15*y(r-nnfe+2)) - y(r-nnfe+18) ));
 %
 %-----------------------------------------------------------------------
 %
