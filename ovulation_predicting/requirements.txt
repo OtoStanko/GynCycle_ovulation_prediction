@@ -1,0 +1,13 @@
+ipython==8.12.3
+protobuf==3.19.4
+kan==0.0.2
+keras==2.8.0
+matplotlib==3.10.6
+numpy==1.26.4
+pandas==2.3.2
+plotly==5.7.0
+pykan==0.0.5
+scipy==1.13.1
+seaborn==0.13.2
+tensorflow==2.8.0
+torch==2.3.0
