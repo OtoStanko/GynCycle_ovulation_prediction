@@ -8,15 +8,15 @@ from scipy.optimize import curve_fit
 from scipy.signal import find_peaks
 
 from ovulation_predicting.preprocessing_functions import create_dataframe, sample_data
-from ovulation_predicting.supporting_scripts import print_ts
+from ovulation_predicting.supporting_scripts import print_ts, show_plot
 
 
 def plot_temp(df):
-    plt.figure(figsize=(10, 6))
+    #plt.figure(figsize=(10, 6))
     for subject_id, row in df.iterrows():
         plt.plot(row.index, row.values, marker='o', label=f"Subject {subject_id}")
     plt.grid(True, alpha=0.3)
-    plt.show()
+    show_plot()
 
 
 SAMPLING_FREQUENCY = 1
@@ -116,7 +116,7 @@ lines, labels = ax1.get_legend_handles_labels()
 lines2, labels2 = ax2.get_legend_handles_labels()
 ax1.legend(lines + lines2, labels + labels2, loc='upper left')
 plt.title('BBT and P4 over Time')
-plt.show()
+show_plot()
 
 temperature_prev = []
 temperature_new = []

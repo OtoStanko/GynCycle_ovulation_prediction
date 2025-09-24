@@ -8,7 +8,7 @@ import seaborn as sns
 from ModelComparator import ModelComparator
 from ovulation_predicting.models import MyModelWrapper
 from preprocessing_functions import *
-from supporting_scripts import print_ts
+from supporting_scripts import print_ts, show_plot
 from TimeSeriesVisualizer import TimeSeriesVisualizer
 
 
@@ -103,7 +103,7 @@ for feature in features:
     plt.title("Preprocessed split dataset ['{}']".format(feature))
     plt.ylabel('Normalized hormone levels')
     plt.xlabel('Time in hours')
-    plt.show()
+    show_plot()
 
 tsv_combined = TimeSeriesVisualizer(test_df, features, 35, 35)
 tsv_combined.update_sliders()
@@ -116,7 +116,7 @@ print("Number of cycles:", len(distances))
 numbers = list(count.keys())
 frequencies = list(count.values())
 plt.bar(numbers, frequencies, color='skyblue')
-plt.show()
+show_plot()
 
 period = sum(distances) / len(distances)
 print("Period:", period)

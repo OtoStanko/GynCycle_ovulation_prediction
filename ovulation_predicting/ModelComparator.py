@@ -94,7 +94,7 @@ class ModelComparator:
                         color='red', zorder=5, label='Highlighted Points')
             plt.xlabel('Time [hours]')
             plt.title('Test {} data'.format(self.features))
-            plt.show()
+            sp.show_plot()
 
         dict_of_model_predictions = self._compute_models_predictions(list_of_models)
         # Statistics about the model forecast and peaks' predictions
@@ -226,7 +226,7 @@ class ModelComparator:
             plt.legend(loc='upper left')
             title = f"Prediction on {self.input_length} days with offset {offset} days"
             plt.title(title)
-            plt.show()
+            sp.show_plot()
         return results
 
     def _compute_models_predictions(self, list_of_models):
@@ -374,7 +374,7 @@ class ModelComparator:
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.title(title)
-        plt.show()
+        sp.show_plot()
 
     def _simulation_summary(self):
         """
@@ -439,7 +439,7 @@ class ModelComparator:
         self.plot_gt_peaks_to_pred_peaks(colors)
 
     def _print_and_plot_in_out_summary(self, colors):
-        plt.figure(figsize=(8, 6))
+        #plt.figure(figsize=(8, 6))
         for idx, key in enumerate(self.peaks_within_threshold):
             tp = np.array(self.peaks_within_threshold[key])
             fp = np.array(self.peaks_outside_threshold[key])
@@ -465,10 +465,10 @@ class ModelComparator:
         plt.ylabel('How well are the peaks hit')
         plt.title('')
         plt.legend(title="Model")
-        plt.show()
+        sp.show_plot()
 
     def _plot_pred_peaks_to_gt_peaks(self, colors):
-        plt.figure(figsize=(8, 6))
+        #plt.figure(figsize=(8, 6))
         for idx, key in enumerate(self.peaks_within_threshold):
             x_values = self.peaks_outside_threshold[key]
             y_values = self.peaks_within_threshold[key]
@@ -490,10 +490,10 @@ class ModelComparator:
         plt.title('How well are the prediction peaks placed near the nearest gt peak '
                   '\n(how well placed are the peaks from the prediction)')
         plt.legend(title="Model")
-        plt.show()
+        sp.show_plot()
 
     def plot_gt_peaks_to_pred_peaks(self, colors):
-        plt.figure(figsize=(8, 6))
+        #plt.figure(figsize=(8, 6))
         for idx, key in enumerate(self.peaks_within_threshold_rev):
             x_values = self.peaks_outside_threshold_rev[key]
             y_values = self.peaks_within_threshold_rev[key]
@@ -516,7 +516,7 @@ class ModelComparator:
         plt.title('How well are the gt peaks predicted by the nearest prediction peak \n'
                   '(how well are the gt peaks identified by the nearest peak from the prediction)')
         plt.legend(title="Model")
-        plt.show()
+        sp.show_plot(block=True)
 
     def print_peak_statistics(self):
         """
@@ -583,7 +583,7 @@ class ModelComparator:
             plt.bar(x_vals + 0.2, expected, width=0.4, label=f"Expected ({self.reference_distribution})", alpha=0.7)
             plt.title(f"Model: {model_name}")
             plt.legend()
-            plt.show()
+            sp.show_plot()
 
     def _get_expected_values_for_reference_distribution(self, x_vals, total_count, observed_sum):
         expected = []
