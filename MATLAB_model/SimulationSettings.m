@@ -32,13 +32,13 @@ classdef SimulationSettings
                     obj.simulationType = SimulationType.NormalCycle;
             end
             obj.showPlots     = 1;
-            obj.saveSim       = 0;
-            obj.savePlotStuff = 0;
+            obj.saveSim       = 1;
+            obj.savePlotStuff = 1;
             obj.savePop       = 0;
             % type of simulation
             obj.stim          = 0;
             % directories settings
-            obj.OutputDir = './ModelPopulation/HormPopulation';
+            obj.OutputDir = './hormone_populations';
             obj.FSHVecPath = './ModelPopulation/ControlRun/FSHS.txt';
             obj.StartVecPath = './ModelPopulation/ControlRun/StartTimesPoiss.txt';
         end

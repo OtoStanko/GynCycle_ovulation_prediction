@@ -4,7 +4,7 @@ from scipy.optimize import curve_fit
 import scipy.signal
 import tensorflow as tf
 
-from ovulation_predicting.supporting_scripts import sin_function
+from ovulation_predicting.supporting_scripts import show_plot, sin_function
 
 
 class NoisySinCurve(tf.keras.Model):
@@ -47,7 +47,7 @@ class NoisySinCurve(tf.keras.Model):
         plt.plot(x_fit, y_fit, label='Fitted Curve', color='orange')
         plt.title('Sampled dataframe with raw hours with fitted sin curve')
         plt.xlabel('Time in hours')
-        plt.show()
+        show_plot()
 
     def call(self, inputs):
         inputs = tf.reshape(inputs, (-1, self.input_length, self.num_features))

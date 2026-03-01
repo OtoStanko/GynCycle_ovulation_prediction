@@ -60,37 +60,38 @@ global ModelPop_CycleInfo
 %-----------------------------------------------------------------------
 %
 %tracking the concentrations of important hormone species
+nnfe = technicalParameters.numNonFollicleEq;
 %E2 Concentration
 E2.Time = t;
-E2.Y = y0(end-16);
+E2.Y = y0(end-nnfe+1);
 
 %P4 Concentration
 P4.Time = t;
-P4.Y = y0(end-15);
+P4.Y = y0(end-nnfe+2);
 
 %FSH Concentration
 FSH.Time = t;
-FSH.Y = y0(end-10);
+FSH.Y = y0(end-nnfe+7);
 
 %FSH Rezeptor
 FSHRez.Time = t;
-FSHRez.Y = y0(end-14);
+FSHRez.Y = y0(end-nnfe+3);
 
 %LH Concentration
 LH.Time = t;
-LH.Y = y0(end-8);
+LH.Y = y0(end-nnfe+9);
 
 %GnRH Concentration
 GnRH.Time = t;
-GnRH.Y = y0(end-2);
+GnRH.Y = y0(end-nnfe+15);
 
 %GnRH Concentration
 GnRHRezA.Time = t;
-GnRHRezA.Y = y0(end-5);
+GnRHRezA.Y = y0(end-nnfe+12);
 
 %GnRH Concentration
 FSHmed.Time = t;
-FSHmed.Y = y0(end);
+FSHmed.Y = y0(end-nnfe+17);
 
 %Yall
 solutions.Time = t;
@@ -106,7 +107,7 @@ while (t<te)
     %follicles recruitment depending on FSH concentration in the system ->
     %FSH window idea
     %HIER MUSS MED FSH WIEDER DAZU
-    fshAll = y0(end-10)+y0(end);
+    fshAll = y0(end-nnfe+7)+y0(end-nnfe+17);
     fshimp = fshAll^Par(32)/(fshAll^Par(32) + Par(33)^Par(32));
     timevec=poissonproc(poissonDistributionParameters.lambda+6*poissonDistributionParameters.lambda*fshimp,[t,te]);
 
@@ -119,7 +120,7 @@ while (t<te)
     end
 
     %determine number of follicles
-    NumFollicles=size(y0,1)-technicalParameters.numNonFollicleEq;
+    NumFollicles=size(y0,1)-nnfe;
 
     %set mass matrix for DAE system
     n=length(y0);
@@ -222,28 +223,28 @@ while (t<te)
 
     %save values for E2
     E2.Time = [E2.Time; T(2:end)];
-    E2.Y = [E2.Y; Y(2:end,end-16)];
+    E2.Y = [E2.Y; Y(2:end,end-nnfe+1)];
     %save values for P4
     P4.Time = [P4.Time; T(2:end)];
-    P4.Y = [P4.Y; Y(2:end,end-15)];
+    P4.Y = [P4.Y; Y(2:end,end-nnfe+2)];
     %save values for LH
     LH.Time = [LH.Time; T(2:end)];
-    LH.Y = [LH.Y; Y(2:end,end-8)];
+    LH.Y = [LH.Y; Y(2:end,end-nnfe+9)];
     %save values for FSH
     FSH.Time = [FSH.Time; T(2:end)];
-    FSH.Y = [FSH.Y; Y(2:end,end-10)];
+    FSH.Y = [FSH.Y; Y(2:end,end-nnfe+7)];
     %save values for FSH REzeptor
     FSHRez.Time = [FSHRez.Time; T(2:end)];
-    FSHRez.Y = [FSHRez.Y; Y(2:end,end-14)];
+    FSHRez.Y = [FSHRez.Y; Y(2:end,end-nnfe+3)];
     %save values for GnRH
     GnRH.Time = [GnRH.Time; T(2:end)];
-    GnRH.Y = [GnRH.Y; Y(2:end,end-2)];
+    GnRH.Y = [GnRH.Y; Y(2:end,end-nnfe+15)];
     %GnRH Concentration
     GnRHRezA.Time = [GnRHRezA.Time; T(2:end)];
-    GnRHRezA.Y = [GnRHRezA.Y; Y(2:end,end-5)];
+    GnRHRezA.Y = [GnRHRezA.Y; Y(2:end,end-nnfe+12)];
     %save values for GnRH
     FSHmed.Time = [FSHmed.Time; T(2:end)];
-    FSHmed.Y = [FSHmed.Y; Y(2:end,end)];
+    FSHmed.Y = [FSHmed.Y; Y(2:end,end-nnfe+17)];
     %save solutions
     solutions.Time = [solutions.Time; T(2:end)];
     solutions.Y = [solutions.Y; Y(2:end,NumFollicles+1:end)];
@@ -261,13 +262,13 @@ while (t<te)
         Follicles.ActiveFSHS = [Follicles.ActiveFSHS Follicle1.FSHSensitivity];
         %Test if Follicle(s) could survive
         %(slope of growth-function positive or negative)
-        testyvalues = LastYValues(1:(end-technicalParameters.numNonFollicleEq));
-        testyvalues = [testyvalues; Follicle1.Y; LastYValues(end+1-technicalParameters.numNonFollicleEq:end)];
+        testyvalues = LastYValues(1:(end-nnfe));
+        testyvalues = [testyvalues; Follicle1.Y; LastYValues(end+1-nnfe:end)];
         technicalParameters.shouldTest = 1;
         testyslope = FollicleFunction(T(end),testyvalues,Tovu,Follicles,technicalParameters,follicleParameters,Par,dd1,simulationSettings,firstExtraction);
         %if follicle got chance to survive->initiate new follicle and update
         %follicles-vector
-        if( testyslope(end-technicalParameters.numNonFollicleEq) > 0 )
+        if( testyslope(end-nnfe) > 0 )
             Follicle1.Time = [ T(end) ];
             Follicle1.TimeDecrease = 0;
             Follicle1.Destiny = -1;
@@ -320,7 +321,7 @@ while (t<te)
         end
 
         %follicle is big, but doesn't ovulate yet because there is not enough LH
-        if(yCurFoll >= (follicleParameters.minOvulationSize)) && (Y(end,end-8) < follicleParameters.cLHForOvulation && ...
+        if(yCurFoll >= (follicleParameters.minOvulationSize)) && (Y(end,end-nnfe+9) < follicleParameters.cLHForOvulation && ...
            Follicles.Follicle{Follicles.Active(i)}.Destiny == -1)
                Follicles.Follicle{Follicles.Active(i)}.Destiny = 3;
                Follicles.Follicle{Follicles.Active(i)}.TimeDecrease=t;
@@ -337,7 +338,7 @@ while (t<te)
        % end
 
         %if LH high enough dominant follicle rest until ovulation shortly after LH peak
-        if Y(end,end-8) >= follicleParameters.cLHForOvulation
+        if Y(end,end-nnfe+9) >= follicleParameters.cLHForOvulation
             if (yCurFoll >= follicleParameters.minOvulationSize) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==-1) ||...
                (yCurFoll >= follicleParameters.minOvulationSize) && (Follicles.Follicle{Follicles.Active(i)}.Destiny==3)
                 th = t-0.5;
@@ -410,7 +411,7 @@ while (t<te)
         y0old = [y0old Follicles.Follicle{Follicles.Active(i)}.Y(end)];
     end
     y0old = y0old';
-    y0 = [y0old;LastYValues(end+1-technicalParameters.numNonFollicleEq:end)];
+    y0 = [y0old;LastYValues(end+1-nnfe:end)];
 
     %integration end reached
     t = T(end);
@@ -479,8 +480,9 @@ end
 NumFollicles
 
 %plotting
+figureCounter = 1;
 if(simulationSettings.showPlots)
-    figure(1);
+    figure(figureCounter);
     clf;
     widthofline = 2;
     hold on;
@@ -538,23 +540,27 @@ rest = n - a;
 CycleInfo = [[0 Cyclelength]; [rest FollperCycle]; OvuT];
 
 if(simulationSettings.showPlots)
-   %fsh
-    hfsh = plot(FSH.Time,FSH.Y,'Color',[1/2 1 1/2],...
-         'DisplayName','x1','LineWidth', widthofline);
+    %temperature
+    temp = plot(solutions.Time,solutions.Y(:,end-nnfe+18),'Color',[1/2 1/2 1/2], ...
+        'DisplayName','x1','LineWidth', widthofline);
 
-   %LH
-   hLH = plot(LH.Time,LH.Y,'Color',[1 1/4 1/2],...
-         'DisplayName','x1','LineWidth', widthofline);
+    %fsh
+    hfsh = plot(FSH.Time,FSH.Y,'Color',[1/2 1 1/2], ...
+        'DisplayName','x1','LineWidth', widthofline);
 
-   %P4
-    hp4 = plot(P4.Time,P4.Y,'Color',[1 0 1],...
-             'DisplayName','x1','LineWidth', widthofline);
+    %LH
+    hLH = plot(LH.Time,LH.Y,'Color',[1 1/4 1/2], ...
+        'DisplayName','x1','LineWidth', widthofline);
+
+    %P4
+    hp4 = plot(P4.Time,P4.Y,'Color',[1 0 1], ...
+        'DisplayName','x1','LineWidth', widthofline);
 
     %threshold when you can measure the follicle size
     hTwo=plot(xlim,[4 4],'Color','r');
 
     %plot for the follicle size, amount of FSH and amount of P4
-    h=[h hfsh hTwo hp4 hLH];
+    h=[h temp hfsh hTwo hp4 hLH];
     xlabel('time in d','fontsize',15);
     ylabel('follicle diameter in mm','fontsize',15);
     ylim([0 50])
@@ -563,22 +569,38 @@ if(simulationSettings.showPlots)
     set(ax, 'Box', 'off' );
     ax.FontSize = 15;
     set(gca,'linewidth',1.5);
-    legend(h,{'follicle growth','FSH','measurable','P4', 'LH'},'fontsize',15,...
-        'Location','NorthEast');%,'ovulation');
+    legend(h,{'follicle growth','temperature','FSH','measurable','P4', 'LH'},'fontsize',15,...
+        'Location','NorthEastOutside');%,'ovulation');
+    
+    %temperature plot
+    figureCounter = figureCounter+1;
+    figure(figureCounter);
+    temperatureVec = solutions.Y(:,end-nnfe+18);
+    plot(solutions.Time,temperatureVec,'Color',[1/2 1/2 1/2], ...
+        'DisplayName','x1','LineWidth', widthofline);
+    xlabel('time in d','fontsize',15);
+    ylabel('temperature in centigrades','fontsize',15);
+    ylim([min(temperatureVec)-0.5 max(temperatureVec)+0.5])
 
-    figure(2);
+    %P4 FSH plot
+    figureCounter = figureCounter+1;
+    figure(figureCounter);
     plot(P4.Time,P4.Y, FSH.Time,FSH.Y,'LineWidth',2);
     set(gca,'fontsize',24);
     legend({'P4','FSH'},'fontsize',24,...
         'Location','NorthEastOutside');
 
-    figure(3);
+    %E2 LH plot
+    figureCounter = figureCounter+1;
+    figure(figureCounter);
     plot(E2.Time,E2.Y, LH.Time, LH.Y, 'LineWidth',2);
     set(gca,'fontsize',24);
     legend({'E2', 'LH'},'fontsize',24,...
         'Location','NorthEastOutside');
 
-    figure(4);
+    %GnRH plot
+    figureCounter = figureCounter+1;
+    figure(figureCounter);
     plot(GnRH.Time,GnRH.Y, 'LineWidth',2);
     set(gca,'fontsize',24);
     legend({'GnRH'},'fontsize',24,...
@@ -593,7 +615,8 @@ if(simulationSettings.showPlots)
     Data=importdata(file,delimiterIn,headerlinesIn);
     ID = unique(Data(:,end));
 
-    figure(5)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     hold on
     for i = 1:length(ID)
     Data_LH = [];
@@ -617,7 +640,8 @@ if(simulationSettings.showPlots)
             hold on
     end
 
-    figure(6)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     hold on
     for i = 1:length(ID)
     H = [];
@@ -641,7 +665,8 @@ if(simulationSettings.showPlots)
             hold on
     end
 
-    figure(7)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     hold on
     for i = 1:length(ID)
     H = [];
@@ -665,7 +690,8 @@ if(simulationSettings.showPlots)
             hold on
     end
 
-    figure(8)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     hold on
     for i = 1:length(ID)
     H = [];
@@ -698,10 +724,12 @@ if(simulationSettings.showPlots)
           freq = [freq yGfreq];
     end
 
-    figure(9)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     plot(E2.Time, freq)
 
-    figure(10)
+    figureCounter = figureCounter+1;
+    figure(figureCounter)
     plot(FSHRez.Time, FSHRez.Y)
 
 end
@@ -838,7 +866,8 @@ if (simulationSettings.savePlotStuff)
 
     FileName = sprintf('%s_%d.csv','Time',runind);
     fullFileName = fullfile(DirStuff, FileName);
-    csvwrite(fullFileName,E2.Time)
+    dlmwrite(fullFileName, E2.Time, 'delimiter', ',', 'precision', 9);
+    %csvwrite(fullFileName,solutions.Time)
 
     FileName = sprintf('%s_%d.csv','OvulationInfo',runind');
     fullFileName = fullfile(DirStuff, FileName);

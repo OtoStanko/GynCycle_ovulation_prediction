@@ -5,6 +5,7 @@ from plotly.subplots import make_subplots
 
 from custom_losses import Peak_loss
 from ovulation_predicting.models.models import FeedBack, WideCNN, ClassificationMLP
+from ovulation_predicting.supporting_scripts import show_plot
 from preprocessing_functions import *
 
 TRAIN_DATA_SUFFIX = '1_n'
@@ -53,7 +54,7 @@ plt.scatter(df.index[peaks], df[hormone].iloc[peaks],
             color='red', zorder=5, label='LH Peaks')
 plt.xlabel('Time [hours]')
 plt.title('Test {} data'.format(hormone))
-plt.show()
+show_plot()
 
 
 window_size = INPUT_LENGTH + OUTPUT_LENGTH

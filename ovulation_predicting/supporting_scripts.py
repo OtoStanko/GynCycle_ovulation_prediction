@@ -4,6 +4,29 @@ from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
 
 
+def show_plot(block: bool = False, refresh: bool = True):
+    """
+    Show matplotlib plots in a PyCharm Community-friendly way.
+
+    Parameters
+    ----------
+    block : bool, default False
+        If True, the script will stop until you close the window (like plt.show()).
+        If False, plots update live and script continues.
+    refresh : bool, default True
+        If True, forces a GUI refresh so figures appear immediately.
+    """
+    plt.figure()
+    if refresh:
+        plt.draw()
+        plt.pause(0.001)  # process GUI events
+
+    if block:
+        plt.ioff()
+        plt.show()
+    else:
+        plt.ion()
+
 def sin_function(x, b, c):
     """
     Sine function in form: 0.05 * sin( (x-b) * (2*pi/(c*24)) ) + 0.05
@@ -31,7 +54,7 @@ def fit_sin_curve(train_df, feature, val_df, test_df, original_df):
     plt.plot(x_fit, y_fit, label='Fitted Curve', color='orange')
     plt.title('Sampled dataframe with raw hours with fitted sin curve')
     plt.ylabel('Time in hours')
-    plt.show()
+    show_plot()
 
 
 def fit_curve(x, y, fun, a=1, b=1, c=1):
@@ -139,4 +162,4 @@ def print_ts(x, y, x_label, y_label, title):
     plt.ylabel(y_label)
     plt.xlabel(x_label)
     plt.title(title)
-    plt.show()
+    show_plot()

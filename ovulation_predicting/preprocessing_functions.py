@@ -85,11 +85,11 @@ def normalize_df(df, method='standard', values=None):
     :param method:  'standard' for standardization,
                     'minmax' for minmax normalization,
                     'own' for 'standardization' with given values
-    :param values: a dict of form {feature, (a, b)}, where feature is a feature from the df and a,b depends on the method.
-    for standardization, if specified, a is mean and b is std to be used. If not specified, both will be calculated
-    for each feature separately. For minmax, a is the lower bound of the interval and b is the upper bound of the interval.
-    If not specified, a=0, b=1. For own method, a and b must be specified. The behaviour is technically the same as in the standardization.
-    a is subtracted and the result is divided by b. But the a and b doesn't have to be mean and std, so to avoid confusion of author and others,
+    :param values: a dict of form {feature, (`a`, `b`)}, where feature is a feature from the df and `a`,`b` depends on the method.
+    for standardization, if specified, `a` is mean and `b` is std to be used. If not specified, both will be calculated
+    for each feature separately. For minmax, `a` is the lower bound of the interval and `b` is the upper bound of the interval.
+    If not specified, `a=0`, `b=1`. For own method, `a` and `b` must be specified. The behaviour is technically the same as in the standardization.
+    `a` is subtracted and the result is divided by `b`. But the `a` and `b` doesn't have to be mean and std, so to avoid confusion of author and others,
     we have included it as a separate method of normalization.
     :return: normalized df
     """

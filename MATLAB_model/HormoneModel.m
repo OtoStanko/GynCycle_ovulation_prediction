@@ -1,4 +1,4 @@
-function dy = HormoneModel(t,y,Par)
+function dy = HormoneModel(t,y,Par, nnfe)
 %
 %-----------------------------------------------------------------------
 %
@@ -7,27 +7,28 @@ dy=zeros(r,c);
 %
 %-----------------------------------------------------------------------
 %
-i_FSH_med  = r;
-i_LH_med   = r-1;
+i_temp     = r-nnfe+18;
+i_FSH_med  = r-nnfe+17;
+i_LH_med   = r-nnfe+16;
 
-i_GnRH     =  r-2;
-i_RecGa    =  r-3;
-i_RecGi    =  r-4;
-i_GReca    =  r-5;
-i_GReci    =  r-6; 
+i_GnRH     =  r-nnfe+15;
+i_RecGa    =  r-nnfe+14;
+i_RecGi    =  r-nnfe+13;
+i_GReca    =  r-nnfe+12;
+i_GReci    =  r-nnfe+11; 
 
-i_RP_LH    =  r-7;
-i_LH       =  r-8;
+i_RP_LH    =  r-nnfe+10;
+i_LH       =  r-nnfe+9;
 
-i_RP_FSH   =  r-9;
-i_FSH      =  r-10;
-i_FSHfoll  =  r-11;
-i_RFSH     =  r-12;
-i_RFSH_des =  r-13;
-i_FSHR     =  r-14;
+i_RP_FSH   =  r-nnfe+8;
+i_FSH      =  r-nnfe+7;
+i_FSHfoll  =  r-nnfe+6;
+i_RFSH     =  r-nnfe+5;
+i_RFSH_des =  r-nnfe+4;
+i_FSHR     =  r-nnfe+3;
 
-i_P4       =  r-15;
-i_E2       =  r-16;
+i_P4       =  r-nnfe+2;
+i_E2       =  r-nnfe+1;
 %
 %-----------------------------------------------------------------------
 %
@@ -52,10 +53,10 @@ i_E2       =  r-16;
 %
 %%%active GnRH receptor
 %
-  dy(i_RecGa) =   Par(12) * y(i_GReca) ...
+  dy(i_RecGa) =  Par(12) * y(i_GReca) ...
                - Par(11) * y(i_GnRH) * y(i_RecGa) ...  
                - Par(14) * y(i_RecGa) ...
-                + Par(15) * y(i_RecGi);
+               + Par(15) * y(i_RecGi);
 %
 %%%inactive GnRH receptor	 
 %
